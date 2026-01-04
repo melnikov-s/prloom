@@ -5,6 +5,7 @@ import { getAdapter, type AgentName } from "../lib/adapters/index.js";
 import { generatePlanSkeleton } from "../lib/plan.js";
 import { renderDesignerPrompt } from "../lib/template.js";
 import { ensureInboxDir, getInboxPath } from "../lib/state.js";
+import { getCurrentBranch, ensureRemoteBranchExists } from "../lib/git.js";
 
 export async function runNew(
   repoRoot: string,
@@ -27,6 +28,21 @@ export async function runNew(
 
   const adapter = getAdapter(designerAgent);
 
+  // Determine base branch for this plan (current branch)
+  const baseBranch = await getCurrentBranch(repoRoot);
+  if (!baseBranch) {
+    console.error("Cannot create plan on detached HEAD.");
+    console.error("Check out a branch and rerun `swarm new`. ");
+    process.exit(1);
+  }
+
+  try {
+    await ensureRemoteBranchExists(repoRoot, baseBranch);
+  } catch (error) {
+    console.error(String(error));
+    process.exit(1);
+  }
+
   // Generate plan ID if not provided
   const id = planId ?? `plan-${Date.now()}`;
   const planPath = getInboxPath(repoRoot, id);
@@ -39,10 +55,11 @@ export async function runNew(
   }
 
   // Create plan skeleton with deterministic frontmatter
-  const skeleton = generatePlanSkeleton(id, workerAgent);
+  const skeleton = generatePlanSkeleton(id, workerAgent, baseBranch);
   writeFileSync(planPath, skeleton);
 
   console.log(`Created plan in inbox: ${planPath}`);
+  console.log(`Base branch: ${baseBranch}`);
   console.log(`Worker agent: ${workerAgent}`);
   console.log(`Designer agent: ${designerAgent}`);
   console.log("");

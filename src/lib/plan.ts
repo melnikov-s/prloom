@@ -10,6 +10,7 @@ export interface PlanFrontmatter {
   agent?: AgentName;
   branch?: string;
   pr?: number;
+  base_branch?: string;
 }
 
 export interface TodoItem {
@@ -38,6 +39,7 @@ export function parsePlan(path: string): Plan {
     agent: parseAgentField(data.agent),
     branch: data.branch,
     pr: data.pr,
+    base_branch: typeof data.base_branch === "string" ? data.base_branch : undefined,
   };
 
   // Extract sections
@@ -132,7 +134,11 @@ export function extractBody(plan: Plan): string {
  * Generate a plan skeleton with deterministic frontmatter.
  * The designer agent will fill in the content sections.
  */
-export function generatePlanSkeleton(id: string, agent?: AgentName): string {
+export function generatePlanSkeleton(
+  id: string,
+  agent?: AgentName,
+  baseBranch?: string
+): string {
   const frontmatter: Record<string, string> = {
     id,
     status: "queued",
@@ -140,6 +146,10 @@ export function generatePlanSkeleton(id: string, agent?: AgentName): string {
 
   if (agent) {
     frontmatter.agent = agent;
+  }
+
+  if (baseBranch) {
+    frontmatter.base_branch = baseBranch;
   }
 
   const content = `

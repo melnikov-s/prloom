@@ -18,6 +18,7 @@ test("loadConfig returns defaults when no config file exists", () => {
 
   expect(config.worktrees_dir).toBe(".swarm/worktrees");
   expect(config.poll_interval_ms).toBe(60000);
+  expect(config.base_branch).toBe("main");
 });
 
 test("loadConfig reads values from swarm.config.json", () => {
@@ -26,6 +27,7 @@ test("loadConfig reads values from swarm.config.json", () => {
     JSON.stringify({
       worktrees_dir: "/custom/path",
       poll_interval_ms: 10000,
+      base_branch: "develop",
     })
   );
 
@@ -33,18 +35,20 @@ test("loadConfig reads values from swarm.config.json", () => {
 
   expect(config.worktrees_dir).toBe("/custom/path");
   expect(config.poll_interval_ms).toBe(10000);
+  expect(config.base_branch).toBe("develop");
 });
 
 test("loadConfig uses defaults for missing fields", () => {
   writeFileSync(
     join(TEST_DIR, "swarm.config.json"),
-    JSON.stringify({ worktrees_dir: "/custom" })
+    JSON.stringify({ worktrees_dir: "/custom", base_branch: "develop" })
   );
 
   const config = loadConfig(TEST_DIR);
 
   expect(config.worktrees_dir).toBe("/custom");
   expect(config.poll_interval_ms).toBe(60000); // default
+  expect(config.base_branch).toBe("develop");
 });
 
 test("resolveWorktreesDir resolves relative path", () => {
@@ -52,6 +56,7 @@ test("resolveWorktreesDir resolves relative path", () => {
     agents: { default: "opencode" as const },
     worktrees_dir: "../worktrees",
     poll_interval_ms: 60000,
+    base_branch: "main",
   };
   const resolved = resolveWorktreesDir("/repo/root", config);
 
@@ -73,6 +78,7 @@ test("loadConfig reads agents from config file", () => {
         default: "claude",
         designer: "codex",
       },
+      base_branch: "develop",
     })
   );
 
@@ -90,6 +96,7 @@ test("loadConfig ignores invalid agent names", () => {
         default: "invalid-agent",
         designer: "codex",
       },
+      base_branch: "develop",
     })
   );
 

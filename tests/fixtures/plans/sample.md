@@ -1,6 +1,7 @@
 ---
 id: sample
 status: queued
+base_branch: develop
 ---
 
 ## Objective

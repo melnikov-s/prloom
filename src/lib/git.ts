@@ -25,7 +25,9 @@ export async function createBranchName(planId: string): Promise<string> {
 export async function createWorktree(
   repoRoot: string,
   worktreesDir: string,
-  branch: string
+  branch: string,
+  baseBranch: string,
+  remoteName: string = "origin"
 ): Promise<string> {
   const worktreePath = join(worktreesDir, branch);
 
@@ -33,10 +35,24 @@ export async function createWorktree(
     mkdirSync(worktreesDir, { recursive: true });
   }
 
-  // Create branch and worktree
-  await execa("git", ["worktree", "add", "-b", branch, worktreePath], {
-    cwd: repoRoot,
-  });
+  // Ensure the base branch exists on the remote and is up-to-date.
+  await execa("git", ["fetch", remoteName, baseBranch], { cwd: repoRoot });
+
+  // Create branch from remote base branch and add worktree.
+  await execa(
+    "git",
+    [
+      "worktree",
+      "add",
+      "-b",
+      branch,
+      worktreePath,
+      `${remoteName}/${baseBranch}`,
+    ],
+    {
+      cwd: repoRoot,
+    }
+  );
 
   return worktreePath;
 }
@@ -74,12 +90,13 @@ export async function push(
 
 export async function hasCommits(
   repoRoot: string,
+  baseBranch: string,
   branch: string
 ): Promise<boolean> {
   try {
     const { stdout } = await execa(
       "git",
-      ["log", "--oneline", `main..${branch}`, "-1"],
+      ["log", "--oneline", `${baseBranch}..${branch}`, "-1"],
       { cwd: repoRoot }
     );
     return stdout.trim().length > 0;
@@ -95,6 +112,31 @@ export async function getCurrentBranch(worktreePath: string): Promise<string> {
   return stdout.trim();
 }
 
+export async function ensureRemoteBranchExists(
+  repoRoot: string,
+  branch: string,
+  remoteName: string = "origin"
+): Promise<void> {
+  if (!branch) {
+    throw new Error("Branch name is required");
+  }
+
+  try {
+    const { stdout } = await execa(
+      "git",
+      ["rev-parse", "--verify", `refs/remotes/${remoteName}/${branch}`],
+      { cwd: repoRoot }
+    );
+    if (stdout.trim()) return;
+  } catch {
+    // ignore
+  }
+
+  throw new Error(
+    `Remote branch not found: ${remoteName}/${branch}. Push it first (git push -u ${remoteName} ${branch}).`
+  );
+}
+
 // Rebase and force push
 
 export interface RebaseResult {
@@ -103,9 +145,9 @@ export interface RebaseResult {
   conflictFiles?: string[];
 }
 
-export async function rebaseOnMain(
+export async function rebaseOnBaseBranch(
   worktreePath: string,
-  baseBranch: string = "main"
+  baseBranch: string
 ): Promise<RebaseResult> {
   try {
     // Fetch latest from origin

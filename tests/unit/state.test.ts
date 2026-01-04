@@ -33,14 +33,14 @@ test("saveState and loadState round-trip", () => {
   const state: State = {
     control_cursor: 100,
     plans: {
-      "test-plan": {
-        sessionId: "abc123",
-        worktree: "/path/to/worktree",
-        branch: "test-plan-xyz",
-        paused: false,
-        planRelpath: "plans/test-plan.md",
-        baseBranch: "main",
-      },
+        "test-plan": {
+          sessionId: "abc123",
+          worktree: "/path/to/worktree",
+          branch: "test-plan-xyz",
+          paused: false,
+          planRelpath: "plans/test-plan.md",
+          baseBranch: "develop",
+        },
     },
   };
 
@@ -87,7 +87,7 @@ test("saveShard and loadShard round-trip", () => {
     branch: "feat-x",
     paused: true,
     planRelpath: "plans/my-plan.md",
-    baseBranch: "main",
+    baseBranch: "develop",
   };
 
   saveShard(TEST_DIR, "my-plan", ps);

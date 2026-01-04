@@ -75,6 +75,13 @@ test("generatePlanSkeleton includes agent when provided", () => {
   expect(skeleton).toContain("agent: codex");
 });
 
+test("generatePlanSkeleton includes base_branch when provided", () => {
+  const skeleton = generatePlanSkeleton("test-plan", "codex", "release/1.2");
+
+  expect(skeleton).toContain("id: test-plan");
+  expect(skeleton).toContain("base_branch: release/1.2");
+});
+
 test("generatePlanSkeleton omits agent when not provided", () => {
   const skeleton = generatePlanSkeleton("test-plan");
 

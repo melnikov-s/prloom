@@ -11,6 +11,7 @@ export interface Config {
   agents: AgentsConfig;
   worktrees_dir: string;
   poll_interval_ms: number;
+  base_branch: string;
 }
 
 const DEFAULTS: Config = {
@@ -19,6 +20,7 @@ const DEFAULTS: Config = {
   },
   worktrees_dir: ".swarm/worktrees",
   poll_interval_ms: 60000, // 60 seconds; use `swarm poll <id>` for immediate
+  base_branch: "main",
 };
 
 export function loadConfig(repoRoot: string): Config {
@@ -43,6 +45,10 @@ export function loadConfig(repoRoot: string): Config {
       agents,
       worktrees_dir: parsed.worktrees_dir ?? DEFAULTS.worktrees_dir,
       poll_interval_ms: parsed.poll_interval_ms ?? DEFAULTS.poll_interval_ms,
+      base_branch:
+        typeof parsed.base_branch === "string" && parsed.base_branch.trim()
+          ? parsed.base_branch
+          : DEFAULTS.base_branch,
     };
   } catch {
     return { ...DEFAULTS };

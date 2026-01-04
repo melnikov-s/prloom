@@ -16,7 +16,7 @@ You write a plan (a Markdown checklist), `swarm` turns it into a dedicated git w
 
 ## Requirements
 
-- Bun
+- Node.js (for running via `npx`)
 - Git
 - GitHub CLI (`gh`) authenticated for the repo
 - At least one supported agent CLI installed:
@@ -26,13 +26,27 @@ You write a plan (a Markdown checklist), `swarm` turns it into a dedicated git w
 
 ## Install
 
+For end-users, prefer `npx` (see Usage).
+
+For local development:
+
 ```bash
 bun install
 ```
 
 ## Usage
 
-Run commands via:
+### NPX (recommended)
+
+In your target repository:
+
+```bash
+npx -y simple-swarm init
+npx -y simple-swarm new my-feature
+npx -y simple-swarm start
+```
+
+### Local dev
 
 ```bash
 bun run dev <command>
@@ -47,6 +61,8 @@ bun run build
 
 ### Commands
 
+- `swarm init`
+  - Initializes `.swarm/`, ensures `.swarm/` is gitignored, and writes `swarm.config.json`.
 - `swarm new [plan-id] [--agent <codex|opencode|claude>]`
   - Creates `.swarm/inbox/<id>.md` and launches an interactive designer session.
 - `swarm start`
@@ -66,10 +82,12 @@ bun run build
 
 ## Basic Workflow
 
-1. Create a plan:
-   - `bun run dev new my-feature`
-2. Start the dispatcher:
-   - `bun run dev start`
+1. Initialize swarm:
+   - `npx -y simple-swarm init`
+2. Create a plan:
+   - `npx -y simple-swarm new my-feature`
+3. Start the dispatcher:
+   - `npx -y simple-swarm start`
 3. Review the draft PR in GitHub.
 4. Leave PR comments or a review; `swarm` triages feedback into TODOs.
 5. When the PR is ready, merge it.
@@ -85,11 +103,12 @@ Create `swarm.config.json` in the repo root:
     "designer": "codex"
   },
   "worktrees_dir": ".swarm/worktrees",
-  "poll_interval_ms": 60000
+  "poll_interval_ms": 60000,
+  "base_branch": "main"
 }
 ```
 
 ## Notes
 
 - Runtime state is stored under `.swarm/` (gitignored).
-- The plan file is committed on the PR branch at `plans/<id>.md` and lands on `main` only when you merge the PR.
+- The plan file is committed on the PR branch at `plans/<id>.md` and lands on the configured `base_branch` only when you merge the PR.

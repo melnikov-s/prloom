@@ -1,6 +1,6 @@
 import { join } from "path";
 import { existsSync, statSync } from "fs";
-import { loadConfig, resolveWorktreesDir } from "./config.js";
+import { loadConfig, resolveWorktreesDir, type Config } from "./config.js";
 import {
   loadState,
   saveState,
@@ -26,7 +26,7 @@ import {
   push,
   copyFileToWorktree,
   ensureWorktreeSwarmDir,
-  rebaseOnMain,
+  rebaseOnBaseBranch,
   forcePush,
 } from "./git.js";
 import {
@@ -89,7 +89,7 @@ export async function runDispatcher(repoRoot: string): Promise<void> {
       }
 
       // 2. Ingest inbox plans
-      await ingestInboxPlans(repoRoot, worktreesDir, state);
+      await ingestInboxPlans(repoRoot, worktreesDir, config, state);
 
       // 3. Process active plans from state
       await processActivePlans(repoRoot, config, state, botLogin);
@@ -106,6 +106,7 @@ export async function runDispatcher(repoRoot: string): Promise<void> {
 async function ingestInboxPlans(
   repoRoot: string,
   worktreesDir: string,
+  config: Config,
   state: State
 ): Promise<void> {
   const inboxPlanIds = listInboxPlanIds(repoRoot);
@@ -126,9 +127,17 @@ async function ingestInboxPlans(
 
       console.log(`📥 Ingesting inbox plan: ${planId}`);
 
+      // Determine base branch for this plan
+      const baseBranch = plan.frontmatter.base_branch ?? config.base_branch;
+
       // Create branch and worktree
       const branch = await createBranchName(planId);
-      const worktreePath = await createWorktree(repoRoot, worktreesDir, branch);
+      const worktreePath = await createWorktree(
+        repoRoot,
+        worktreesDir,
+        branch,
+        baseBranch
+      );
       const planRelpath = `plans/${planId}.md`;
 
       // Copy plan to worktree
@@ -147,6 +156,7 @@ async function ingestInboxPlans(
       const pr = await createDraftPR(
         repoRoot,
         branch,
+        baseBranch,
         planId,
         extractBody(updatedPlan)
       );
@@ -158,7 +168,7 @@ async function ingestInboxPlans(
         pr,
         paused: false,
         planRelpath,
-        baseBranch: "main",
+        baseBranch,
       };
 
       // Delete inbox plan (not archive)
@@ -198,7 +208,7 @@ export function getFeedbackPollDecision(opts: {
 
 async function processActivePlans(
   repoRoot: string,
-  config: ReturnType<typeof loadConfig>,
+  config: Config,
   state: State,
   botLogin: string
 ): Promise<void> {
@@ -356,7 +366,7 @@ async function pollNewFeedback(
 
 async function runTriage(
   repoRoot: string,
-  config: ReturnType<typeof loadConfig>,
+  config: Config,
   ps: PlanState,
   plan: ReturnType<typeof parsePlan>,
   feedback: PRFeedback[]
@@ -375,11 +385,10 @@ async function runTriage(
   try {
     const result = readTriageResultFile(ps.worktree);
 
-
     // Handle rebase request
     if (result.rebase_requested) {
       console.log(`  Rebase requested, rebasing on ${ps.baseBranch}...`);
-      const rebaseResult = await rebaseOnMain(ps.worktree, ps.baseBranch);
+      const rebaseResult = await rebaseOnBaseBranch(ps.worktree, ps.baseBranch);
 
       if (rebaseResult.hasConflicts) {
         const planPath = join(ps.worktree, ps.planRelpath);

@@ -3,12 +3,21 @@
   "version": "0.1.0",
   "type": "module",
   "bin": {
-    "swarm": "./dist/cli/index.js"
+    "swarm": "./dist/cli/index.js",
+    "simple-swarm": "./dist/cli/index.js"
   },
+  "files": [
+    "dist/**/*",
+    "README.md",
+    "LICENSE",
+    "prompts/**/*"
+  ],
   "scripts": {
-    "build": "bun build src/cli/index.ts --outdir dist/cli --target node",
-    "dev": "bun run src/cli/index.ts",
-    "test": "bun test"
+    "gen:prompts": "bun run scripts/generate_prompts.ts",
+    "build": "bun run gen:prompts && bun build src/cli/index.ts --outdir dist/cli --target node",
+    "dev": "bun run gen:prompts && bun run src/cli/index.ts",
+    "test": "bun run gen:prompts && bun test",
+    "prepack": "bun run build"
   },
   "devDependencies": {
     "@types/bun": "latest",

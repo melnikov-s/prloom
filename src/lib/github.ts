@@ -3,6 +3,7 @@ import { execa } from "execa";
 export async function createDraftPR(
   repoRoot: string,
   branch: string,
+  baseBranch: string,
   title: string,
   body: string
 ): Promise<number> {
@@ -18,6 +19,8 @@ export async function createDraftPR(
       body,
       "--head",
       branch,
+      "--base",
+      baseBranch,
     ],
     { cwd: repoRoot }
   );

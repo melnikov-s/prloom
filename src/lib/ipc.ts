@@ -1,5 +1,11 @@
 import { join } from "path";
-import { existsSync, readFileSync, appendFileSync, statSync } from "fs";
+import {
+  existsSync,
+  readFileSync,
+  appendFileSync,
+  statSync,
+  mkdirSync,
+} from "fs";
 
 export interface IpcCommand {
   type: "stop" | "unpause" | "poll" | "launch_poll";
@@ -14,6 +20,11 @@ function getControlPath(repoRoot: string): string {
 }
 
 export function enqueue(repoRoot: string, cmd: Omit<IpcCommand, "ts">): void {
+  const swarmDir = join(repoRoot, ".swarm");
+  if (!existsSync(swarmDir)) {
+    mkdirSync(swarmDir, { recursive: true });
+  }
+
   const path = getControlPath(repoRoot);
   const line = JSON.stringify({ ...cmd, ts: new Date().toISOString() }) + "\n";
   appendFileSync(path, line);
@@ -34,8 +45,6 @@ export function consume(
     return { commands: [], newCursor: cursor };
   }
 
-  const buffer = Buffer.alloc(stat.size - cursor);
-  const fd = Bun.file(path);
   const content = readFileSync(path, "utf-8").slice(cursor);
 
   const lines = content.split("\n").filter((line) => line.trim());

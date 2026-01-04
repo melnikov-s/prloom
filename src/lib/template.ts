@@ -3,13 +3,14 @@ import { readFileSync, existsSync, unlinkSync } from "fs";
 import { join } from "path";
 import type { Plan, TodoItem } from "./plan.js";
 import type { PRFeedback } from "./github.js";
+import { BUILTIN_PROMPTS, type PromptName } from "./prompt_sources.js";
 
-function loadTemplate(repoRoot: string, name: string): string {
-  const templatePath = join(repoRoot, "prompts", `${name}.md`);
-  if (!existsSync(templatePath)) {
-    throw new Error(`Prompt template not found: ${templatePath}`);
-  }
-  return readFileSync(templatePath, "utf-8");
+// Prompts are bundled into the CLI.
+// They are stored as individual files in this repo under `prompts/`, but read
+// and embedded at build time via `src/lib/prompt_sources.ts`.
+
+function loadTemplate(_repoRoot: string, name: PromptName): string {
+  return BUILTIN_PROMPTS[name];
 }
 
 export function renderWorkerPrompt(
