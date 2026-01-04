@@ -1,22 +1,23 @@
 import Handlebars from "handlebars";
-import { readFileSync, existsSync } from "fs";
+import { readFileSync, existsSync, unlinkSync } from "fs";
 import { join } from "path";
 import type { Plan, TodoItem } from "./plan.js";
+import type { PRFeedback } from "./github.js";
+
+function loadTemplate(repoRoot: string, name: string): string {
+  const templatePath = join(repoRoot, "prompts", `${name}.md`);
+  if (!existsSync(templatePath)) {
+    throw new Error(`Prompt template not found: ${templatePath}`);
+  }
+  return readFileSync(templatePath, "utf-8");
+}
 
 export function renderWorkerPrompt(
   repoRoot: string,
   plan: Plan,
   todo: TodoItem
 ): string {
-  const templatePath = join(repoRoot, "prompts", "worker.md");
-
-  let template: string;
-  if (existsSync(templatePath)) {
-    template = readFileSync(templatePath, "utf-8");
-  } else {
-    template = DEFAULT_WORKER_TEMPLATE;
-  }
-
+  const template = loadTemplate(repoRoot, "worker");
   const compiled = Handlebars.compile(template);
   return compiled({
     current_todo: `TODO #${todo.index}: ${todo.text}`,
@@ -28,63 +29,69 @@ export function renderDesignerPrompt(
   repoRoot: string,
   existingPlan?: string
 ): string {
-  const templatePath = join(repoRoot, "prompts", "designer.md");
-
-  let template: string;
-  if (existsSync(templatePath)) {
-    template = readFileSync(templatePath, "utf-8");
-  } else {
-    template = DEFAULT_DESIGNER_TEMPLATE;
-  }
-
+  const template = loadTemplate(repoRoot, "designer");
   const compiled = Handlebars.compile(template);
   return compiled({
     existing_plan: existingPlan ?? "",
   });
 }
 
-const DEFAULT_WORKER_TEMPLATE = `# Worker Instructions
+// Triage
 
-You are implementing exactly ONE task from this plan.
+export interface TriageResult {
+  reply_markdown: string;
+  rebase_requested: boolean;
+}
 
-## Your Task
-{{current_todo}}
+export function renderTriagePrompt(
+  repoRoot: string,
+  plan: Plan,
+  feedback: PRFeedback[]
+): string {
+  const template = loadTemplate(repoRoot, "review_triage");
 
-## Rules
-1. Implement only the specified task
-2. Update the plan file:
-   - Mark the task as [x]
-   - Add a Progress Log entry
-3. Run tests if specified in Context
-4. If stuck, set frontmatter \`status: blocked\`
-5. If this is the final TODO, set frontmatter \`status: done\`
-6. Exit when complete
+  // Format feedback for the prompt
+  const feedbackText = feedback
+    .map((f) => {
+      let entry = `### ${f.type} by @${f.author}\n\n${f.body}`;
+      if (f.path) entry += `\n\n*File: ${f.path}${f.line ? `:${f.line}` : ""}*`;
+      if (f.reviewState) entry += `\n\n*Review: ${f.reviewState}*`;
+      return entry;
+    })
+    .join("\n\n---\n\n");
 
----
+  const compiled = Handlebars.compile(template);
+  return compiled({
+    feedback: feedbackText,
+    plan: plan.raw,
+  });
+}
 
-# Plan
+const TRIAGE_RESULT_FILE = ".swarm/triage-result.json";
 
-{{plan}}
-`;
+export function readTriageResultFile(worktreePath: string): TriageResult {
+  const resultPath = join(worktreePath, TRIAGE_RESULT_FILE);
 
-const DEFAULT_DESIGNER_TEMPLATE = `# Designer Instructions
+  if (!existsSync(resultPath)) {
+    throw new Error("Triage result file not found");
+  }
 
-Help create a plan for a coding task.
+  const raw = readFileSync(resultPath, "utf-8");
+  const result = JSON.parse(raw);
 
-1. Clarify what to build
-2. Discuss implementation approach if needed
-3. Output a plan with:
-   - Clear objective
-   - Inlined context (files, test commands)
-   - TODO checklist (granular, sequential tasks)
+  // Validate required fields
+  if (typeof result.reply_markdown !== "string") {
+    throw new Error("Invalid triage result: missing reply_markdown");
+  }
+  if (typeof result.rebase_requested !== "boolean") {
+    throw new Error("Invalid triage result: missing rebase_requested");
+  }
 
-Save to plans/<id>.md with frontmatter:
-- id: <chosen-id>
-- status: queued
+  // Delete the file after reading
+  unlinkSync(resultPath);
 
-{{#if existing_plan}}
-## Existing Plan to Refine
-
-{{existing_plan}}
-{{/if}}
-`;
+  return {
+    reply_markdown: result.reply_markdown,
+    rebase_requested: result.rebase_requested,
+  };
+}

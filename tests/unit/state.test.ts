@@ -34,11 +34,12 @@ test("saveState and loadState round-trip", () => {
     control_cursor: 100,
     plans: {
       "test-plan": {
-        session_id: "abc123",
+        sessionId: "abc123",
         worktree: "/path/to/worktree",
         branch: "test-plan-xyz",
         paused: false,
-        next_todo: 2,
+        planRelpath: "plans/test-plan.md",
+        baseBranch: "main",
       },
     },
   };
@@ -47,8 +48,8 @@ test("saveState and loadState round-trip", () => {
   const loaded = loadState(TEST_DIR);
 
   expect(loaded.control_cursor).toBe(100);
-  expect(loaded.plans["test-plan"]?.session_id).toBe("abc123");
-  expect(loaded.plans["test-plan"]?.next_todo).toBe(2);
+  expect(loaded.plans["test-plan"]?.sessionId).toBe("abc123");
+  expect(loaded.plans["test-plan"]?.planRelpath).toBe("plans/test-plan.md");
 });
 
 test("acquireLock creates lock file", () => {
@@ -81,17 +82,18 @@ test("releaseLock removes lock file", () => {
 
 test("saveShard and loadShard round-trip", () => {
   const ps: PlanState = {
-    session_id: "sess123",
+    sessionId: "sess123",
     worktree: "/wt",
     branch: "feat-x",
     paused: true,
-    next_todo: 1,
+    planRelpath: "plans/my-plan.md",
+    baseBranch: "main",
   };
 
   saveShard(TEST_DIR, "my-plan", ps);
   const loaded = loadShard(TEST_DIR, "my-plan");
 
-  expect(loaded?.session_id).toBe("sess123");
+  expect(loaded?.sessionId).toBe("sess123");
   expect(loaded?.paused).toBe(true);
 });
 

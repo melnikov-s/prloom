@@ -1,32 +1,60 @@
-import { glob } from "glob";
 import { join } from "path";
-import { loadState } from "../lib/state.js";
+import { existsSync } from "fs";
+import { loadState, listInboxPlanIds } from "../lib/state.js";
 import { parsePlan } from "../lib/plan.js";
 
 export async function runStatus(repoRoot: string): Promise<void> {
   const state = loadState(repoRoot);
-  const planFiles = await glob("plans/*.md", { cwd: repoRoot });
+  const inboxPlanIds = listInboxPlanIds(repoRoot);
 
-  console.log("PLAN              STATUS    PAUSED  SESSION");
-  console.log("─".repeat(55));
+  // Show inbox plans
+  console.log("INBOX (pending dispatch)");
+  console.log("─".repeat(40));
 
-  for (const planFile of planFiles) {
-    const planPath = join(repoRoot, planFile);
-    const plan = parsePlan(planPath);
-    const ps = state.plans[plan.frontmatter.id];
-
-    const status = plan.frontmatter.status.padEnd(10);
-    const paused = ps?.paused ? "yes" : "no";
-    const session = ps?.session_id ?? "—";
-
-    console.log(
-      `${plan.frontmatter.id.padEnd(18)} ${status} ${paused.padEnd(
-        8
-      )} ${session}`
-    );
+  if (inboxPlanIds.length === 0) {
+    console.log("  (no inbox plans)");
+  } else {
+    for (const id of inboxPlanIds) {
+      console.log(`  ${id}`);
+    }
   }
 
-  if (planFiles.length === 0) {
-    console.log("No plans found in plans/");
+  console.log("");
+
+  // Show active plans from state
+  console.log("ACTIVE PLANS");
+  console.log("─".repeat(70));
+  console.log("PLAN              STATUS    PAUSED  PR#     SESSION");
+  console.log("─".repeat(70));
+
+  const planIds = Object.keys(state.plans);
+
+  if (planIds.length === 0) {
+    console.log("  (no active plans)");
+  } else {
+    for (const planId of planIds) {
+      const ps = state.plans[planId]!;
+      const planPath = join(ps.worktree, ps.planRelpath);
+
+      let status = "unknown";
+      if (existsSync(planPath)) {
+        try {
+          const plan = parsePlan(planPath);
+          status = plan.frontmatter.status;
+        } catch {
+          status = "error";
+        }
+      }
+
+      const paused = ps.paused ? "yes" : "no";
+      const prNum = ps.pr ? String(ps.pr) : "—";
+      const session = ps.sessionId ?? "—";
+
+      console.log(
+        `${planId.padEnd(18)} ${status.padEnd(10)} ${paused.padEnd(
+          8
+        )} ${prNum.padEnd(8)} ${session}`
+      );
+    }
   }
 }

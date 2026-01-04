@@ -10,10 +10,11 @@ export async function runLogs(repoRoot: string, planId: string): Promise<void> {
   }
 
   console.log(`Plan: ${planId}`);
-  console.log(`Session ID: ${ps.session_id ?? "—"}`);
+  console.log(`Session ID: ${ps.sessionId ?? "—"}`);
   console.log(`Worktree: ${ps.worktree || "—"}`);
   console.log(`Branch: ${ps.branch || "—"}`);
   console.log(`PR: ${ps.pr ?? "—"}`);
   console.log(`Paused: ${ps.paused}`);
-  console.log(`Next TODO: ${ps.next_todo}`);
+  console.log(`Last Polled: ${ps.lastPolledAt ?? "—"}`);
+  console.log(`Last Error: ${ps.lastError ?? "—"}`);
 }

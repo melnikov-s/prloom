@@ -1,6 +1,6 @@
 import { execa } from "execa";
-import { join } from "path";
-import { existsSync } from "fs";
+import { join, dirname } from "path";
+import { existsSync, copyFileSync, mkdirSync } from "fs";
 import { nanoid } from "nanoid";
 
 export async function branchExists(
@@ -30,7 +30,7 @@ export async function createWorktree(
   const worktreePath = join(worktreesDir, branch);
 
   if (!existsSync(worktreesDir)) {
-    await execa("mkdir", ["-p", worktreesDir]);
+    mkdirSync(worktreesDir, { recursive: true });
   }
 
   // Create branch and worktree
@@ -93,4 +93,87 @@ export async function getCurrentBranch(worktreePath: string): Promise<string> {
     cwd: worktreePath,
   });
   return stdout.trim();
+}
+
+// Rebase and force push
+
+export interface RebaseResult {
+  success: boolean;
+  hasConflicts: boolean;
+  conflictFiles?: string[];
+}
+
+export async function rebaseOnMain(
+  worktreePath: string,
+  baseBranch: string = "main"
+): Promise<RebaseResult> {
+  try {
+    // Fetch latest from origin
+    await execa("git", ["fetch", "origin", baseBranch], { cwd: worktreePath });
+
+    // Attempt rebase
+    await execa("git", ["rebase", `origin/${baseBranch}`], {
+      cwd: worktreePath,
+    });
+
+    return { success: true, hasConflicts: false };
+  } catch (error) {
+    // Check for conflicts
+    try {
+      const { stdout } = await execa(
+        "git",
+        ["diff", "--name-only", "--diff-filter=U"],
+        { cwd: worktreePath }
+      );
+
+      if (stdout.trim()) {
+        // Abort the rebase
+        await execa("git", ["rebase", "--abort"], { cwd: worktreePath });
+        return {
+          success: false,
+          hasConflicts: true,
+          conflictFiles: stdout.trim().split("\n"),
+        };
+      }
+    } catch {
+      // Ignore errors checking for conflicts
+    }
+
+    return { success: false, hasConflicts: false };
+  }
+}
+
+export async function forcePush(
+  worktreePath: string,
+  branch: string
+): Promise<void> {
+  await execa("git", ["push", "--force-with-lease", "origin", branch], {
+    cwd: worktreePath,
+  });
+}
+
+// Copy file to worktree
+
+export function copyFileToWorktree(
+  srcPath: string,
+  worktreePath: string,
+  destRelPath: string
+): void {
+  const destPath = join(worktreePath, destRelPath);
+  const destDir = dirname(destPath);
+
+  if (!existsSync(destDir)) {
+    mkdirSync(destDir, { recursive: true });
+  }
+
+  copyFileSync(srcPath, destPath);
+}
+
+// Ensure .swarm directory exists in worktree
+
+export function ensureWorktreeSwarmDir(worktreePath: string): void {
+  const swarmDir = join(worktreePath, ".swarm");
+  if (!existsSync(swarmDir)) {
+    mkdirSync(swarmDir, { recursive: true });
+  }
 }

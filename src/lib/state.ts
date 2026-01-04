@@ -6,15 +6,27 @@ import {
   mkdirSync,
   renameSync,
   unlinkSync,
+  readdirSync,
 } from "fs";
 
 export interface PlanState {
-  session_id?: string;
+  sessionId?: string;
   worktree: string;
   branch: string;
   pr?: number;
   paused: boolean;
-  next_todo: number;
+  planRelpath: string; // e.g. "plans/<id>.md"
+  baseBranch: string; // e.g. "main" for rebase
+
+  /** Force a one-time PR feedback poll without shifting schedule */
+  pollOnce?: boolean;
+
+  // Cursors for incremental PR feedback polling
+  lastIssueCommentId?: number;
+  lastReviewId?: number;
+  lastReviewCommentId?: number;
+  lastPolledAt?: string; // ISO timestamp
+  lastError?: string; // For visibility in swarm status
 }
 
 export interface State {
@@ -138,5 +150,39 @@ export function loadShard(repoRoot: string, planId: string): PlanState | null {
     return JSON.parse(raw);
   } catch {
     return null;
+  }
+}
+
+// Inbox
+
+const INBOX_DIR = "inbox";
+
+export function ensureInboxDir(repoRoot: string): void {
+  const inboxDir = join(getSwarmDir(repoRoot), INBOX_DIR);
+  if (!existsSync(inboxDir)) {
+    mkdirSync(inboxDir, { recursive: true });
+  }
+}
+
+export function getInboxPath(repoRoot: string, planId: string): string {
+  return join(getSwarmDir(repoRoot), INBOX_DIR, `${planId}.md`);
+}
+
+export function listInboxPlanIds(repoRoot: string): string[] {
+  const inboxDir = join(getSwarmDir(repoRoot), INBOX_DIR);
+  if (!existsSync(inboxDir)) {
+    return [];
+  }
+
+  const files = readdirSync(inboxDir);
+  return files
+    .filter((f) => f.endsWith(".md"))
+    .map((f) => f.replace(/\.md$/, ""));
+}
+
+export function deleteInboxPlan(repoRoot: string, planId: string): void {
+  const inboxPath = getInboxPath(repoRoot, planId);
+  if (existsSync(inboxPath)) {
+    unlinkSync(inboxPath);
   }
 }

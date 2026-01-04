@@ -4,6 +4,7 @@ import {
   parsePlan,
   findNextUnchecked,
   extractBody,
+  generatePlanSkeleton,
 } from "../../src/lib/plan.js";
 
 const FIXTURE_PATH = join(import.meta.dir, "../fixtures/plans/sample.md");
@@ -56,4 +57,26 @@ test("extractBody includes objective and progress log", () => {
   expect(body).toContain("This is a sample plan for testing.");
   expect(body).toContain("## Progress Log");
   expect(body).toContain("✅ Completed: Second task");
+});
+
+test("generatePlanSkeleton creates valid frontmatter", () => {
+  const skeleton = generatePlanSkeleton("test-plan");
+
+  expect(skeleton).toContain("id: test-plan");
+  expect(skeleton).toContain("status: queued");
+  expect(skeleton).toContain("## Objective");
+  expect(skeleton).toContain("## TODO");
+});
+
+test("generatePlanSkeleton includes agent when provided", () => {
+  const skeleton = generatePlanSkeleton("test-plan", "codex");
+
+  expect(skeleton).toContain("id: test-plan");
+  expect(skeleton).toContain("agent: codex");
+});
+
+test("generatePlanSkeleton omits agent when not provided", () => {
+  const skeleton = generatePlanSkeleton("test-plan");
+
+  expect(skeleton).not.toContain("agent:");
 });

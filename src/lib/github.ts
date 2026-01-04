@@ -63,3 +63,223 @@ export async function getPRState(
   if (state === "closed") return "closed";
   return "open";
 }
+
+// PR Feedback Types
+
+export interface GitHubUser {
+  id: number;
+  login: string;
+}
+
+export interface PRFeedback {
+  id: number;
+  type: "issue_comment" | "review" | "review_comment";
+  author: string;
+  body: string;
+  path?: string;
+  line?: number;
+  reviewState?: string;
+  createdAt: string;
+}
+
+export interface FeedbackCursors {
+  lastIssueCommentId?: number;
+  lastReviewId?: number;
+  lastReviewCommentId?: number;
+}
+
+const BOT_MARKER = "<!-- swarm:bot -->";
+
+// Get authenticated GitHub user
+
+let cachedUser: GitHubUser | null = null;
+
+export async function getCurrentGitHubUser(): Promise<GitHubUser> {
+  if (cachedUser) return cachedUser;
+
+  const { stdout } = await execa("gh", [
+    "api",
+    "user",
+    "--jq",
+    "{id: .id, login: .login}",
+  ]);
+  cachedUser = JSON.parse(stdout);
+  return cachedUser!;
+}
+
+// Fetch PR comments (issue comments)
+
+export async function getPRComments(
+  repoRoot: string,
+  prNumber: number
+): Promise<PRFeedback[]> {
+  const { stdout } = await execa(
+    "gh",
+    [
+      "api",
+      `repos/{owner}/{repo}/issues/${prNumber}/comments`,
+      "--jq",
+      ".[] | {id: .id, author: .user.login, body: .body, createdAt: .created_at}",
+    ],
+    { cwd: repoRoot }
+  );
+
+  if (!stdout.trim()) return [];
+
+  return stdout
+    .trim()
+    .split("\n")
+    .map((line) => {
+      const obj = JSON.parse(line);
+      return {
+        id: obj.id,
+        type: "issue_comment" as const,
+        author: obj.author,
+        body: obj.body,
+        createdAt: obj.createdAt,
+      };
+    });
+}
+
+// Fetch PR reviews
+
+export async function getPRReviews(
+  repoRoot: string,
+  prNumber: number
+): Promise<PRFeedback[]> {
+  const { stdout } = await execa(
+    "gh",
+    [
+      "api",
+      `repos/{owner}/{repo}/pulls/${prNumber}/reviews`,
+      "--jq",
+      ".[] | {id: .id, author: .user.login, body: .body, state: .state, createdAt: .submitted_at}",
+    ],
+    { cwd: repoRoot }
+  );
+
+  if (!stdout.trim()) return [];
+
+  return stdout
+    .trim()
+    .split("\n")
+    .map((line) => {
+      const obj = JSON.parse(line);
+      return {
+        id: obj.id,
+        type: "review" as const,
+        author: obj.author,
+        body: obj.body || "",
+        reviewState: obj.state,
+        createdAt: obj.createdAt,
+      };
+    });
+}
+
+// Fetch PR review comments (inline comments)
+
+export async function getPRReviewComments(
+  repoRoot: string,
+  prNumber: number
+): Promise<PRFeedback[]> {
+  const { stdout } = await execa(
+    "gh",
+    [
+      "api",
+      `repos/{owner}/{repo}/pulls/${prNumber}/comments`,
+      "--jq",
+      ".[] | {id: .id, author: .user.login, body: .body, path: .path, line: .line, createdAt: .created_at}",
+    ],
+    { cwd: repoRoot }
+  );
+
+  if (!stdout.trim()) return [];
+
+  return stdout
+    .trim()
+    .split("\n")
+    .map((line) => {
+      const obj = JSON.parse(line);
+      return {
+        id: obj.id,
+        type: "review_comment" as const,
+        author: obj.author,
+        body: obj.body,
+        path: obj.path,
+        line: obj.line,
+        createdAt: obj.createdAt,
+      };
+    });
+}
+
+// Post PR comment with bot marker
+
+export async function postPRComment(
+  repoRoot: string,
+  prNumber: number,
+  body: string
+): Promise<void> {
+  const markedBody = `${BOT_MARKER}\n${body}`;
+  await execa("gh", ["pr", "comment", String(prNumber), "--body", markedBody], {
+    cwd: repoRoot,
+  });
+}
+
+// Bot detection
+
+export function isBotFeedback(feedback: PRFeedback, botLogin: string): boolean {
+  // Check author
+  if (feedback.author === botLogin) return true;
+  // Check marker in body
+  if (feedback.body.includes(BOT_MARKER)) return true;
+  return false;
+}
+
+// Filter new feedback based on cursors
+
+export function filterNewFeedback(
+  feedback: PRFeedback[],
+  cursors: FeedbackCursors,
+  botLogin: string
+): PRFeedback[] {
+  return feedback.filter((f) => {
+    // Ignore bot feedback
+    if (isBotFeedback(f, botLogin)) return false;
+
+    // Filter by cursor based on type
+    if (f.type === "issue_comment") {
+      return !cursors.lastIssueCommentId || f.id > cursors.lastIssueCommentId;
+    }
+    if (f.type === "review") {
+      return !cursors.lastReviewId || f.id > cursors.lastReviewId;
+    }
+    if (f.type === "review_comment") {
+      return !cursors.lastReviewCommentId || f.id > cursors.lastReviewCommentId;
+    }
+    return true;
+  });
+}
+
+// Get max IDs from feedback for cursor update
+
+export function getMaxFeedbackIds(feedback: PRFeedback[]): FeedbackCursors {
+  const result: FeedbackCursors = {};
+
+  for (const f of feedback) {
+    if (f.type === "issue_comment") {
+      result.lastIssueCommentId = Math.max(
+        result.lastIssueCommentId ?? 0,
+        f.id
+      );
+    } else if (f.type === "review") {
+      result.lastReviewId = Math.max(result.lastReviewId ?? 0, f.id);
+    } else if (f.type === "review_comment") {
+      result.lastReviewCommentId = Math.max(
+        result.lastReviewCommentId ?? 0,
+        f.id
+      );
+    }
+  }
+
+  return result;
+}

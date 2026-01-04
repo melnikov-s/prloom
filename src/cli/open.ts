@@ -1,8 +1,12 @@
+import { join } from "path";
 import { loadState } from "../lib/state.js";
-import { resumeSession } from "../lib/opencode.js";
+import { loadConfig } from "../lib/config.js";
+import { parsePlan } from "../lib/plan.js";
+import { getAdapter } from "../lib/adapters/index.js";
 
 export async function runOpen(repoRoot: string, planId: string): Promise<void> {
   const state = loadState(repoRoot);
+  const config = loadConfig(repoRoot);
   const ps = state.plans[planId];
 
   if (!ps) {
@@ -19,14 +23,16 @@ export async function runOpen(repoRoot: string, planId: string): Promise<void> {
     process.exit(1);
   }
 
-  if (!ps.session_id) {
-    console.error(`No session ID for ${planId}`);
-    process.exit(1);
-  }
+  // Get the plan's agent from frontmatter or use config default
+  const planPath = join(ps.worktree, ps.planRelpath);
+  const plan = parsePlan(planPath);
+  const agentName = plan.frontmatter.agent ?? config.agents.default;
+  const adapter = getAdapter(agentName);
 
   console.log(`Opening TUI for ${planId}...`);
-  console.log(`Session: ${ps.session_id}`);
+  console.log(`Agent: ${agentName}`);
   console.log(`Worktree: ${ps.worktree}`);
 
-  await resumeSession(ps.worktree, ps.session_id);
+  // Start fresh interactive session (sessions are ephemeral per-TODO)
+  await adapter.interactive({ cwd: ps.worktree });
 }

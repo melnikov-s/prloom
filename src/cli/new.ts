@@ -1,22 +1,56 @@
 import { join } from "path";
-import { existsSync, mkdirSync } from "fs";
-import { runDesigner } from "../lib/opencode.js";
+import { existsSync, writeFileSync } from "fs";
+import { loadConfig } from "../lib/config.js";
+import { getAdapter, type AgentName } from "../lib/adapters/index.js";
+import { generatePlanSkeleton } from "../lib/plan.js";
 import { renderDesignerPrompt } from "../lib/template.js";
+import { ensureInboxDir, getInboxPath } from "../lib/state.js";
 
-export async function runNew(repoRoot: string, planId?: string): Promise<void> {
-  const plansDir = join(repoRoot, "plans");
+export async function runNew(
+  repoRoot: string,
+  planId?: string,
+  agentOverride?: string
+): Promise<void> {
+  const config = loadConfig(repoRoot);
 
-  if (!existsSync(plansDir)) {
-    mkdirSync(plansDir, { recursive: true });
+  // Ensure inbox directory exists
+  ensureInboxDir(repoRoot);
+
+  // Resolve designer agent: CLI flag > config.designer > config.default
+  const designerAgent =
+    (agentOverride as AgentName) ??
+    config.agents.designer ??
+    config.agents.default;
+
+  // Resolve worker agent: CLI flag > config.default
+  const workerAgent = (agentOverride as AgentName) ?? config.agents.default;
+
+  const adapter = getAdapter(designerAgent);
+
+  // Generate plan ID if not provided
+  const id = planId ?? `plan-${Date.now()}`;
+  const planPath = getInboxPath(repoRoot, id);
+
+  // Check if plan already exists in inbox
+  if (existsSync(planPath)) {
+    console.error(`Plan already exists in inbox: ${planPath}`);
+    console.error("Use 'swarm edit' to modify existing plans.");
+    process.exit(1);
   }
 
-  console.log("Starting Designer session...");
-  console.log(
-    planId ? `Plan ID: ${planId}` : "Plan ID will be chosen during session"
-  );
+  // Create plan skeleton with deterministic frontmatter
+  const skeleton = generatePlanSkeleton(id, workerAgent);
+  writeFileSync(planPath, skeleton);
 
-  const prompt = renderDesignerPrompt(repoRoot);
-  await runDesigner(repoRoot, prompt);
+  console.log(`Created plan in inbox: ${planPath}`);
+  console.log(`Worker agent: ${workerAgent}`);
+  console.log(`Designer agent: ${designerAgent}`);
+  console.log("");
+  console.log("Starting Designer session to fill in the plan...");
+
+  const prompt = renderDesignerPrompt(repoRoot, skeleton);
+  await adapter.interactive({ cwd: repoRoot, prompt });
 
   console.log("Designer session ended.");
+  console.log("Plan is now in inbox. Run 'swarm start' to dispatch.");
 }

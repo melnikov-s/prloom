@@ -11,10 +11,15 @@ yargs(hideBin(process.argv))
     "new [plan-id]",
     "Create a new plan with Designer",
     (yargs) =>
-      yargs.positional("plan-id", { type: "string", describe: "Plan ID" }),
+      yargs
+        .positional("plan-id", { type: "string", describe: "Plan ID" })
+        .option("agent", {
+          type: "string",
+          describe: "Coding agent to use (codex, opencode, claude)",
+        }),
     async (argv) => {
       const { runNew } = await import("./new.js");
-      await runNew(process.cwd(), argv["plan-id"]);
+      await runNew(process.cwd(), argv["plan-id"], argv.agent);
     }
   )
 
@@ -23,10 +28,15 @@ yargs(hideBin(process.argv))
     "edit <plan-id>",
     "Edit an existing plan",
     (yargs) =>
-      yargs.positional("plan-id", { type: "string", demandOption: true }),
+      yargs
+        .positional("plan-id", { type: "string", demandOption: true })
+        .option("agent", {
+          type: "string",
+          describe: "Coding agent to use (codex, opencode, claude)",
+        }),
     async (argv) => {
       const { runEdit } = await import("./edit.js");
-      await runEdit(process.cwd(), argv["plan-id"] as string);
+      await runEdit(process.cwd(), argv["plan-id"] as string, argv.agent);
     }
   )
 
@@ -97,6 +107,40 @@ yargs(hideBin(process.argv))
     async (argv) => {
       const { runLogs } = await import("./logs.js");
       await runLogs(process.cwd(), argv["plan-id"] as string);
+    }
+  )
+
+  // swarm poll
+  .command(
+    "poll [plan-id]",
+    "Launch immediate PR feedback poll (all plans if no ID given)",
+    (yargs) =>
+      yargs.positional("plan-id", {
+        type: "string",
+        describe: "Plan ID (optional)",
+      }),
+    async (argv) => {
+      const { enqueue } = await import("../lib/ipc.js");
+      const { loadState } = await import("../lib/state.js");
+      const planId = argv["plan-id"] as string | undefined;
+
+      if (planId) {
+        enqueue(process.cwd(), { type: "poll", plan_id: planId });
+        console.log(`Queued immediate poll (no reset) for ${planId}`);
+      } else {
+        const state = loadState(process.cwd());
+        const planIds = Object.keys(state.plans);
+        if (planIds.length === 0) {
+          console.log("No active plans to poll");
+        } else {
+          for (const id of planIds) {
+            enqueue(process.cwd(), { type: "launch_poll", plan_id: id });
+          }
+          console.log(
+            `Queued immediate poll (reset schedule) for ${planIds.length} plans`
+          );
+        }
+      }
     }
   )
 

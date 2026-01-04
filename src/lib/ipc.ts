@@ -2,7 +2,7 @@ import { join } from "path";
 import { existsSync, readFileSync, appendFileSync, statSync } from "fs";
 
 export interface IpcCommand {
-  type: "stop" | "unpause";
+  type: "stop" | "unpause" | "poll" | "launch_poll";
   plan_id: string;
   ts: string;
 }
