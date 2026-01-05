@@ -1,5 +1,5 @@
 import { join } from "path";
-import { existsSync, statSync } from "fs";
+import { existsSync, statSync, readFileSync } from "fs";
 import { loadConfig, resolveWorktreesDir, type Config } from "./config.js";
 import {
   loadState,
@@ -394,6 +394,22 @@ async function processActivePlans(
             console.warn(
               `   ⚠️ TODO #${todo.index} was NOT marked complete by worker`
             );
+            console.warn(`   Exit code: ${execResult.exitCode}`);
+
+            // Show log file location and content
+            const logPath = join(ps.worktree, "prloom", ".local", "worker.log");
+            if (existsSync(logPath)) {
+              console.warn(`   Log file: ${logPath}`);
+              const log = readFileSync(logPath, "utf-8");
+              const lines = log.trim().split("\n").slice(-30);
+              console.warn(`   Last 30 lines of worker log:`);
+              for (const line of lines) {
+                console.warn(`     ${line}`);
+              }
+            } else {
+              console.warn(`   No worker log found at: ${logPath}`);
+            }
+
             // Don't commit/push, let retry logic handle it on next iteration
             continue;
           }
