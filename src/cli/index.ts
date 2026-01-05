@@ -2,6 +2,16 @@
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
 import { resolveRepoRoot } from "../lib/repo_root.js";
+import { readFileSync } from "fs";
+import { join, dirname } from "path";
+import { fileURLToPath } from "url";
+
+// Read version from package.json
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const packageJson = JSON.parse(
+  readFileSync(join(__dirname, "..", "..", "package.json"), "utf-8")
+);
 
 async function getRepoRoot(): Promise<string> {
   try {
@@ -14,6 +24,7 @@ async function getRepoRoot(): Promise<string> {
 
 yargs(hideBin(process.argv))
   .scriptName("prloom")
+  .version(packageJson.version)
   .usage("$0 <command> [options]")
 
   // prloom init
