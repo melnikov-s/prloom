@@ -110,6 +110,7 @@ export function renderTriagePrompt(
       let entry = `### ${f.type} by @${f.author}\n\n${f.body}`;
       if (f.path) entry += `\n\n*File: ${f.path}${f.line ? `:${f.line}` : ""}*`;
       if (f.reviewState) entry += `\n\n*Review: ${f.reviewState}*`;
+      if (f.inReplyToId) entry += `\n\n*In reply to comment #${f.inReplyToId}*`;
       return entry;
     })
     .join("\n\n---\n\n");

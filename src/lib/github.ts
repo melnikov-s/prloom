@@ -83,6 +83,8 @@ export interface PRFeedback {
   line?: number;
   reviewState?: string;
   createdAt: string;
+  /** For review_comment: ID of the parent comment if this is a reply */
+  inReplyToId?: number;
 }
 
 export interface FeedbackCursors {
@@ -191,7 +193,7 @@ export async function getPRReviewComments(
       "api",
       `repos/{owner}/{repo}/pulls/${prNumber}/comments`,
       "--jq",
-      ".[] | {id: .id, author: .user.login, body: .body, path: .path, line: .line, createdAt: .created_at}",
+      ".[] | {id: .id, author: .user.login, body: .body, path: .path, line: .line, createdAt: .created_at, inReplyToId: .in_reply_to_id}",
     ],
     { cwd: repoRoot }
   );
@@ -211,6 +213,7 @@ export async function getPRReviewComments(
         path: obj.path,
         line: obj.line,
         createdAt: obj.createdAt,
+        inReplyToId: obj.inReplyToId || undefined,
       };
     });
 }

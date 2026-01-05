@@ -141,3 +141,23 @@ test("renderDesignerNewPrompt appends context when planner.md exists", () => {
   expect(prompt).toContain("# Repository Context");
   expect(prompt).toContain("# Architecture Notes");
 });
+
+test("renderTriagePrompt includes inReplyToId thread context", () => {
+  const { renderTriagePrompt } = require("../../src/lib/template.js");
+  const plan = parsePlan(FIXTURE_PATH);
+  const feedback = [
+    {
+      id: 123,
+      type: "review_comment",
+      author: "reviewer",
+      body: "This is a reply",
+      path: "src/foo.ts",
+      line: 10,
+      createdAt: "2024-01-01T00:00:00Z",
+      inReplyToId: 100,
+    },
+  ];
+
+  const prompt = renderTriagePrompt("/repo", plan, feedback);
+  expect(prompt).toContain("In reply to comment #100");
+});
