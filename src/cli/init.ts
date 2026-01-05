@@ -26,7 +26,12 @@ export async function runInit(
   const defaultBranch = await detectDefaultBranch(repoRoot);
 
   // Write config if missing (or if force)
-  const configPath = join(repoRoot, "prloom.config.json");
+  const configPath = join(repoRoot, "prloom", "config.json");
+  const prloomDir = join(repoRoot, "prloom");
+
+  // Ensure prloom/ exists first
+  mkdirSync(prloomDir, { recursive: true });
+
   if (!existsSync(configPath) || opts.force) {
     // Load existing (if any) so we preserve agent choices when force is used
     const existing = loadConfig(repoRoot);
@@ -42,16 +47,20 @@ export async function runInit(
     console.log(`Found existing ${configPath} (leaving unchanged)`);
   }
 
-  // Ensure .prloom/ runtime directories exist
-  const prloomDir = join(repoRoot, ".prloom");
-  const inboxDir = join(prloomDir, "inbox");
-  const plansDir = join(prloomDir, "plans");
+  // Ensure prloom/.local runtime directories exist
+  const localDir = join(prloomDir, ".local");
+  const inboxDir = join(localDir, "inbox");
+  const plansStateDir = join(localDir, "plans");
 
   mkdirSync(inboxDir, { recursive: true });
+  mkdirSync(plansStateDir, { recursive: true });
+
+  // Ensure prloom/plans exists for committed plans
+  const plansDir = join(prloomDir, "plans");
   mkdirSync(plansDir, { recursive: true });
 
   // Ensure gitignore
-  await ensureGitignoreEntry(repoRoot, ".prloom/");
+  await ensureGitignoreEntry(repoRoot, "prloom/.local/");
 
   console.log("✅ prloom initialized");
   console.log(`Base branch: ${defaultBranch}`);

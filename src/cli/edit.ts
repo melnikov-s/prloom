@@ -63,7 +63,7 @@ export async function runEdit(
 
   console.log(`Agent: ${agentName}`);
 
-  const prompt = renderDesignerEditPrompt(planPath, existingPlan);
+  const prompt = renderDesignerEditPrompt(cwd, planPath, existingPlan);
   await adapter.interactive({ cwd, prompt });
 
   console.log("Designer session ended.");

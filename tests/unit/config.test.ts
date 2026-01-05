@@ -1,5 +1,5 @@
 import { test, expect, beforeEach, afterEach } from "bun:test";
-import { mkdirSync, rmSync, writeFileSync, existsSync } from "fs";
+import { mkdirSync, rmSync, writeFileSync } from "fs";
 import { join } from "path";
 import { loadConfig, resolveWorktreesDir } from "../../src/lib/config.js";
 
@@ -16,14 +16,15 @@ afterEach(() => {
 test("loadConfig returns defaults when no config file exists", () => {
   const config = loadConfig(TEST_DIR);
 
-  expect(config.worktrees_dir).toBe(".prloom/worktrees");
+  expect(config.worktrees_dir).toBe("prloom/.local/worktrees");
   expect(config.poll_interval_ms).toBe(60000);
   expect(config.base_branch).toBe("main");
 });
 
-test("loadConfig reads values from prloom.config.json", () => {
+test("loadConfig reads values from prloom/config.json", () => {
+  mkdirSync(join(TEST_DIR, "prloom"), { recursive: true });
   writeFileSync(
-    join(TEST_DIR, "prloom.config.json"),
+    join(TEST_DIR, "prloom", "config.json"),
     JSON.stringify({
       worktrees_dir: "/custom/path",
       poll_interval_ms: 10000,
@@ -39,8 +40,9 @@ test("loadConfig reads values from prloom.config.json", () => {
 });
 
 test("loadConfig uses defaults for missing fields", () => {
+  mkdirSync(join(TEST_DIR, "prloom"), { recursive: true });
   writeFileSync(
-    join(TEST_DIR, "prloom.config.json"),
+    join(TEST_DIR, "prloom", "config.json"),
     JSON.stringify({ worktrees_dir: "/custom", base_branch: "develop" })
   );
 
@@ -71,8 +73,9 @@ test("loadConfig returns default agents when not specified", () => {
 });
 
 test("loadConfig reads agents from config file", () => {
+  mkdirSync(join(TEST_DIR, "prloom"), { recursive: true });
   writeFileSync(
-    join(TEST_DIR, "prloom.config.json"),
+    join(TEST_DIR, "prloom", "config.json"),
     JSON.stringify({
       agents: {
         default: "claude",
@@ -89,8 +92,9 @@ test("loadConfig reads agents from config file", () => {
 });
 
 test("loadConfig ignores invalid agent names", () => {
+  mkdirSync(join(TEST_DIR, "prloom"), { recursive: true });
   writeFileSync(
-    join(TEST_DIR, "prloom.config.json"),
+    join(TEST_DIR, "prloom", "config.json"),
     JSON.stringify({
       agents: {
         default: "invalid-agent",

@@ -37,7 +37,7 @@ export interface State {
   plans: Record<string, PlanState>;
 }
 
-const SWARM_DIR = ".prloom";
+const SWARM_DIR = "prloom/.local";
 const STATE_FILE = "state.json";
 const LOCK_FILE = "lock";
 const PLANS_DIR = "plans";

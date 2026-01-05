@@ -211,10 +211,10 @@ export function copyFileToWorktree(
   copyFileSync(srcPath, destPath);
 }
 
-// Ensure .prloom directory exists in worktree
+// Ensure prloom/.local directory exists in worktree
 
 export function ensureWorktreePrloomDir(worktreePath: string): void {
-  const prloomDir = join(worktreePath, ".prloom");
+  const prloomDir = join(worktreePath, "prloom", ".local");
   if (!existsSync(prloomDir)) {
     mkdirSync(prloomDir, { recursive: true });
   }

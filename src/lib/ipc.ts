@@ -16,11 +16,11 @@ export interface IpcCommand {
 const CONTROL_FILE = "control.jsonl";
 
 function getControlPath(repoRoot: string): string {
-  return join(repoRoot, ".prloom", CONTROL_FILE);
+  return join(repoRoot, "prloom", ".local", CONTROL_FILE);
 }
 
 export function enqueue(repoRoot: string, cmd: Omit<IpcCommand, "ts">): void {
-  const prloomDir = join(repoRoot, ".prloom");
+  const prloomDir = join(repoRoot, "prloom", ".local");
   if (!existsSync(prloomDir)) {
     mkdirSync(prloomDir, { recursive: true });
   }

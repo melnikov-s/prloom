@@ -33,14 +33,14 @@ test("saveState and loadState round-trip", () => {
   const state: State = {
     control_cursor: 100,
     plans: {
-        "test-plan": {
-          sessionId: "abc123",
-          worktree: "/path/to/worktree",
-          branch: "test-plan-xyz",
-          paused: false,
-          planRelpath: "plans/test-plan.md",
-          baseBranch: "develop",
-        },
+      "test-plan": {
+        sessionId: "abc123",
+        worktree: "/path/to/worktree",
+        branch: "test-plan-xyz",
+        paused: false,
+        planRelpath: "plans/test-plan.md",
+        baseBranch: "develop",
+      },
     },
   };
 
@@ -55,7 +55,7 @@ test("saveState and loadState round-trip", () => {
 test("acquireLock creates lock file", () => {
   acquireLock(TEST_DIR);
 
-  const lockPath = join(TEST_DIR, ".prloom", "lock");
+  const lockPath = join(TEST_DIR, "prloom", ".local", "lock");
   expect(existsSync(lockPath)).toBe(true);
 
   const lock = JSON.parse(readFileSync(lockPath, "utf-8"));
@@ -76,7 +76,7 @@ test("releaseLock removes lock file", () => {
   acquireLock(TEST_DIR);
   releaseLock(TEST_DIR);
 
-  const lockPath = join(TEST_DIR, ".prloom", "lock");
+  const lockPath = join(TEST_DIR, "prloom", ".local", "lock");
   expect(existsSync(lockPath)).toBe(false);
 });
 

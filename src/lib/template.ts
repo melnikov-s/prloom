@@ -13,6 +13,21 @@ function loadTemplate(_repoRoot: string, name: PromptName): string {
   return BUILTIN_PROMPTS[name];
 }
 
+/**
+ * Load agent-specific context from prloom/<agentType>.md if it exists.
+ * Returns empty string if the file doesn't exist.
+ */
+export function loadAgentContext(
+  repoRoot: string,
+  agentType: "planner" | "worker"
+): string {
+  const contextPath = join(repoRoot, "prloom", `${agentType}.md`);
+  if (!existsSync(contextPath)) {
+    return "";
+  }
+  return readFileSync(contextPath, "utf-8");
+}
+
 export function renderWorkerPrompt(
   repoRoot: string,
   plan: Plan,
@@ -20,10 +35,16 @@ export function renderWorkerPrompt(
 ): string {
   const template = loadTemplate(repoRoot, "worker");
   const compiled = Handlebars.compile(template);
-  return compiled({
+  let prompt = compiled({
     current_todo: `TODO #${todo.index}: ${todo.text}`,
     plan: plan.raw,
   });
+
+  const context = loadAgentContext(repoRoot, "worker");
+  if (context) {
+    prompt += `\n\n---\n\n# Repository Context\n\n${context}`;
+  }
+  return prompt;
 }
 
 export function renderDesignerNewPrompt(
@@ -35,25 +56,38 @@ export function renderDesignerNewPrompt(
 ): string {
   const template = BUILTIN_PROMPTS["designer_new"];
   const compiled = Handlebars.compile(template);
-  return compiled({
+  let prompt = compiled({
     repo_path: repoPath,
     plan_path: planPath,
     base_branch: baseBranch,
     worker_agent: workerAgent,
     user_description: userDescription ?? "",
   });
+
+  const context = loadAgentContext(repoPath, "planner");
+  if (context) {
+    prompt += `\n\n---\n\n# Repository Context\n\n${context}`;
+  }
+  return prompt;
 }
 
 export function renderDesignerEditPrompt(
+  repoPath: string,
   planPath: string,
   existingPlan: string
 ): string {
   const template = BUILTIN_PROMPTS["designer_edit"];
   const compiled = Handlebars.compile(template);
-  return compiled({
+  let prompt = compiled({
     plan_path: planPath,
     existing_plan: existingPlan,
   });
+
+  const context = loadAgentContext(repoPath, "planner");
+  if (context) {
+    prompt += `\n\n---\n\n# Repository Context\n\n${context}`;
+  }
+  return prompt;
 }
 
 // Triage
@@ -87,7 +121,7 @@ export function renderTriagePrompt(
   });
 }
 
-const TRIAGE_RESULT_FILE = ".prloom/triage-result.json";
+const TRIAGE_RESULT_FILE = "prloom/.local/triage-result.json";
 
 export function readTriageResultFile(worktreePath: string): TriageResult {
   const resultPath = join(worktreePath, TRIAGE_RESULT_FILE);

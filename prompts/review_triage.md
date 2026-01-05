@@ -34,7 +34,7 @@ You are processing PR feedback for an active plan. Your job is to:
 
 ### Writing the Result File
 
-After editing the plan, you MUST write `.prloom/triage-result.json` with:
+After editing the plan, you MUST write `prloom/.local/triage-result.json` with:
 
 ```json
 {
@@ -58,6 +58,6 @@ After editing the plan, you MUST write `.prloom/triage-result.json` with:
 
 ## Critical Rules
 
-1. You MUST write `.prloom/triage-result.json` even if you add no TODOs
+1. You MUST write `prloom/.local/triage-result.json` even if you add no TODOs
 2. The result file must contain valid JSON only, no markdown wrapper
 3. Failure to write the result file will mark the plan as blocked

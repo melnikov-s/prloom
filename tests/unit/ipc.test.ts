@@ -6,7 +6,7 @@ import { enqueue, consume } from "../../src/lib/ipc.js";
 const TEST_DIR = "/tmp/prloom-test-ipc";
 
 beforeEach(() => {
-  mkdirSync(join(TEST_DIR, ".prloom"), { recursive: true });
+  mkdirSync(join(TEST_DIR, "prloom", ".local"), { recursive: true });
 });
 
 afterEach(() => {
@@ -17,7 +17,7 @@ test("enqueue appends command to control.jsonl", () => {
   enqueue(TEST_DIR, { type: "stop", plan_id: "test-plan" });
 
   const content = readFileSync(
-    join(TEST_DIR, ".prloom", "control.jsonl"),
+    join(TEST_DIR, "prloom", ".local", "control.jsonl"),
     "utf-8"
   );
   const line = JSON.parse(content.trim());

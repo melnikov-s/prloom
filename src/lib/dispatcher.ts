@@ -154,7 +154,7 @@ async function ingestInboxPlans(
         branch,
         baseBranch
       );
-      const planRelpath = `plans/${planId}.md`;
+      const planRelpath = `prloom/plans/${planId}.md`;
 
       // Copy plan to worktree
       copyFileToWorktree(inboxPath, worktreePath, planRelpath);
