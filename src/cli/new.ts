@@ -74,7 +74,12 @@ export async function runNew(
   console.log("");
   console.log("Starting Designer session to fill in the plan...");
 
-  const prompt = renderDesignerNewPrompt(planPath, baseBranch, workerAgent);
+  const prompt = renderDesignerNewPrompt(
+    repoRoot,
+    planPath,
+    baseBranch,
+    workerAgent
+  );
   await adapter.interactive({ cwd: repoRoot, prompt });
 
   console.log("Designer session ended.");

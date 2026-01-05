@@ -27,6 +27,7 @@ export function renderWorkerPrompt(
 }
 
 export function renderDesignerNewPrompt(
+  repoPath: string,
   planPath: string,
   baseBranch: string,
   workerAgent: string,
@@ -35,6 +36,7 @@ export function renderDesignerNewPrompt(
   const template = BUILTIN_PROMPTS["designer_new"];
   const compiled = Handlebars.compile(template);
   return compiled({
+    repo_path: repoPath,
     plan_path: planPath,
     base_branch: baseBranch,
     worker_agent: workerAgent,

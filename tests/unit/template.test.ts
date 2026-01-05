@@ -22,6 +22,7 @@ test("renderWorkerPrompt uses built-in template", () => {
 
 test("renderDesignerNewPrompt includes path and context", () => {
   const prompt = renderDesignerNewPrompt(
+    "/repo",
     "/repo/plan.md",
     "main",
     "opencode",
@@ -33,6 +34,7 @@ test("renderDesignerNewPrompt includes path and context", () => {
   expect(prompt).toContain("Build a feature");
   expect(prompt).toContain("main");
   expect(prompt).toContain("opencode");
+  expect(prompt).toContain("/repo");
 });
 
 test("renderDesignerEditPrompt includes existing plan", () => {
