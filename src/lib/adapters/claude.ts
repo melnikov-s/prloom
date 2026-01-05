@@ -1,5 +1,6 @@
 import { execa } from "execa";
-import type { AgentAdapter, ExecutionResult } from "./types.js";
+import type { AgentAdapter, ExecutionResult, TmuxConfig } from "./types.js";
+import { waitForTmuxSession } from "./tmux.js";
 
 /**
  * Adapter for Claude Code CLI
@@ -8,16 +9,36 @@ import type { AgentAdapter, ExecutionResult } from "./types.js";
 export const claudeAdapter: AgentAdapter = {
   name: "claude",
 
-  async execute({ cwd, prompt }): Promise<ExecutionResult> {
-    const result = await execa(
-      "claude",
-      ["-p", prompt, "--dangerously-skip-permissions"],
-      {
-        cwd,
-        timeout: 0,
-        reject: false,
-      }
-    );
+  async execute({ cwd, prompt, tmux }): Promise<ExecutionResult> {
+    const args = ["-p", prompt, "--dangerously-skip-permissions"];
+
+    if (tmux) {
+      // Spawn in detached tmux session
+      await execa(
+        "tmux",
+        [
+          "new-session",
+          "-d",
+          "-s",
+          tmux.sessionName,
+          "-c",
+          cwd,
+          "claude",
+          ...args,
+        ],
+        { reject: false }
+      );
+      // Wait for session to complete
+      await waitForTmuxSession(tmux.sessionName);
+      return { exitCode: 0 };
+    }
+
+    // Direct execution (no tmux)
+    const result = await execa("claude", args, {
+      cwd,
+      timeout: 0,
+      reject: false,
+    });
     return { exitCode: result.exitCode ?? 0 };
   },
 

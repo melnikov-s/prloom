@@ -50,7 +50,15 @@ import {
   readTriageResultFile,
 } from "./template.js";
 
-export async function runDispatcher(repoRoot: string): Promise<void> {
+export interface DispatcherOptions {
+  /** Run workers in tmux sessions for observation */
+  tmux?: boolean;
+}
+
+export async function runDispatcher(
+  repoRoot: string,
+  options: DispatcherOptions = {}
+): Promise<void> {
   const config = loadConfig(repoRoot);
   const worktreesDir = resolveWorktreesDir(repoRoot, config);
 
@@ -92,7 +100,7 @@ export async function runDispatcher(repoRoot: string): Promise<void> {
       await ingestInboxPlans(repoRoot, worktreesDir, config, state);
 
       // 3. Process active plans from state
-      await processActivePlans(repoRoot, config, state, botLogin);
+      await processActivePlans(repoRoot, config, state, botLogin, options);
 
       saveState(repoRoot, state);
       await sleepUntilIpcOrTimeout(
@@ -218,7 +226,8 @@ async function processActivePlans(
   repoRoot: string,
   config: Config,
   state: State,
-  botLogin: string
+  botLogin: string,
+  options: DispatcherOptions = {}
 ): Promise<void> {
   for (const [planId, ps] of Object.entries(state.plans)) {
     try {
@@ -269,7 +278,7 @@ async function processActivePlans(
 
             // Skip automated triage for manual agent plans
             if (!isManualAgent) {
-              await runTriage(repoRoot, config, ps, plan, newFeedback);
+              await runTriage(repoRoot, config, ps, plan, newFeedback, options);
             }
 
             // Re-parse plan after triage may have modified it
@@ -309,7 +318,26 @@ async function processActivePlans(
           const prompt = renderWorkerPrompt(repoRoot, plan, todo);
           const agentName = plan.frontmatter.agent ?? config.agents.default;
           const adapter = getAdapter(agentName);
-          await adapter.execute({ cwd: ps.worktree, prompt });
+
+          // Build tmux config if enabled
+          const tmuxConfig = options.tmux
+            ? { sessionName: `prloom-${planId}` }
+            : undefined;
+
+          // Track session in state for prloom watch
+          if (tmuxConfig) {
+            ps.tmuxSession = tmuxConfig.sessionName;
+            console.log(
+              `   [spawned in tmux session: ${tmuxConfig.sessionName}]`
+            );
+          }
+
+          await adapter.execute({ cwd: ps.worktree, prompt, tmux: tmuxConfig });
+
+          // Clear tmux session after completion
+          if (tmuxConfig) {
+            ps.tmuxSession = undefined;
+          }
 
           // Commit and push
           const committed = await commitAll(
@@ -385,7 +413,8 @@ async function runTriage(
   config: Config,
   ps: PlanState,
   plan: ReturnType<typeof parsePlan>,
-  feedback: PRFeedback[]
+  feedback: PRFeedback[],
+  options: DispatcherOptions = {}
 ): Promise<void> {
   // Ensure .prloom directory exists in worktree
   ensureWorktreePrloomDir(ps.worktree);
@@ -395,7 +424,13 @@ async function runTriage(
   const prompt = renderTriagePrompt(repoRoot, plan, feedback);
 
   console.log(`🔍 Running triage for ${plan.frontmatter.id}...`);
-  await adapter.execute({ cwd: ps.worktree, prompt });
+
+  // Build tmux config if enabled
+  const tmuxConfig = options.tmux
+    ? { sessionName: `prloom-triage-${plan.frontmatter.id}` }
+    : undefined;
+
+  await adapter.execute({ cwd: ps.worktree, prompt, tmux: tmuxConfig });
 
   // Read and process triage result
   try {

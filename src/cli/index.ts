@@ -97,10 +97,15 @@ yargs(hideBin(process.argv))
   .command(
     "start",
     "Start the dispatcher",
-    () => {},
-    async () => {
+    (yargs) =>
+      yargs.option("tmux", {
+        type: "boolean",
+        describe: "Run workers in tmux sessions for observation",
+        default: false,
+      }),
+    async (argv) => {
       const { runDispatcher } = await import("../lib/dispatcher.js");
-      await runDispatcher(await getRepoRoot());
+      await runDispatcher(await getRepoRoot(), { tmux: argv.tmux });
     }
   )
 
@@ -148,6 +153,18 @@ yargs(hideBin(process.argv))
     async (argv) => {
       const { runOpen } = await import("./open.js");
       await runOpen(await getRepoRoot(), argv["plan-id"] as string);
+    }
+  )
+
+  // prloom watch
+  .command(
+    "watch <plan-id>",
+    "Observe a running worker (requires --tmux mode)",
+    (yargs) =>
+      yargs.positional("plan-id", { type: "string", demandOption: true }),
+    async (argv) => {
+      const { runWatch } = await import("./watch.js");
+      await runWatch(await getRepoRoot(), argv["plan-id"] as string);
     }
   )
 

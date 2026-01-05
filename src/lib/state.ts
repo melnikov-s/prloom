@@ -18,6 +18,9 @@ export interface PlanState {
   planRelpath: string; // e.g. "plans/<id>.md"
   baseBranch: string; // e.g. "main" for rebase
 
+  /** Active tmux session name when running with --tmux */
+  tmuxSession?: string;
+
   /** Force a one-time PR feedback poll without shifting schedule */
   pollOnce?: boolean;
 

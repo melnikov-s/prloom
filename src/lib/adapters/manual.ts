@@ -9,7 +9,7 @@ import type { AgentAdapter, ExecutionResult } from "./types.js";
 export const manualAdapter: AgentAdapter = {
   name: "manual",
 
-  async execute({ cwd, prompt }): Promise<ExecutionResult> {
+  async execute({ cwd, prompt, tmux }): Promise<ExecutionResult> {
     console.log(
       "⚠️  Manual agent: execute() called but should be skipped by dispatcher."
     );

@@ -2,6 +2,10 @@ import { execa } from "execa";
 
 export type AgentName = "codex" | "opencode" | "claude" | "manual";
 
+export interface TmuxConfig {
+  sessionName: string;
+}
+
 export interface ExecutionResult {
   exitCode: number;
 }
@@ -12,8 +16,13 @@ export interface AgentAdapter {
   /**
    * Execute a prompt in headless mode (for automated worker execution).
    * Session is ephemeral - disposed after completion.
+   * If tmux config provided, runs in a detached tmux session for observation.
    */
-  execute(opts: { cwd: string; prompt: string }): Promise<ExecutionResult>;
+  execute(opts: {
+    cwd: string;
+    prompt: string;
+    tmux?: TmuxConfig;
+  }): Promise<ExecutionResult>;
 
   /**
    * Launch interactive TUI session (for designer or manual takeover).
