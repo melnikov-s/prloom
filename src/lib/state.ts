@@ -30,6 +30,10 @@ export interface PlanState {
   lastReviewCommentId?: number;
   lastPolledAt?: string; // ISO timestamp
   lastError?: string; // For visibility in prloom status
+
+  // Retry tracking to detect stuck TODOs
+  lastTodoIndex?: number;
+  todoRetryCount?: number;
 }
 
 export interface State {

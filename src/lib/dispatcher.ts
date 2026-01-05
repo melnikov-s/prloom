@@ -316,6 +316,37 @@ async function processActivePlans(
         const todo = findNextUnchecked(plan);
 
         if (todo) {
+          // Check for retry loop - same TODO being attempted again
+          const MAX_TODO_RETRIES = 3;
+          if (ps.lastTodoIndex === todo.index) {
+            ps.todoRetryCount = (ps.todoRetryCount ?? 0) + 1;
+            console.log(
+              `   [retry ${ps.todoRetryCount}/${MAX_TODO_RETRIES} for TODO #${todo.index}]`
+            );
+
+            if (ps.todoRetryCount >= MAX_TODO_RETRIES) {
+              console.error(
+                `❌ TODO #${todo.index} failed ${MAX_TODO_RETRIES} times, blocking plan`
+              );
+              const planPath = join(ps.worktree, ps.planRelpath);
+              setStatus(planPath, "blocked");
+              ps.lastError = `TODO #${todo.index} failed after ${MAX_TODO_RETRIES} retries - worker did not mark it complete`;
+
+              if (ps.pr) {
+                await postPRComment(
+                  repoRoot,
+                  ps.pr,
+                  `❌ **Plan blocked**: TODO #${todo.index} failed after ${MAX_TODO_RETRIES} attempts.\n\nThe worker did not mark this TODO as complete. Please investigate manually.\n\n\`\`\`\nprloom unpause ${planId}\n\`\`\``
+                );
+              }
+              continue;
+            }
+          } else {
+            // New TODO, reset retry counter
+            ps.lastTodoIndex = todo.index;
+            ps.todoRetryCount = 0;
+          }
+
           console.log(
             `🔧 Running TODO #${todo.index} for ${planId}: ${todo.text}`
           );
@@ -337,12 +368,40 @@ async function processActivePlans(
             );
           }
 
-          await adapter.execute({ cwd: ps.worktree, prompt, tmux: tmuxConfig });
+          const execResult = await adapter.execute({
+            cwd: ps.worktree,
+            prompt,
+            tmux: tmuxConfig,
+          });
 
           // Clear tmux session after completion
           if (tmuxConfig) {
             ps.tmuxSession = undefined;
           }
+
+          // Check exit code
+          if (execResult.exitCode !== 0) {
+            console.warn(
+              `   ⚠️ Worker exited with code ${execResult.exitCode}`
+            );
+          }
+
+          // Re-parse plan to check if TODO was marked complete
+          const updatedPlan = parsePlan(planPath);
+          const updatedTodo = updatedPlan.todos[todo.index];
+
+          if (!updatedTodo?.done) {
+            console.warn(
+              `   ⚠️ TODO #${todo.index} was NOT marked complete by worker`
+            );
+            // Don't commit/push, let retry logic handle it on next iteration
+            continue;
+          }
+
+          // TODO was completed - reset retry tracking
+          ps.lastTodoIndex = undefined;
+          ps.todoRetryCount = undefined;
+          console.log(`   ✓ TODO #${todo.index} marked complete`);
 
           // Commit and push
           const committed = await commitAll(
