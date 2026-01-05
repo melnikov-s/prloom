@@ -456,9 +456,43 @@ async function runTriage(
         await postPRComment(
           repoRoot,
           ps.pr!,
-          `⚠️ Rebase conflict detected:\n\`\`\`\n${rebaseResult.conflictFiles?.join(
-            "\n"
-          )}\n\`\`\`\nPlease resolve manually.`
+          `⚠️ **Rebase conflict detected**
+
+The following files have conflicts:
+\`\`\`
+${rebaseResult.conflictFiles?.join("\n")}
+\`\`\`
+
+**To resolve:**
+
+1. Navigate to the worktree:
+   \`\`\`
+   cd ${ps.worktree}
+   \`\`\`
+
+2. Fetch and rebase manually:
+   \`\`\`
+   git fetch origin ${ps.baseBranch}
+   git rebase origin/${ps.baseBranch}
+   \`\`\`
+
+3. Resolve conflicts in your editor, then:
+   \`\`\`
+   git add .
+   git rebase --continue
+   \`\`\`
+
+4. Force push the resolved branch:
+   \`\`\`
+   git push --force-with-lease
+   \`\`\`
+
+5. Unblock the plan:
+   \`\`\`
+   prloom unpause ${plan.frontmatter.id}
+   \`\`\`
+
+The plan is now **blocked** until conflicts are resolved.`
         );
       } else if (rebaseResult.success) {
         await forcePush(ps.worktree, ps.branch);
