@@ -3,7 +3,7 @@ import { mkdirSync, rmSync, writeFileSync, existsSync } from "fs";
 import { join } from "path";
 import { loadConfig, resolveWorktreesDir } from "../../src/lib/config.js";
 
-const TEST_DIR = "/tmp/swarm-test-config";
+const TEST_DIR = "/tmp/prloom-test-config";
 
 beforeEach(() => {
   mkdirSync(TEST_DIR, { recursive: true });
@@ -16,14 +16,14 @@ afterEach(() => {
 test("loadConfig returns defaults when no config file exists", () => {
   const config = loadConfig(TEST_DIR);
 
-  expect(config.worktrees_dir).toBe(".swarm/worktrees");
+  expect(config.worktrees_dir).toBe(".prloom/worktrees");
   expect(config.poll_interval_ms).toBe(60000);
   expect(config.base_branch).toBe("main");
 });
 
-test("loadConfig reads values from swarm.config.json", () => {
+test("loadConfig reads values from prloom.config.json", () => {
   writeFileSync(
-    join(TEST_DIR, "swarm.config.json"),
+    join(TEST_DIR, "prloom.config.json"),
     JSON.stringify({
       worktrees_dir: "/custom/path",
       poll_interval_ms: 10000,
@@ -40,7 +40,7 @@ test("loadConfig reads values from swarm.config.json", () => {
 
 test("loadConfig uses defaults for missing fields", () => {
   writeFileSync(
-    join(TEST_DIR, "swarm.config.json"),
+    join(TEST_DIR, "prloom.config.json"),
     JSON.stringify({ worktrees_dir: "/custom", base_branch: "develop" })
   );
 
@@ -72,7 +72,7 @@ test("loadConfig returns default agents when not specified", () => {
 
 test("loadConfig reads agents from config file", () => {
   writeFileSync(
-    join(TEST_DIR, "swarm.config.json"),
+    join(TEST_DIR, "prloom.config.json"),
     JSON.stringify({
       agents: {
         default: "claude",
@@ -90,7 +90,7 @@ test("loadConfig reads agents from config file", () => {
 
 test("loadConfig ignores invalid agent names", () => {
   writeFileSync(
-    join(TEST_DIR, "swarm.config.json"),
+    join(TEST_DIR, "prloom.config.json"),
     JSON.stringify({
       agents: {
         default: "invalid-agent",

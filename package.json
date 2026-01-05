@@ -1,10 +1,9 @@
 {
-  "name": "simple-swarm",
+  "name": "prloom",
   "version": "0.1.0",
   "type": "module",
   "bin": {
-    "swarm": "./dist/cli/index.js",
-    "simple-swarm": "./dist/cli/index.js"
+    "prloom": "./dist/cli/index.js"
   },
   "files": [
     "dist/**/*",

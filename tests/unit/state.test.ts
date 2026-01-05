@@ -12,7 +12,7 @@ import {
   type PlanState,
 } from "../../src/lib/state.js";
 
-const TEST_DIR = "/tmp/swarm-test-state";
+const TEST_DIR = "/tmp/prloom-test-state";
 
 beforeEach(() => {
   mkdirSync(TEST_DIR, { recursive: true });
@@ -55,7 +55,7 @@ test("saveState and loadState round-trip", () => {
 test("acquireLock creates lock file", () => {
   acquireLock(TEST_DIR);
 
-  const lockPath = join(TEST_DIR, ".swarm", "lock");
+  const lockPath = join(TEST_DIR, ".prloom", "lock");
   expect(existsSync(lockPath)).toBe(true);
 
   const lock = JSON.parse(readFileSync(lockPath, "utf-8"));
@@ -76,7 +76,7 @@ test("releaseLock removes lock file", () => {
   acquireLock(TEST_DIR);
   releaseLock(TEST_DIR);
 
-  const lockPath = join(TEST_DIR, ".swarm", "lock");
+  const lockPath = join(TEST_DIR, ".prloom", "lock");
   expect(existsSync(lockPath)).toBe(false);
 });
 

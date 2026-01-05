@@ -18,7 +18,7 @@ export async function runOpen(repoRoot: string, planId: string): Promise<void> {
   if (!ps.paused) {
     console.error(`Plan ${planId} is not paused.`);
     console.error(
-      "Run 'swarm stop ${planId}' first to avoid automation collision."
+      "Run 'prloom stop ${planId}' first to avoid automation collision."
     );
     process.exit(1);
   }

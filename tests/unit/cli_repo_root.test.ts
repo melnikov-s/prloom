@@ -5,7 +5,7 @@ import { tmpdir } from "os";
 import { join } from "path";
 
 test("CLI reports not inside git repository", async () => {
-  const dir = mkdtempSync(join(tmpdir(), "swarm-no-git-"));
+  const dir = mkdtempSync(join(tmpdir(), "prloom-no-git-"));
 
   try {
     const res = await execa(

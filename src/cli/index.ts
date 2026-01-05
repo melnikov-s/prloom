@@ -13,13 +13,13 @@ async function getRepoRoot(): Promise<string> {
 }
 
 yargs(hideBin(process.argv))
-  .scriptName("swarm")
+  .scriptName("prloom")
   .usage("$0 <command> [options]")
 
-  // swarm init
+  // prloom init
   .command(
     "init",
-    "Initialize swarm in this repository",
+    "Initialize prloom in this repository",
     (yargs) =>
       yargs
         .option("yes", {
@@ -30,7 +30,7 @@ yargs(hideBin(process.argv))
         })
         .option("force", {
           type: "boolean",
-          describe: "Overwrite swarm.config.json if it exists",
+          describe: "Overwrite prloom.config.json if it exists",
           default: false,
         }),
     async (argv) => {
@@ -39,7 +39,7 @@ yargs(hideBin(process.argv))
     }
   )
 
-  // swarm new
+  // prloom new
   .command(
     "new [plan-id]",
     "Create a new plan with Designer",
@@ -66,7 +66,7 @@ yargs(hideBin(process.argv))
     }
   )
 
-  // swarm edit
+  // prloom edit
   .command(
     "edit <plan-id>",
     "Edit an existing plan",
@@ -93,7 +93,7 @@ yargs(hideBin(process.argv))
     }
   )
 
-  // swarm start
+  // prloom start
   .command(
     "start",
     "Start the dispatcher",
@@ -104,7 +104,7 @@ yargs(hideBin(process.argv))
     }
   )
 
-  // swarm status
+  // prloom status
   .command(
     "status",
     "Show plan states",
@@ -115,7 +115,7 @@ yargs(hideBin(process.argv))
     }
   )
 
-  // swarm stop
+  // prloom stop
   .command(
     "stop <plan-id>",
     "Pause automation for a plan",
@@ -127,7 +127,7 @@ yargs(hideBin(process.argv))
     }
   )
 
-  // swarm unpause
+  // prloom unpause
   .command(
     "unpause <plan-id>",
     "Resume automation for a plan",
@@ -139,7 +139,7 @@ yargs(hideBin(process.argv))
     }
   )
 
-  // swarm open
+  // prloom open
   .command(
     "open <plan-id>",
     "Open TUI for manual work (requires paused)",
@@ -151,7 +151,7 @@ yargs(hideBin(process.argv))
     }
   )
 
-  // swarm logs
+  // prloom logs
   .command(
     "logs <plan-id>",
     "Show session ID for a plan",
@@ -163,7 +163,7 @@ yargs(hideBin(process.argv))
     }
   )
 
-  // swarm poll
+  // prloom poll
   .command(
     "poll [plan-id]",
     "Fetch and display PR feedback for a plan (or signal all if no ID)",

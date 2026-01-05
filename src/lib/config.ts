@@ -18,13 +18,13 @@ const DEFAULTS: Config = {
   agents: {
     default: "opencode",
   },
-  worktrees_dir: ".swarm/worktrees",
-  poll_interval_ms: 60000, // 60 seconds; use `swarm poll <id>` for immediate
+  worktrees_dir: ".prloom/worktrees",
+  poll_interval_ms: 60000, // 60 seconds; use `prloom poll <id>` for immediate
   base_branch: "main",
 };
 
 export function loadConfig(repoRoot: string): Config {
-  const configPath = join(repoRoot, "swarm.config.json");
+  const configPath = join(repoRoot, "prloom.config.json");
 
   if (!existsSync(configPath)) {
     return { ...DEFAULTS };

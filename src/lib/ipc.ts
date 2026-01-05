@@ -16,13 +16,13 @@ export interface IpcCommand {
 const CONTROL_FILE = "control.jsonl";
 
 function getControlPath(repoRoot: string): string {
-  return join(repoRoot, ".swarm", CONTROL_FILE);
+  return join(repoRoot, ".prloom", CONTROL_FILE);
 }
 
 export function enqueue(repoRoot: string, cmd: Omit<IpcCommand, "ts">): void {
-  const swarmDir = join(repoRoot, ".swarm");
-  if (!existsSync(swarmDir)) {
-    mkdirSync(swarmDir, { recursive: true });
+  const prloomDir = join(repoRoot, ".prloom");
+  if (!existsSync(prloomDir)) {
+    mkdirSync(prloomDir, { recursive: true });
   }
 
   const path = getControlPath(repoRoot);

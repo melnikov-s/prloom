@@ -1,14 +1,14 @@
-# simple-swarm
+# prloom
 
-`simple-swarm` is a terminal-first “agentic PR factory” for developers.
+`prloom` is a terminal-first “agentic PR factory” for developers.
 
-You write a plan (a Markdown checklist), `swarm` turns it into a dedicated git worktree + branch, opens a draft PR, and then iterates one TODO at a time using a configurable coding agent. Review happens in GitHub: comments and review submissions are triaged into new TODOs and pushed back onto the same PR.
+You write a plan (a Markdown checklist), `prloom` turns it into a dedicated git worktree + branch, opens a draft PR, and then iterates one TODO at a time using a configurable coding agent. Review happens in GitHub: comments and review submissions are triaged into new TODOs and pushed back onto the same PR.
 
-`simple-swarm` is designed to be safe to run from multiple clones: all runtime state lives in `.swarm/` (gitignored), so each developer can run their own dispatcher against the PRs they create/track in their local state.
+`prloom` is designed to be safe to run from multiple clones: all runtime state lives in `.prloom/` (gitignored), so each developer can run their own dispatcher against the PRs they create/track in their local state.
 
 ## How It Works
 
-- Plans start locally in `.swarm/inbox/` (gitignored; clean `git status`).
+- Plans start locally in `.prloom/inbox/` (gitignored; clean `git status`).
 - The dispatcher ingests a plan into a new branch/worktree at `plans/<id>.md` and opens a draft PR.
 - The worker agent executes exactly one TODO per iteration and updates the plan in-branch.
 - PR comments/reviews trigger a triage agent which updates the plan with new TODOs and posts a reply.
@@ -41,9 +41,9 @@ bun install
 In your target repository:
 
 ```bash
-npx -y simple-swarm init
-npx -y simple-swarm new my-feature
-npx -y simple-swarm start
+npx -y prloom init
+npx -y prloom new my-feature
+npx -y prloom start
 ```
 
 ### Local dev
@@ -61,40 +61,40 @@ bun run build
 
 ### Commands
 
-- `swarm init`
-  - Initializes `.swarm/`, ensures `.swarm/` is gitignored, and writes `swarm.config.json`.
-- `swarm new [plan-id] [--agent <codex|opencode|claude>]`
-  - Creates `.swarm/inbox/<id>.md` and launches an interactive designer session.
-- `swarm start`
+- `prloom init`
+  - Initializes `.prloom/`, ensures `.prloom/` is gitignored, and writes `prloom.config.json`.
+- `prloom new [plan-id] [--agent <codex|opencode|claude>]`
+  - Creates `.prloom/inbox/<id>.md` and launches an interactive designer session.
+- `prloom start`
   - Starts the dispatcher loop (ingests inbox plans, runs TODOs, polls PR feedback).
-- `swarm status`
-  - Shows inbox plans and active plans tracked in `.swarm/state.json`.
-- `swarm edit <plan-id> [--agent <...>]`
+- `prloom status`
+  - Shows inbox plans and active plans tracked in `.prloom/state.json`.
+- `prloom edit <plan-id> [--agent <...>]`
   - Edits a plan either in inbox (pre-dispatch) or in the plan’s worktree (post-dispatch).
-- `swarm stop <plan-id>` / `swarm unpause <plan-id>`
+- `prloom stop <plan-id>` / `prloom unpause <plan-id>`
   - Pauses/resumes automation for an active plan.
-- `swarm open <plan-id>`
+- `prloom open <plan-id>`
   - Opens the configured agent’s interactive TUI in the plan worktree (requires paused).
-- `swarm poll [plan-id]`
+- `prloom poll [plan-id]`
   - Forces an immediate PR-feedback poll.
   - With `<plan-id>`: poll once for that plan without shifting its schedule.
   - Without `<plan-id>`: poll now and reset the schedule for all active plans.
 
 ## Basic Workflow
 
-1. Initialize swarm:
-   - `npx -y simple-swarm init`
+1. Initialize prloom:
+   - `npx -y prloom init`
 2. Create a plan:
-   - `npx -y simple-swarm new my-feature`
+   - `npx -y prloom new my-feature`
 3. Start the dispatcher:
-   - `npx -y simple-swarm start`
+   - `npx -y prloom start`
 3. Review the draft PR in GitHub.
-4. Leave PR comments or a review; `swarm` triages feedback into TODOs.
+4. Leave PR comments or a review; `prloom` triages feedback into TODOs.
 5. When the PR is ready, merge it.
 
 ## Configuration
 
-Create `swarm.config.json` in the repo root:
+Create `prloom.config.json` in the repo root:
 
 ```json
 {
@@ -102,7 +102,7 @@ Create `swarm.config.json` in the repo root:
     "default": "opencode",
     "designer": "codex"
   },
-  "worktrees_dir": ".swarm/worktrees",
+  "worktrees_dir": ".prloom/worktrees",
   "poll_interval_ms": 60000,
   "base_branch": "main"
 }
@@ -110,5 +110,5 @@ Create `swarm.config.json` in the repo root:
 
 ## Notes
 
-- Runtime state is stored under `.swarm/` (gitignored).
+- Runtime state is stored under `.prloom/` (gitignored).
 - The plan file is committed on the PR branch at `plans/<id>.md` and lands on the configured `base_branch` only when you merge the PR.

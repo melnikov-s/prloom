@@ -11,7 +11,7 @@ You are helping the user create or refine a plan for a coding task.
 
 ## Plan Structure
 
-A plan file has already been created at the correct location (either `.swarm/inbox/<id>.md` before dispatch, or `plans/<id>.md` inside a worktree after dispatch).
+A plan file has already been created at the correct location (either `.prloom/inbox/<id>.md` before dispatch, or `plans/<id>.md` inside a worktree after dispatch).
 Your job is to fill in the sections of the existing file; do NOT create new plan files elsewhere.
 
 - **Objective**: Clear, specific description of what will be built

@@ -31,7 +31,7 @@ export async function runNew(
   const baseBranch = await getCurrentBranch(repoRoot);
   if (!baseBranch) {
     console.error("Cannot create plan on detached HEAD.");
-    console.error("Check out a branch and rerun `swarm new`. ");
+    console.error("Check out a branch and rerun `prloom new`. ");
     process.exit(1);
   }
 
@@ -49,7 +49,7 @@ export async function runNew(
   // Check if plan already exists in inbox
   if (existsSync(planPath)) {
     console.error(`Plan already exists in inbox: ${planPath}`);
-    console.error("Use 'swarm edit' to modify existing plans.");
+    console.error("Use 'prloom edit' to modify existing plans.");
     process.exit(1);
   }
 
@@ -65,7 +65,7 @@ export async function runNew(
   if (noDesigner) {
     console.log("");
     console.log("Plan skeleton created. Edit manually or use your IDE.");
-    console.log("Run 'swarm start' to dispatch when ready.");
+    console.log("Run 'prloom start' to dispatch when ready.");
     return;
   }
 
@@ -78,5 +78,5 @@ export async function runNew(
   await adapter.interactive({ cwd: repoRoot, prompt });
 
   console.log("Designer session ended.");
-  console.log("Plan is now in inbox. Run 'swarm start' to dispatch.");
+  console.log("Plan is now in inbox. Run 'prloom start' to dispatch.");
 }

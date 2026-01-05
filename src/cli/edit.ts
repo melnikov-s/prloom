@@ -32,7 +32,7 @@ export async function runEdit(
       console.log(`Editing ingested plan in worktree: ${planId}`);
     } else {
       console.error(`Plan not found: ${planId}`);
-      console.error("Check inbox or active plans with 'swarm status'.");
+      console.error("Check inbox or active plans with 'prloom status'.");
       process.exit(1);
     }
   }

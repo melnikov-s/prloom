@@ -26,7 +26,7 @@ export interface PlanState {
   lastReviewId?: number;
   lastReviewCommentId?: number;
   lastPolledAt?: string; // ISO timestamp
-  lastError?: string; // For visibility in swarm status
+  lastError?: string; // For visibility in prloom status
 }
 
 export interface State {
@@ -34,7 +34,7 @@ export interface State {
   plans: Record<string, PlanState>;
 }
 
-const SWARM_DIR = ".swarm";
+const SWARM_DIR = ".prloom";
 const STATE_FILE = "state.json";
 const LOCK_FILE = "lock";
 const PLANS_DIR = "plans";

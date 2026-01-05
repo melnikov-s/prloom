@@ -1,6 +1,6 @@
-# Simple-Swarm Integration
+# PRLoom Integration
 
-Simple-swarm is a CLI tool that orchestrates coding work through **plans** - markdown files that describe what needs to be built. Each plan contains an objective, context, and a TODO checklist. Swarm manages the lifecycle: creating worktrees, opening PRs, and tracking progress.
+PRLoom is a CLI tool that orchestrates coding work through **plans** - markdown files that describe what needs to be built. Each plan contains an objective, context, and a TODO checklist. PRLoom manages the lifecycle: creating worktrees, opening PRs, and tracking progress.
 
 ## What is a Plan?
 
@@ -37,48 +37,48 @@ Add user authentication with email/password login.
 
 ## Plan Lifecycle
 
-1. **Create** - `swarm new <id> --agent manual --no-designer` creates a plan in `.swarm/inbox/<id>.md`
+1. **Create** - `prloom new <id> --agent manual --no-designer` creates a plan in `.prloom/inbox/<id>.md`
 2. **Edit** - Fill in the Objective, Context, and TODO sections
-3. **Dispatch** - When `swarm start` runs, the plan is moved to a git worktree and a draft PR is opened
+3. **Dispatch** - When `prloom start` runs, the plan is moved to a git worktree and a draft PR is opened
 4. **Execute** - Complete each TODO, mark checkboxes, append to Progress Log
 5. **Complete** - When all TODOs are done, the PR is marked ready for review
 
 ## CLI Commands
 
-| Command                                       | Description                                 |
-| --------------------------------------------- | ------------------------------------------- |
-| `swarm init`                                  | Initialize swarm in a repository            |
-| `swarm new <id> --agent manual --no-designer` | Create a new plan skeleton                  |
-| `swarm status`                                | Show all plans with their worktree paths    |
-| `swarm edit <id> --no-designer`               | Print the path to an existing plan          |
-| `swarm poll <id>`                             | Fetch and display PR feedback               |
-| `swarm start`                                 | Start the dispatcher (manages PR lifecycle) |
+| Command                                        | Description                                 |
+| ---------------------------------------------- | ------------------------------------------- |
+| `prloom init`                                  | Initialize prloom in a repository           |
+| `prloom new <id> --agent manual --no-designer` | Create a new plan skeleton                  |
+| `prloom status`                                | Show all plans with their worktree paths    |
+| `prloom edit <id> --no-designer`               | Print the path to an existing plan          |
+| `prloom poll <id>`                             | Fetch and display PR feedback               |
+| `prloom start`                                 | Start the dispatcher (manages PR lifecycle) |
 
 ## Creating a New Plan
 
 ```bash
-swarm new my-feature --agent manual --no-designer
+prloom new my-feature --agent manual --no-designer
 ```
 
 Output:
 
 ```
-Created plan in inbox: .swarm/inbox/my-feature.md
+Created plan in inbox: .prloom/inbox/my-feature.md
 Base branch: main
 Worker agent: manual
 
 Plan skeleton created. Edit manually or use your IDE.
-Run 'swarm start' to dispatch when ready.
+Run 'prloom start' to dispatch when ready.
 ```
 
-The plan is now at `.swarm/inbox/my-feature.md`. Edit it to add your Objective, Context, and TODOs.
+The plan is now at `.prloom/inbox/my-feature.md`. Edit it to add your Objective, Context, and TODOs.
 
 ## Finding Your Worktree
 
-After `swarm start` ingests the plan:
+After `prloom start` ingests the plan:
 
 ```bash
-swarm status
+prloom status
 ```
 
 Output:
@@ -94,14 +94,14 @@ my-feature
   Status:   active
   Agent:    manual
   PR:       PR #42
-  Worktree: /Users/dev/.swarm-worktrees/my-feature
-  Plan:     /Users/dev/.swarm-worktrees/my-feature/plans/my-feature.md
+  Worktree: /Users/dev/.prloom-worktrees/my-feature
+  Plan:     /Users/dev/.prloom-worktrees/my-feature/plans/my-feature.md
 
 ────────────────────────────────────────────────────────────
 COMMANDS:
-  swarm new <id> --agent manual --no-designer  Create a new plan
-  swarm poll <id>                              View PR feedback
-  swarm edit <id> --no-designer                Get plan path
+  prloom new <id> --agent manual --no-designer  Create a new plan
+  prloom poll <id>                              View PR feedback
+  prloom edit <id> --no-designer                Get plan path
 ```
 
 Open the worktree directory in your editor. The plan file is at `plans/<id>.md`.
@@ -125,14 +125,14 @@ For each unchecked item (`- [ ] ...`):
 6. Commit and push:
    ```bash
    git add -A
-   git commit -m "[swarm] my-feature: users table migration"
+   git commit -m "[prloom] my-feature: users table migration"
    git push
    ```
 
 ## Checking PR Feedback
 
 ```bash
-swarm poll my-feature
+prloom poll my-feature
 ```
 
 Output:
@@ -157,8 +157,8 @@ NEXT STEPS:
   3. Implement fixes in the worktree
   4. Commit and push changes
 
-Worktree: /Users/dev/.swarm-worktrees/my-feature
-Plan:     /Users/dev/.swarm-worktrees/my-feature/plans/my-feature.md
+Worktree: /Users/dev/.prloom-worktrees/my-feature
+Plan:     /Users/dev/.prloom-worktrees/my-feature/plans/my-feature.md
 ```
 
 Address the feedback by adding TODO items and implementing fixes.

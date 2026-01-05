@@ -68,7 +68,7 @@ export function renderTriagePrompt(
   });
 }
 
-const TRIAGE_RESULT_FILE = ".swarm/triage-result.json";
+const TRIAGE_RESULT_FILE = ".prloom/triage-result.json";
 
 export function readTriageResultFile(worktreePath: string): TriageResult {
   const resultPath = join(worktreePath, TRIAGE_RESULT_FILE);

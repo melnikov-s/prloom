@@ -65,10 +65,10 @@ export async function runStatus(repoRoot: string): Promise<void> {
   console.log("─".repeat(60));
   console.log("COMMANDS:");
   console.log(
-    "  swarm new <id> --agent manual --no-designer  Create a new plan"
+    "  prloom new <id> --agent manual --no-designer  Create a new plan"
   );
   console.log(
-    "  swarm poll <id>                              View PR feedback"
+    "  prloom poll <id>                              View PR feedback"
   );
-  console.log("  swarm edit <id> --no-designer                Get plan path");
+  console.log("  prloom edit <id> --no-designer                Get plan path");
 }

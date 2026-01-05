@@ -18,7 +18,7 @@ export async function runPoll(repoRoot: string, planId: string): Promise<void> {
   if (!ps) {
     console.error(`Plan not found: ${planId}`);
     console.error("");
-    console.error("Hint: Run 'swarm status' to see active plans.");
+    console.error("Hint: Run 'prloom status' to see active plans.");
     process.exit(1);
   }
 

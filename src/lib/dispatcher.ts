@@ -25,7 +25,7 @@ import {
   commitAll,
   push,
   copyFileToWorktree,
-  ensureWorktreeSwarmDir,
+  ensureWorktreePrloomDir,
   rebaseOnBaseBranch,
   forcePush,
 } from "./git.js";
@@ -156,7 +156,7 @@ async function ingestInboxPlans(
       setStatus(worktreePlanPath, "active");
 
       // Commit and push
-      await commitAll(worktreePath, `[swarm] ${planId}: initial plan`);
+      await commitAll(worktreePath, `[prloom] ${planId}: initial plan`);
       await push(worktreePath, branch);
 
       // Create draft PR
@@ -285,7 +285,7 @@ async function processActivePlans(
           }
 
           // Only update the polling schedule timestamp on normal polling cycles.
-          // For one-off polls (`swarm poll <id>`), keep schedule intact.
+          // For one-off polls (`prloom poll <id>`), keep schedule intact.
           if (decision.shouldUpdateLastPolledAt) {
             ps.lastPolledAt = new Date().toISOString();
           }
@@ -314,7 +314,7 @@ async function processActivePlans(
           // Commit and push
           const committed = await commitAll(
             ps.worktree,
-            `[swarm] ${planId}: TODO #${todo.index}`
+            `[prloom] ${planId}: TODO #${todo.index}`
           );
           if (committed) {
             await push(ps.worktree, ps.branch);
@@ -342,7 +342,7 @@ async function processActivePlans(
         } else {
           // All TODOs done
           setStatus(planPath, "done");
-          await commitAll(ps.worktree, `[swarm] ${planId}: done`);
+          await commitAll(ps.worktree, `[prloom] ${planId}: done`);
           await push(ps.worktree, ps.branch);
           if (ps.pr) {
             await markPRReady(repoRoot, ps.pr);
@@ -387,8 +387,8 @@ async function runTriage(
   plan: ReturnType<typeof parsePlan>,
   feedback: PRFeedback[]
 ): Promise<void> {
-  // Ensure .swarm directory exists in worktree
-  ensureWorktreeSwarmDir(ps.worktree);
+  // Ensure .prloom directory exists in worktree
+  ensureWorktreePrloomDir(ps.worktree);
 
   const triageAgent = config.agents.designer ?? config.agents.default;
   const adapter = getAdapter(triageAgent);
@@ -433,7 +433,7 @@ async function runTriage(
     // Commit any changes from triage
     const committed = await commitAll(
       ps.worktree,
-      `[swarm] ${plan.frontmatter.id}: triage`
+      `[prloom] ${plan.frontmatter.id}: triage`
     );
     if (committed) {
       await push(ps.worktree, ps.branch);
@@ -484,7 +484,7 @@ async function sleepUntilIpcOrTimeout(
   cursor: number,
   timeoutMs: number
 ): Promise<void> {
-  const controlPath = join(repoRoot, ".swarm", "control.jsonl");
+  const controlPath = join(repoRoot, ".prloom", "control.jsonl");
   const started = Date.now();
 
   while (Date.now() - started < timeoutMs) {

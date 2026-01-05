@@ -211,11 +211,11 @@ export function copyFileToWorktree(
   copyFileSync(srcPath, destPath);
 }
 
-// Ensure .swarm directory exists in worktree
+// Ensure .prloom directory exists in worktree
 
-export function ensureWorktreeSwarmDir(worktreePath: string): void {
-  const swarmDir = join(worktreePath, ".swarm");
-  if (!existsSync(swarmDir)) {
-    mkdirSync(swarmDir, { recursive: true });
+export function ensureWorktreePrloomDir(worktreePath: string): void {
+  const prloomDir = join(worktreePath, ".prloom");
+  if (!existsSync(prloomDir)) {
+    mkdirSync(prloomDir, { recursive: true });
   }
 }

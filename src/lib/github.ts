@@ -91,7 +91,7 @@ export interface FeedbackCursors {
   lastReviewCommentId?: number;
 }
 
-const BOT_MARKER = "<!-- swarm:bot -->";
+const BOT_MARKER = "<!-- prloom:bot -->";
 
 // Get authenticated GitHub user
 

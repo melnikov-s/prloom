@@ -2,7 +2,7 @@
   "lockfileVersion": 1,
   "workspaces": {
     "": {
-      "name": "simple-swarm",
+      "name": "prloom",
       "dependencies": {
         "execa": "^9.6.1",
         "glob": "^13.0.0",

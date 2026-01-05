@@ -26,7 +26,7 @@ export async function runInit(
   const defaultBranch = await detectDefaultBranch(repoRoot);
 
   // Write config if missing (or if force)
-  const configPath = join(repoRoot, "swarm.config.json");
+  const configPath = join(repoRoot, "prloom.config.json");
   if (!existsSync(configPath) || opts.force) {
     // Load existing (if any) so we preserve agent choices when force is used
     const existing = loadConfig(repoRoot);
@@ -42,18 +42,18 @@ export async function runInit(
     console.log(`Found existing ${configPath} (leaving unchanged)`);
   }
 
-  // Ensure .swarm/ runtime directories exist
-  const swarmDir = join(repoRoot, ".swarm");
-  const inboxDir = join(swarmDir, "inbox");
-  const plansDir = join(swarmDir, "plans");
+  // Ensure .prloom/ runtime directories exist
+  const prloomDir = join(repoRoot, ".prloom");
+  const inboxDir = join(prloomDir, "inbox");
+  const plansDir = join(prloomDir, "plans");
 
   mkdirSync(inboxDir, { recursive: true });
   mkdirSync(plansDir, { recursive: true });
 
   // Ensure gitignore
-  await ensureGitignoreEntry(repoRoot, ".swarm/");
+  await ensureGitignoreEntry(repoRoot, ".prloom/");
 
-  console.log("✅ swarm initialized");
+  console.log("✅ prloom initialized");
   console.log(`Base branch: ${defaultBranch}`);
 
   // Prompt for IDE instruction files (unless --yes skips prompts)
@@ -62,7 +62,7 @@ export async function runInit(
   }
 
   console.log("");
-  console.log("Next: run `swarm new <id>` then `swarm start`");
+  console.log("Next: run `prloom new <id>` then `prloom start`");
 }
 
 async function promptIdeInstructionFiles(repoRoot: string): Promise<void> {
@@ -74,14 +74,14 @@ async function promptIdeInstructionFiles(repoRoot: string): Promise<void> {
   console.log("");
 
   const wantCursor = await promptYesNo(
-    "Append swarm instructions to CURSOR.md?"
+    "Append prloom instructions to CURSOR.md?"
   );
   if (wantCursor) {
     appendSwarmInstructions(repoRoot, "CURSOR.md", agentTemplate);
   }
 
   const wantAntigravity = await promptYesNo(
-    "Append swarm instructions to ANTIGRAVITY.md?"
+    "Append prloom instructions to ANTIGRAVITY.md?"
   );
   if (wantAntigravity) {
     appendSwarmInstructions(repoRoot, "ANTIGRAVITY.md", agentTemplate);
@@ -123,7 +123,7 @@ function appendSwarmInstructions(
   if (!existsSync(filePath)) {
     // Create new file with wrapped content
     writeFileSync(filePath, wrappedContent + "\n");
-    console.log(`Created ${filename} with swarm instructions`);
+    console.log(`Created ${filename} with prloom instructions`);
     return;
   }
 
@@ -138,12 +138,12 @@ function appendSwarmInstructions(
   if (tagPattern.test(existing)) {
     const updated = existing.replace(tagPattern, wrappedContent);
     writeFileSync(filePath, updated);
-    console.log(`Updated swarm instructions in ${filename}`);
+    console.log(`Updated prloom instructions in ${filename}`);
   } else {
     // Append to end of file
     const updated = existing.trimEnd() + "\n\n" + wrappedContent + "\n";
     writeFileSync(filePath, updated);
-    console.log(`Appended swarm instructions to ${filename}`);
+    console.log(`Appended prloom instructions to ${filename}`);
   }
 }
 
@@ -180,7 +180,7 @@ async function ensureGhAuthed(): Promise<void> {
     await execa("gh", ["auth", "status"], { stdio: "ignore" });
   } catch {
     console.error("GitHub CLI is not authenticated.");
-    console.error("Run `gh auth login` then rerun `swarm init`.");
+    console.error("Run `gh auth login` then rerun `prloom init`.");
     process.exit(1);
   }
 }
@@ -199,7 +199,7 @@ async function ensureGhRepoResolvable(repoRoot: string): Promise<void> {
     console.error(
       "Make sure this repo has an `origin` remote pointing to GitHub."
     );
-    console.error("Then rerun `swarm init`. ");
+    console.error("Then rerun `prloom init`. ");
     process.exit(1);
   }
 }
