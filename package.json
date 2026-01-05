@@ -10,7 +10,8 @@
     "dist/**/*",
     "README.md",
     "LICENSE",
-    "prompts/**/*"
+    "prompts/**/*",
+    "manual_agent.md"
   ],
   "scripts": {
     "gen:prompts": "bun run scripts/generate_prompts.ts",

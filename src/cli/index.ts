@@ -48,11 +48,21 @@ yargs(hideBin(process.argv))
         .positional("plan-id", { type: "string", describe: "Plan ID" })
         .option("agent", {
           type: "string",
-          describe: "Coding agent to use (codex, opencode, claude)",
+          describe: "Coding agent to use (codex, opencode, claude, manual)",
+        })
+        .option("no-designer", {
+          type: "boolean",
+          describe: "Create plan skeleton without launching designer session",
+          default: false,
         }),
     async (argv) => {
       const { runNew } = await import("./new.js");
-      await runNew(await getRepoRoot(), argv["plan-id"], argv.agent);
+      await runNew(
+        await getRepoRoot(),
+        argv["plan-id"],
+        argv.agent,
+        argv["no-designer"]
+      );
     }
   )
 
@@ -65,11 +75,21 @@ yargs(hideBin(process.argv))
         .positional("plan-id", { type: "string", demandOption: true })
         .option("agent", {
           type: "string",
-          describe: "Coding agent to use (codex, opencode, claude)",
+          describe: "Coding agent to use (codex, opencode, claude, manual)",
+        })
+        .option("no-designer", {
+          type: "boolean",
+          describe: "Print plan path without launching designer session",
+          default: false,
         }),
     async (argv) => {
       const { runEdit } = await import("./edit.js");
-      await runEdit(await getRepoRoot(), argv["plan-id"] as string, argv.agent);
+      await runEdit(
+        await getRepoRoot(),
+        argv["plan-id"] as string,
+        argv.agent,
+        argv["no-designer"]
+      );
     }
   )
 
@@ -146,22 +166,26 @@ yargs(hideBin(process.argv))
   // swarm poll
   .command(
     "poll [plan-id]",
-    "Launch immediate PR feedback poll (all plans if no ID given)",
+    "Fetch and display PR feedback for a plan (or signal all if no ID)",
     (yargs) =>
-      yargs.positional("plan-id", {
-        type: "string",
-        describe: "Plan ID (optional)",
-      }),
+      yargs
+        .positional("plan-id", {
+          type: "string",
+          describe: "Plan ID (omit to signal all plans)",
+        })
+        .option("signal", {
+          type: "boolean",
+          describe: "Signal dispatcher to poll (instead of displaying)",
+          default: false,
+        }),
     async (argv) => {
-      const { enqueue } = await import("../lib/ipc.js");
-      const { loadState } = await import("../lib/state.js");
-      const planId = argv["plan-id"] as string | undefined;
       const repoRoot = await getRepoRoot();
+      const planId = argv["plan-id"] as string | undefined;
 
-      if (planId) {
-        enqueue(repoRoot, { type: "poll", plan_id: planId });
-        console.log(`Queued immediate poll (no reset) for ${planId}`);
-      } else {
+      if (!planId) {
+        // No plan ID: signal all plans (original behavior)
+        const { enqueue } = await import("../lib/ipc.js");
+        const { loadState } = await import("../lib/state.js");
         const state = loadState(repoRoot);
         const planIds = Object.keys(state.plans);
         if (planIds.length === 0) {
@@ -171,9 +195,18 @@ yargs(hideBin(process.argv))
             enqueue(repoRoot, { type: "launch_poll", plan_id: id });
           }
           console.log(
-            `Queued immediate poll (reset schedule) for ${planIds.length} plans`
+            `Signaled dispatcher to poll feedback for ${planIds.length} plans`
           );
         }
+      } else if (argv.signal) {
+        // Signal dispatcher mode
+        const { enqueue } = await import("../lib/ipc.js");
+        enqueue(repoRoot, { type: "poll", plan_id: planId });
+        console.log(`Signaled dispatcher to poll feedback for ${planId}`);
+      } else {
+        // Display mode - show feedback directly
+        const { runPoll } = await import("./poll.js");
+        await runPoll(repoRoot, planId);
       }
     }
   )

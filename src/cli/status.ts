@@ -1,6 +1,6 @@
 import { join } from "path";
 import { existsSync } from "fs";
-import { loadState, listInboxPlanIds } from "../lib/state.js";
+import { loadState, listInboxPlanIds, getInboxPath } from "../lib/state.js";
 import { parsePlan } from "../lib/plan.js";
 
 export async function runStatus(repoRoot: string): Promise<void> {
@@ -9,13 +9,15 @@ export async function runStatus(repoRoot: string): Promise<void> {
 
   // Show inbox plans
   console.log("INBOX (pending dispatch)");
-  console.log("─".repeat(40));
+  console.log("─".repeat(60));
 
   if (inboxPlanIds.length === 0) {
     console.log("  (no inbox plans)");
   } else {
     for (const id of inboxPlanIds) {
+      const inboxPath = getInboxPath(repoRoot, id);
       console.log(`  ${id}`);
+      console.log(`    Path: ${inboxPath}`);
     }
   }
 
@@ -23,9 +25,7 @@ export async function runStatus(repoRoot: string): Promise<void> {
 
   // Show active plans from state
   console.log("ACTIVE PLANS");
-  console.log("─".repeat(70));
-  console.log("PLAN              STATUS    PAUSED  PR#     SESSION");
-  console.log("─".repeat(70));
+  console.log("─".repeat(60));
 
   const planIds = Object.keys(state.plans);
 
@@ -37,24 +37,38 @@ export async function runStatus(repoRoot: string): Promise<void> {
       const planPath = join(ps.worktree, ps.planRelpath);
 
       let status = "unknown";
+      let agent = "—";
       if (existsSync(planPath)) {
         try {
           const plan = parsePlan(planPath);
           status = plan.frontmatter.status;
+          agent = plan.frontmatter.agent ?? "default";
         } catch {
           status = "error";
         }
       }
 
-      const paused = ps.paused ? "yes" : "no";
-      const prNum = ps.pr ? String(ps.pr) : "—";
-      const session = ps.sessionId ?? "—";
+      const paused = ps.paused ? " [PAUSED]" : "";
+      const prNum = ps.pr ? `PR #${ps.pr}` : "No PR";
 
-      console.log(
-        `${planId.padEnd(18)} ${status.padEnd(10)} ${paused.padEnd(
-          8
-        )} ${prNum.padEnd(8)} ${session}`
-      );
+      console.log(`${planId}${paused}`);
+      console.log(`  Status:   ${status}`);
+      console.log(`  Agent:    ${agent}`);
+      console.log(`  PR:       ${prNum}`);
+      console.log(`  Worktree: ${ps.worktree}`);
+      console.log(`  Plan:     ${planPath}`);
+      console.log("");
     }
   }
+
+  // Add hints
+  console.log("─".repeat(60));
+  console.log("COMMANDS:");
+  console.log(
+    "  swarm new <id> --agent manual --no-designer  Create a new plan"
+  );
+  console.log(
+    "  swarm poll <id>                              View PR feedback"
+  );
+  console.log("  swarm edit <id> --no-designer                Get plan path");
 }

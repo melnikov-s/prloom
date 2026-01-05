@@ -8,7 +8,8 @@ import { loadState, getInboxPath } from "../lib/state.js";
 export async function runEdit(
   repoRoot: string,
   planId: string,
-  agentOverride?: string
+  agentOverride?: string,
+  noDesigner?: boolean
 ): Promise<void> {
   const config = loadConfig(repoRoot);
   const state = loadState(repoRoot);
@@ -39,6 +40,15 @@ export async function runEdit(
   if (!existsSync(planPath)) {
     console.error(`Plan file not found: ${planPath}`);
     process.exit(1);
+  }
+
+  console.log(`Plan path: ${planPath}`);
+
+  // Skip designer session if --no-designer flag is used
+  if (noDesigner) {
+    console.log("");
+    console.log("Edit the plan manually or use your IDE.");
+    return;
   }
 
   const existingPlan = readFileSync(planPath, "utf-8");

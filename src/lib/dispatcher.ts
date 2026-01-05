@@ -95,10 +95,18 @@ export async function runDispatcher(repoRoot: string): Promise<void> {
       await processActivePlans(repoRoot, config, state, botLogin);
 
       saveState(repoRoot, state);
-      await sleepUntilIpcOrTimeout(repoRoot, state.control_cursor, config.poll_interval_ms);
+      await sleepUntilIpcOrTimeout(
+        repoRoot,
+        state.control_cursor,
+        config.poll_interval_ms
+      );
     } catch (error) {
       console.error("Dispatcher error:", error);
-      await sleepUntilIpcOrTimeout(repoRoot, state.control_cursor, config.poll_interval_ms);
+      await sleepUntilIpcOrTimeout(
+        repoRoot,
+        state.control_cursor,
+        config.poll_interval_ms
+      );
     }
   }
 }
@@ -237,6 +245,9 @@ async function processActivePlans(
 
       let plan = parsePlan(planPath);
 
+      // Skip automated execution for manual agent plans
+      const isManualAgent = plan.frontmatter.agent === "manual";
+
       // Poll and triage feedback (even if status=done)
       // Throttle to avoid GitHub rate limits
       if (ps.pr) {
@@ -256,7 +267,10 @@ async function processActivePlans(
           if (newFeedback.length > 0) {
             console.log(`💬 ${newFeedback.length} new feedback for ${planId}`);
 
-            await runTriage(repoRoot, config, ps, plan, newFeedback);
+            // Skip automated triage for manual agent plans
+            if (!isManualAgent) {
+              await runTriage(repoRoot, config, ps, plan, newFeedback);
+            }
 
             // Re-parse plan after triage may have modified it
             plan = parsePlan(planPath);
@@ -279,7 +293,9 @@ async function processActivePlans(
       }
 
       // Execute next TODO (status = active or queued are runnable)
+      // Skip automated TODO execution for manual agent plans
       if (
+        !isManualAgent &&
         plan.frontmatter.status !== "blocked" &&
         plan.frontmatter.status !== "done"
       ) {
@@ -453,7 +469,9 @@ function handleCommand(state: State, cmd: IpcCommand): void {
   } else if (cmd.type === "launch_poll") {
     // Force immediate feedback poll AND reset schedule (poll timestamp)
     ps.lastPolledAt = undefined;
-    console.log(`🔄 Launching immediate poll (reset schedule) for ${cmd.plan_id}`);
+    console.log(
+      `🔄 Launching immediate poll (reset schedule) for ${cmd.plan_id}`
+    );
   }
 }
 

@@ -10,7 +10,8 @@ import { getCurrentBranch, ensureRemoteBranchExists } from "../lib/git.js";
 export async function runNew(
   repoRoot: string,
   planId?: string,
-  agentOverride?: string
+  agentOverride?: string,
+  noDesigner?: boolean
 ): Promise<void> {
   const config = loadConfig(repoRoot);
 
@@ -25,8 +26,6 @@ export async function runNew(
 
   // Resolve worker agent: CLI flag > config.default
   const workerAgent = (agentOverride as AgentName) ?? config.agents.default;
-
-  const adapter = getAdapter(designerAgent);
 
   // Determine base branch for this plan (current branch)
   const baseBranch = await getCurrentBranch(repoRoot);
@@ -61,6 +60,16 @@ export async function runNew(
   console.log(`Created plan in inbox: ${planPath}`);
   console.log(`Base branch: ${baseBranch}`);
   console.log(`Worker agent: ${workerAgent}`);
+
+  // Skip designer session if --no-designer flag is used
+  if (noDesigner) {
+    console.log("");
+    console.log("Plan skeleton created. Edit manually or use your IDE.");
+    console.log("Run 'swarm start' to dispatch when ready.");
+    return;
+  }
+
+  const adapter = getAdapter(designerAgent);
   console.log(`Designer agent: ${designerAgent}`);
   console.log("");
   console.log("Starting Designer session to fill in the plan...");

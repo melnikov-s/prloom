@@ -1,6 +1,6 @@
 import { execa } from "execa";
 
-export type AgentName = "codex" | "opencode" | "claude";
+export type AgentName = "codex" | "opencode" | "claude" | "manual";
 
 export interface ExecutionResult {
   exitCode: number;
@@ -23,5 +23,10 @@ export interface AgentAdapter {
 }
 
 export function isAgentName(value: string): value is AgentName {
-  return value === "codex" || value === "opencode" || value === "claude";
+  return (
+    value === "codex" ||
+    value === "opencode" ||
+    value === "claude" ||
+    value === "manual"
+  );
 }
