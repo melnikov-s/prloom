@@ -1,6 +1,6 @@
 # Designer: Create a New Plan
 
-You are helping a software engineer **plan** a coding task for prloom.
+You are helping a software engineer **plan** a coding task.
 
 > [!CAUTION] > **You are PLANNING, not building.**
 >
