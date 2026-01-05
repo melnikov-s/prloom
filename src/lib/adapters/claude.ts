@@ -1,6 +1,10 @@
 import { execa } from "execa";
 import type { AgentAdapter, ExecutionResult, TmuxConfig } from "./types.js";
-import { waitForTmuxSession } from "./tmux.js";
+import {
+  waitForTmuxSession,
+  prepareLogFiles,
+  readExecutionResult,
+} from "./tmux.js";
 
 /**
  * Adapter for Claude Code CLI
@@ -10,9 +14,14 @@ export const claudeAdapter: AgentAdapter = {
   name: "claude",
 
   async execute({ cwd, prompt, tmux }): Promise<ExecutionResult> {
-    const args = ["-p", prompt, "--dangerously-skip-permissions"];
-
     if (tmux) {
+      const { logFile, exitCodeFile } = prepareLogFiles(cwd);
+
+      // Wrap command to capture output and exit code
+      const wrappedCmd = `claude -p ${JSON.stringify(
+        prompt
+      )} --dangerously-skip-permissions 2>&1 | tee ${logFile}; echo $? > ${exitCodeFile}`;
+
       // Spawn in detached tmux session
       await execa(
         "tmux",
@@ -23,22 +32,28 @@ export const claudeAdapter: AgentAdapter = {
           tmux.sessionName,
           "-c",
           cwd,
-          "claude",
-          ...args,
+          "bash",
+          "-c",
+          wrappedCmd,
         ],
         { reject: false }
       );
+
       // Wait for session to complete
       await waitForTmuxSession(tmux.sessionName);
-      return { exitCode: 0 };
+      return readExecutionResult(cwd);
     }
 
     // Direct execution (no tmux)
-    const result = await execa("claude", args, {
-      cwd,
-      timeout: 0,
-      reject: false,
-    });
+    const result = await execa(
+      "claude",
+      ["-p", prompt, "--dangerously-skip-permissions"],
+      {
+        cwd,
+        timeout: 0,
+        reject: false,
+      }
+    );
     return { exitCode: result.exitCode ?? 0 };
   },
 

@@ -1,6 +1,10 @@
 import { execa } from "execa";
 import type { AgentAdapter, ExecutionResult, TmuxConfig } from "./types.js";
-import { waitForTmuxSession } from "./tmux.js";
+import {
+  waitForTmuxSession,
+  prepareLogFiles,
+  readExecutionResult,
+} from "./tmux.js";
 
 /**
  * Adapter for OpenCode CLI
@@ -11,6 +15,13 @@ export const opencodeAdapter: AgentAdapter = {
 
   async execute({ cwd, prompt, tmux }): Promise<ExecutionResult> {
     if (tmux) {
+      const { logFile, exitCodeFile } = prepareLogFiles(cwd);
+
+      // Wrap command to capture output and exit code
+      const wrappedCmd = `opencode run ${JSON.stringify(
+        prompt
+      )} 2>&1 | tee ${logFile}; echo $? > ${exitCodeFile}`;
+
       // Spawn in detached tmux session
       await execa(
         "tmux",
@@ -21,15 +32,16 @@ export const opencodeAdapter: AgentAdapter = {
           tmux.sessionName,
           "-c",
           cwd,
-          "opencode",
-          "run",
-          prompt,
+          "bash",
+          "-c",
+          wrappedCmd,
         ],
         { reject: false }
       );
+
       // Wait for session to complete
       await waitForTmuxSession(tmux.sessionName);
-      return { exitCode: 0 };
+      return readExecutionResult(cwd);
     }
 
     // Direct execution (no tmux)

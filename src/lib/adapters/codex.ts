@@ -1,6 +1,10 @@
 import { execa } from "execa";
 import type { AgentAdapter, ExecutionResult, TmuxConfig } from "./types.js";
-import { waitForTmuxSession } from "./tmux.js";
+import {
+  waitForTmuxSession,
+  prepareLogFiles,
+  readExecutionResult,
+} from "./tmux.js";
 
 /**
  * Adapter for OpenAI Codex CLI
@@ -10,9 +14,14 @@ export const codexAdapter: AgentAdapter = {
   name: "codex",
 
   async execute({ cwd, prompt, tmux }): Promise<ExecutionResult> {
-    const args = ["exec", prompt, "--full-auto"];
-
     if (tmux) {
+      const { logFile, exitCodeFile } = prepareLogFiles(cwd);
+
+      // Wrap command to capture output and exit code
+      const wrappedCmd = `codex exec ${JSON.stringify(
+        prompt
+      )} --full-auto 2>&1 | tee ${logFile}; echo $? > ${exitCodeFile}`;
+
       // Spawn in detached tmux session
       await execa(
         "tmux",
@@ -23,18 +32,20 @@ export const codexAdapter: AgentAdapter = {
           tmux.sessionName,
           "-c",
           cwd,
-          "codex",
-          ...args,
+          "bash",
+          "-c",
+          wrappedCmd,
         ],
         { reject: false }
       );
+
       // Wait for session to complete
       await waitForTmuxSession(tmux.sessionName);
-      return { exitCode: 0 };
+      return readExecutionResult(cwd);
     }
 
     // Direct execution (no tmux)
-    const result = await execa("codex", args, {
+    const result = await execa("codex", ["exec", prompt, "--full-auto"], {
       cwd,
       timeout: 0,
       reject: false,
