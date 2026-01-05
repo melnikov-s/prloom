@@ -2,10 +2,11 @@ import { join } from "path";
 import { existsSync, writeFileSync } from "fs";
 import { loadConfig } from "../lib/config.js";
 import { getAdapter, type AgentName } from "../lib/adapters/index.js";
-import { generatePlanSkeleton } from "../lib/plan.js";
+import { generatePlanSkeleton, setStatus } from "../lib/plan.js";
 import { renderDesignerNewPrompt } from "../lib/template.js";
 import { ensureInboxDir, getInboxPath } from "../lib/state.js";
 import { getCurrentBranch, ensureRemoteBranchExists } from "../lib/git.js";
+import { confirm } from "./prompt.js";
 
 export async function runNew(
   repoRoot: string,
@@ -53,7 +54,7 @@ export async function runNew(
     process.exit(1);
   }
 
-  // Create plan skeleton with deterministic frontmatter
+  // Create plan skeleton with deterministic frontmatter (status: draft)
   const skeleton = generatePlanSkeleton(id, workerAgent, baseBranch);
   writeFileSync(planPath, skeleton);
 
@@ -64,8 +65,8 @@ export async function runNew(
   // Skip designer session if --no-designer flag is used
   if (noDesigner) {
     console.log("");
-    console.log("Plan skeleton created. Edit manually or use your IDE.");
-    console.log("Run 'prloom start' to dispatch when ready.");
+    console.log("Plan skeleton created (status: draft).");
+    console.log("Use 'prloom edit' to design, then queue for dispatch.");
     return;
   }
 
@@ -82,6 +83,15 @@ export async function runNew(
   );
   await adapter.interactive({ cwd: repoRoot, prompt });
 
+  console.log("");
   console.log("Designer session ended.");
-  console.log("Plan is now in inbox. Run 'prloom start' to dispatch.");
+
+  // Prompt to queue the plan
+  const shouldQueue = await confirm("Queue this plan for the dispatcher?");
+  if (shouldQueue) {
+    setStatus(planPath, "queued");
+    console.log("Plan queued. Run 'prloom start' to dispatch.");
+  } else {
+    console.log("Plan left as draft. Use 'prloom edit' to continue later.");
+  }
 }

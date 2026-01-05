@@ -4,6 +4,8 @@ import { loadConfig } from "../lib/config.js";
 import { getAdapter, type AgentName } from "../lib/adapters/index.js";
 import { renderDesignerEditPrompt } from "../lib/template.js";
 import { loadState, getInboxPath } from "../lib/state.js";
+import { parsePlan, setStatus } from "../lib/plan.js";
+import { confirm } from "./prompt.js";
 
 export async function runEdit(
   repoRoot: string,
@@ -18,10 +20,12 @@ export async function runEdit(
   const inboxPath = getInboxPath(repoRoot, planId);
   let planPath: string;
   let cwd: string;
+  let isInbox = false;
 
   if (existsSync(inboxPath)) {
     planPath = inboxPath;
     cwd = repoRoot;
+    isInbox = true;
     console.log(`Editing inbox plan: ${planId}`);
   } else {
     // Check if ingested (in state)
@@ -66,5 +70,20 @@ export async function runEdit(
   const prompt = renderDesignerEditPrompt(cwd, planPath, existingPlan);
   await adapter.interactive({ cwd, prompt });
 
+  console.log("");
   console.log("Designer session ended.");
+
+  // For inbox plans: check if still draft and prompt to queue
+  if (isInbox) {
+    const plan = parsePlan(planPath);
+    if (plan.frontmatter.status === "draft") {
+      const shouldQueue = await confirm("Queue this plan for the dispatcher?");
+      if (shouldQueue) {
+        setStatus(planPath, "queued");
+        console.log("Plan queued. Run 'prloom start' to dispatch.");
+      } else {
+        console.log("Plan left as draft.");
+      }
+    }
+  }
 }

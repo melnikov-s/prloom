@@ -141,6 +141,11 @@ async function ingestInboxPlans(
         continue;
       }
 
+      // Skip drafts - designer is still working on them
+      if (plan.frontmatter.status === "draft") {
+        continue;
+      }
+
       console.log(`📥 Ingesting inbox plan: ${planId}`);
 
       // Determine base branch for this plan

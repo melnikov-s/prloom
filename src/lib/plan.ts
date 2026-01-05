@@ -2,7 +2,7 @@ import { readFileSync, writeFileSync } from "fs";
 import matter from "gray-matter";
 import { type AgentName, isAgentName } from "./adapters/index.js";
 
-export type PlanStatus = "queued" | "active" | "blocked" | "done";
+export type PlanStatus = "draft" | "queued" | "active" | "blocked" | "done";
 
 export interface PlanFrontmatter {
   id: string;
@@ -39,7 +39,8 @@ export function parsePlan(path: string): Plan {
     agent: parseAgentField(data.agent),
     branch: data.branch,
     pr: data.pr,
-    base_branch: typeof data.base_branch === "string" ? data.base_branch : undefined,
+    base_branch:
+      typeof data.base_branch === "string" ? data.base_branch : undefined,
   };
 
   // Extract sections
@@ -141,7 +142,7 @@ export function generatePlanSkeleton(
 ): string {
   const frontmatter: Record<string, string> = {
     id,
-    status: "queued",
+    status: "draft",
   };
 
   if (agent) {

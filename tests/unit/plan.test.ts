@@ -1,13 +1,20 @@
 import { test, expect } from "bun:test";
 import { join } from "path";
+import { mkdtempSync, writeFileSync, rmSync } from "fs";
+import { tmpdir } from "os";
 import {
   parsePlan,
   findNextUnchecked,
   extractBody,
   generatePlanSkeleton,
+  setStatus,
 } from "../../src/lib/plan.js";
 
 const FIXTURE_PATH = join(import.meta.dir, "../fixtures/plans/sample.md");
+const DRAFT_FIXTURE_PATH = join(
+  import.meta.dir,
+  "../fixtures/plans/draft-sample.md"
+);
 
 test("parsePlan extracts frontmatter id", () => {
   const plan = parsePlan(FIXTURE_PATH);
@@ -63,7 +70,7 @@ test("generatePlanSkeleton creates valid frontmatter", () => {
   const skeleton = generatePlanSkeleton("test-plan");
 
   expect(skeleton).toContain("id: test-plan");
-  expect(skeleton).toContain("status: queued");
+  expect(skeleton).toContain("status: draft");
   expect(skeleton).toContain("## Objective");
   expect(skeleton).toContain("## TODO");
 });
@@ -86,4 +93,63 @@ test("generatePlanSkeleton omits agent when not provided", () => {
   const skeleton = generatePlanSkeleton("test-plan");
 
   expect(skeleton).not.toContain("agent:");
+});
+
+// Draft status tests
+test("parsePlan parses draft status", () => {
+  const plan = parsePlan(DRAFT_FIXTURE_PATH);
+  expect(plan.frontmatter.status).toBe("draft");
+  expect(plan.frontmatter.id).toBe("draft-sample");
+});
+
+test("setStatus changes plan status from draft to queued", () => {
+  // Create a temp plan file
+  const tmpDir = mkdtempSync(join(tmpdir(), "prloom-test-"));
+  const planPath = join(tmpDir, "test-plan.md");
+  const skeleton = generatePlanSkeleton("test-plan");
+  writeFileSync(planPath, skeleton);
+
+  // Verify starts as draft
+  let plan = parsePlan(planPath);
+  expect(plan.frontmatter.status).toBe("draft");
+
+  // Change to queued
+  setStatus(planPath, "queued");
+  plan = parsePlan(planPath);
+  expect(plan.frontmatter.status).toBe("queued");
+
+  // Cleanup
+  rmSync(tmpDir, { recursive: true });
+});
+
+test("setStatus changes plan status from queued to active", () => {
+  const tmpDir = mkdtempSync(join(tmpdir(), "prloom-test-"));
+  const planPath = join(tmpDir, "test-plan.md");
+  const skeleton = generatePlanSkeleton("test-plan");
+  writeFileSync(planPath, skeleton);
+
+  setStatus(planPath, "queued");
+  setStatus(planPath, "active");
+
+  const plan = parsePlan(planPath);
+  expect(plan.frontmatter.status).toBe("active");
+
+  rmSync(tmpDir, { recursive: true });
+});
+
+test("setStatus preserves other frontmatter fields", () => {
+  const tmpDir = mkdtempSync(join(tmpdir(), "prloom-test-"));
+  const planPath = join(tmpDir, "test-plan.md");
+  const skeleton = generatePlanSkeleton("my-plan", "codex", "main");
+  writeFileSync(planPath, skeleton);
+
+  setStatus(planPath, "queued");
+
+  const plan = parsePlan(planPath);
+  expect(plan.frontmatter.status).toBe("queued");
+  expect(plan.frontmatter.id).toBe("my-plan");
+  expect(plan.frontmatter.agent).toBe("codex");
+  expect(plan.frontmatter.base_branch).toBe("main");
+
+  rmSync(tmpDir, { recursive: true });
 });
