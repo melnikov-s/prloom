@@ -26,14 +26,31 @@ export function renderWorkerPrompt(
   });
 }
 
-export function renderDesignerPrompt(
-  repoRoot: string,
-  existingPlan?: string
+export function renderDesignerNewPrompt(
+  planPath: string,
+  baseBranch: string,
+  workerAgent: string,
+  userDescription?: string
 ): string {
-  const template = loadTemplate(repoRoot, "designer");
+  const template = BUILTIN_PROMPTS["designer_new"];
   const compiled = Handlebars.compile(template);
   return compiled({
-    existing_plan: existingPlan ?? "",
+    plan_path: planPath,
+    base_branch: baseBranch,
+    worker_agent: workerAgent,
+    user_description: userDescription ?? "",
+  });
+}
+
+export function renderDesignerEditPrompt(
+  planPath: string,
+  existingPlan: string
+): string {
+  const template = BUILTIN_PROMPTS["designer_edit"];
+  const compiled = Handlebars.compile(template);
+  return compiled({
+    plan_path: planPath,
+    existing_plan: existingPlan,
   });
 }
 

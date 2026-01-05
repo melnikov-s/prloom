@@ -211,6 +211,17 @@ yargs(hideBin(process.argv))
     }
   )
 
+  // prloom clean
+  .command(
+    "clean",
+    "Remove stale inbox plans",
+    () => {},
+    async () => {
+      const { runClean } = await import("./clean.js");
+      await runClean(await getRepoRoot());
+    }
+  )
+
   .demandCommand(1, "You need to specify a command")
   .strict()
   .help()

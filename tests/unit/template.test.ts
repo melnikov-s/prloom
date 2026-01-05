@@ -2,7 +2,8 @@ import { test, expect } from "bun:test";
 import { join } from "path";
 import {
   renderWorkerPrompt,
-  renderDesignerPrompt,
+  renderDesignerNewPrompt,
+  renderDesignerEditPrompt,
 } from "../../src/lib/template.js";
 import { parsePlan } from "../../src/lib/plan.js";
 
@@ -19,16 +20,26 @@ test("renderWorkerPrompt uses built-in template", () => {
   expect(prompt).toContain("sample");
 });
 
-test("renderDesignerPrompt uses built-in template", () => {
-  const prompt = renderDesignerPrompt("/does-not-matter");
+test("renderDesignerNewPrompt includes path and context", () => {
+  const prompt = renderDesignerNewPrompt(
+    "/repo/plan.md",
+    "main",
+    "opencode",
+    "Build a feature"
+  );
 
-  expect(prompt).toContain("Designer Instructions");
+  expect(prompt).toContain("Designer: Create a New Plan");
+  expect(prompt).toContain("/repo/plan.md");
+  expect(prompt).toContain("Build a feature");
+  expect(prompt).toContain("main");
+  expect(prompt).toContain("opencode");
 });
 
-test("renderDesignerPrompt includes existing plan when provided", () => {
+test("renderDesignerEditPrompt includes existing plan", () => {
   const existingPlan = "---\nid: old\n---\n\n## Objective\n\nOld plan";
-  const prompt = renderDesignerPrompt("/does-not-matter", existingPlan);
+  const prompt = renderDesignerEditPrompt("/repo/plan.md", existingPlan);
 
-  expect(prompt).toContain("Existing Plan");
+  expect(prompt).toContain("Designer: Edit an Existing Plan");
+  expect(prompt).toContain("/repo/plan.md");
   expect(prompt).toContain("Old plan");
 });

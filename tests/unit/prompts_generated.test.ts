@@ -7,8 +7,11 @@ test("prompt_sources matches prompts directory files", () => {
   const repoRoot = join(import.meta.dir, "..", "..");
   const promptsDir = join(repoRoot, "prompts");
 
-  expect(BUILTIN_PROMPTS.designer).toBe(
-    readFileSync(join(promptsDir, "designer.md"), "utf-8")
+  expect(BUILTIN_PROMPTS.designer_new).toBe(
+    readFileSync(join(promptsDir, "designer_new.md"), "utf-8")
+  );
+  expect(BUILTIN_PROMPTS.designer_edit).toBe(
+    readFileSync(join(promptsDir, "designer_edit.md"), "utf-8")
   );
   expect(BUILTIN_PROMPTS.worker).toBe(
     readFileSync(join(promptsDir, "worker.md"), "utf-8")

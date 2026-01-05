@@ -2,7 +2,7 @@ import { join } from "path";
 import { existsSync, readFileSync } from "fs";
 import { loadConfig } from "../lib/config.js";
 import { getAdapter, type AgentName } from "../lib/adapters/index.js";
-import { renderDesignerPrompt } from "../lib/template.js";
+import { renderDesignerEditPrompt } from "../lib/template.js";
 import { loadState, getInboxPath } from "../lib/state.js";
 
 export async function runEdit(
@@ -63,7 +63,7 @@ export async function runEdit(
 
   console.log(`Agent: ${agentName}`);
 
-  const prompt = renderDesignerPrompt(repoRoot, existingPlan);
+  const prompt = renderDesignerEditPrompt(planPath, existingPlan);
   await adapter.interactive({ cwd, prompt });
 
   console.log("Designer session ended.");

@@ -3,7 +3,7 @@ import { existsSync, writeFileSync } from "fs";
 import { loadConfig } from "../lib/config.js";
 import { getAdapter, type AgentName } from "../lib/adapters/index.js";
 import { generatePlanSkeleton } from "../lib/plan.js";
-import { renderDesignerPrompt } from "../lib/template.js";
+import { renderDesignerNewPrompt } from "../lib/template.js";
 import { ensureInboxDir, getInboxPath } from "../lib/state.js";
 import { getCurrentBranch, ensureRemoteBranchExists } from "../lib/git.js";
 
@@ -74,7 +74,7 @@ export async function runNew(
   console.log("");
   console.log("Starting Designer session to fill in the plan...");
 
-  const prompt = renderDesignerPrompt(repoRoot, skeleton);
+  const prompt = renderDesignerNewPrompt(planPath, baseBranch, workerAgent);
   await adapter.interactive({ cwd: repoRoot, prompt });
 
   console.log("Designer session ended.");
