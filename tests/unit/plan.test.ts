@@ -8,7 +8,6 @@ import {
   extractBody,
   generatePlanSkeleton,
   setStatus,
-  ensureActiveStatus,
 } from "../../src/lib/plan.js";
 
 const FIXTURE_PATH = join(import.meta.dir, "../fixtures/plans/sample.md");
@@ -263,31 +262,31 @@ test("setStatus changes plan status from active to review", () => {
   rmSync(tmpDir, { recursive: true });
 });
 
-test("ensureActiveStatus flips review to active", () => {
+test("parsePlan parses blocked marker [b]", () => {
   const tmpDir = mkdtempSync(join(tmpdir(), "prloom-test-"));
   const planPath = join(tmpDir, "test-plan.md");
 
   const planContent = `---
-id: review-plan
-status: review
+id: blocked-todo-plan
+status: active
 ---
-
-## Objective
-
-Test plan
 
 ## TODO
 
 - [x] Done task
-
-## Progress Log
+- [b] Blocked task
+- [ ] Pending task
 `;
   writeFileSync(planPath, planContent);
 
-  ensureActiveStatus(planPath);
-
   const plan = parsePlan(planPath);
-  expect(plan.frontmatter.status).toBe("active");
+  expect(plan.todos).toHaveLength(3);
+  expect(plan.todos[0]?.done).toBe(true);
+  expect(plan.todos[0]?.blocked).toBe(false);
+  expect(plan.todos[1]?.done).toBe(false);
+  expect(plan.todos[1]?.blocked).toBe(true);
+  expect(plan.todos[2]?.done).toBe(false);
+  expect(plan.todos[2]?.blocked).toBe(false);
 
   rmSync(tmpDir, { recursive: true });
 });

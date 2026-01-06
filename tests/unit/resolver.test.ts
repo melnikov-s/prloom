@@ -36,6 +36,7 @@ test("resolvePlanId: exact ID match (state)", async () => {
         branch: "some-branch",
         planRelpath: "prloom/plans/fghij.md",
         baseBranch: "main",
+        status: "active",
       },
     },
   });
@@ -75,6 +76,7 @@ test("resolvePlanId: fully qualified branch match (state)", async () => {
         branch: fullBranch,
         planRelpath: "prloom/plans/pqrst.md",
         baseBranch: "main",
+        status: "active",
       },
     },
   });

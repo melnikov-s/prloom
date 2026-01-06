@@ -29,11 +29,11 @@ afterEach(() => {
 
 test("renderWorkerPrompt uses built-in template", () => {
   const plan = parsePlan(FIXTURE_PATH);
-  const todo = { index: 0, text: "First task", done: false };
+  const todo = { index: 0, text: "First task", done: false, blocked: false };
 
   const prompt = renderWorkerPrompt("/does-not-matter", plan, todo);
 
-  expect(prompt).toContain("TODO #0: First task");
+  expect(prompt).toContain("TODO #1: First task");
   expect(prompt).toContain("# Plan");
   expect(prompt).toContain("sample");
 });
@@ -118,9 +118,10 @@ test("renderWorkerPrompt appends context when worker.md exists", () => {
   );
 
   const plan = parsePlan(FIXTURE_PATH);
-  const todo = { index: 0, text: "Test task", done: false };
+  const todo = { index: 0, text: "Test task", done: false, blocked: false };
 
   const prompt = renderWorkerPrompt(TEMP_REPO, plan, todo);
+  expect(prompt).toContain("TODO #1: Test task");
   expect(prompt).toContain("# Repository Context");
   expect(prompt).toContain("# Custom Worker Instructions");
 });

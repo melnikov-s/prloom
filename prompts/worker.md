@@ -18,12 +18,13 @@ You are implementing exactly ONE task from this plan.
      - Gotchas that future workers should know
    - If nothing notable happened, skip the note — the commit is the record
 3. Run tests if specified in the Context section
-4. If you get stuck and cannot complete the task:
-   - Set frontmatter `status: blocked`
+4. If you complete the task successfully:
+   - Mark the task as `[x]`
+   - Add a Session Note about notable decisions or codebase behavior
+5. If you are stuck or cannot complete the task:
+   - Mark the task as `[b]` (Blocked)
    - Explain the blocker in Session Notes
-5. If this is the final TODO and all tasks are complete:
-   - Set frontmatter `status: review`
-6. Exit when complete
+6. Exit when done with the task. The system detects completion from the checkbox.
 
 ## Session Notes Guidance
 

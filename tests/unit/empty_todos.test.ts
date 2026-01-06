@@ -12,7 +12,7 @@ import {
   getInboxPath,
   type State,
 } from "../../src/lib/state.js";
-import { generatePlanSkeleton, setStatus } from "../../src/lib/plan.js";
+import { generatePlanSkeleton } from "../../src/lib/plan.js";
 import { loadConfig } from "../../src/lib/config.js";
 
 // No-op logger for tests
@@ -84,6 +84,7 @@ status: active
         branch: "feat-branch",
         planRelpath,
         baseBranch: "main",
+        status: "active",
       },
     },
   };
@@ -92,7 +93,6 @@ status: active
   await processActivePlans(repoRoot, config, state, "bot-user", {}, noopLogger);
 
   // Verify it was blocked
-  const updatedContent = (await import("fs")).readFileSync(planPath, "utf-8");
-  expect(updatedContent).toContain("status: blocked");
+  expect(state.plans[id]!.status).toBe("blocked");
   expect(state.plans[id]!.lastError).toContain("zero TODO items");
 });

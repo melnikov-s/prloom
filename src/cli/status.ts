@@ -16,7 +16,9 @@ export async function runStatus(repoRoot: string): Promise<void> {
   } else {
     for (const id of inboxPlanIds) {
       const inboxPath = getInboxPath(repoRoot, id);
-      console.log(`  ${id}`);
+      const plan = parsePlan(inboxPath);
+      const status = plan.frontmatter.status;
+      console.log(`  ${id} [${status}]`);
       console.log(`    Path: ${inboxPath}`);
     }
   }

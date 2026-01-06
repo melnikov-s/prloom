@@ -52,6 +52,7 @@ Then:
 
 The plan file already has a template with these sections. Fill them in:
 
+- **Title**: Short PR title (e.g., "Fix PDF viewer pagination")
 - **Objective**: What will be built (1-2 sentences)
 - **Context**: Files to modify, constraints, any notes the Worker needs
 - **TODO (Commits)**: Each item is ONE commit the Worker will make

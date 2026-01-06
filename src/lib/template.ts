@@ -36,7 +36,7 @@ export function renderWorkerPrompt(
   const template = loadTemplate(repoRoot, "worker");
   const compiled = Handlebars.compile(template);
   let prompt = compiled({
-    current_todo: `TODO #${todo.index}: ${todo.text}`,
+    current_todo: `TODO #${todo.index + 1}: ${todo.text}`,
     plan: plan.raw,
   });
 

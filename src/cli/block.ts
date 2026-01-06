@@ -1,6 +1,6 @@
 import { join } from "path";
 import { setStatus } from "../lib/plan.js";
-import { loadState } from "../lib/state.js";
+import { loadState, saveState } from "../lib/state.js";
 
 export async function runBlock(
   repoRoot: string,
@@ -14,7 +14,7 @@ export async function runBlock(
     process.exit(1);
   }
 
-  const planPath = join(ps.worktree, ps.planRelpath);
-  setStatus(planPath, "blocked");
+  ps.status = "blocked";
+  saveState(repoRoot, state);
   console.log(`⏹️ Blocked ${planId}`);
 }

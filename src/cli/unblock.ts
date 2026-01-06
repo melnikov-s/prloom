@@ -14,8 +14,7 @@ export async function runUnblock(
     process.exit(1);
   }
 
-  const planPath = join(ps.worktree, ps.planRelpath);
-  setStatus(planPath, "active");
+  ps.status = "active";
 
   // Reset retry counter
   ps.lastTodoIndex = undefined;

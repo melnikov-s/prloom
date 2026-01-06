@@ -40,6 +40,7 @@ test("saveState and loadState round-trip", () => {
 
         planRelpath: "plans/test-plan.md",
         baseBranch: "develop",
+        status: "active",
       },
     },
   };
@@ -88,6 +89,7 @@ test("saveShard and loadShard round-trip", () => {
 
     planRelpath: "plans/my-plan.md",
     baseBranch: "develop",
+    status: "active",
   };
 
   saveShard(TEST_DIR, "my-plan", ps);

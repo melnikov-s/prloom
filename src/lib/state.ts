@@ -17,6 +17,9 @@ export interface PlanState {
   planRelpath: string; // e.g. "prloom/plans/<id>.md"
   baseBranch: string; // e.g. "main" for rebase
 
+  /** Plan execution status - owned by dispatcher, not frontmatter */
+  status: "active" | "blocked" | "review" | "done";
+
   /** Active tmux session name when running with --tmux */
   tmuxSession?: string;
 

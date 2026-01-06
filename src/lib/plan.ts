@@ -23,11 +23,13 @@ export interface TodoItem {
   index: number;
   text: string;
   done: boolean;
+  blocked: boolean;
 }
 
 export interface Plan {
   path: string;
   frontmatter: PlanFrontmatter;
+  title: string;
   objective: string;
   context: string;
   todos: TodoItem[];
@@ -50,6 +52,7 @@ export function parsePlan(path: string): Plan {
   };
 
   // Extract sections
+  const title = extractSection(content, "Title") ?? "";
   const objective = extractSection(content, "Objective") ?? "";
   const context = extractSection(content, "Context") ?? "";
   const progressLog = extractSection(content, "Progress Log") ?? "";
@@ -61,6 +64,7 @@ export function parsePlan(path: string): Plan {
   return {
     path,
     frontmatter,
+    title,
     objective,
     context,
     todos,
@@ -83,10 +87,12 @@ function parseTodos(section: string): TodoItem[] {
   for (const line of lines) {
     const checkboxMatch = line.match(/^- \[([\s\S])\] (.+)$/);
     if (checkboxMatch && checkboxMatch[1] && checkboxMatch[2]) {
+      const marker = checkboxMatch[1].toLowerCase();
       todos.push({
         index,
         text: checkboxMatch[2].trim(),
-        done: checkboxMatch[1].toLowerCase() === "x",
+        done: marker === "x",
+        blocked: marker === "b",
       });
       index++;
     }
@@ -106,6 +112,11 @@ export function findNextUnchecked(plan: Plan): TodoItem | null {
   return plan.todos.find((t) => !t.done) ?? null;
 }
 
+/**
+ * Set the status in plan frontmatter.
+ * NOTE: This should only be used for inbox/pre-ingestion plans.
+ * Once a plan is active, the dispatcher owns the status in state.json.
+ */
 export function setStatus(path: string, status: PlanStatus): void {
   const raw = readFileSync(path, "utf-8");
   const parsed = matter(raw);
@@ -161,6 +172,10 @@ export function generatePlanSkeleton(
   }
 
   const content = `
+## Title
+
+<!-- Short PR title (e.g., "Fix PDF viewer pagination") -->
+
 ## Objective
 
 <!-- Describe what will be built -->
@@ -238,23 +253,4 @@ export function appendProgressLog(path: string, entry: string): void {
 
   const updated = matter.stringify(updatedContent, data);
   writeFileSync(path, updated);
-}
-
-/**
- * Ensure plan status is 'active'.
- * If status is 'done' and we're adding new TODOs, flip it back to 'active'.
- */
-export function ensureActiveStatus(path: string): void {
-  const raw = readFileSync(path, "utf-8");
-  const { data, content } = matter(raw);
-
-  if (
-    data.status === "done" ||
-    data.status === "review" ||
-    data.status === "queued"
-  ) {
-    data.status = "active";
-    const updated = matter.stringify(content, data);
-    writeFileSync(path, updated);
-  }
 }

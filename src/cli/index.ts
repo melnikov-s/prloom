@@ -148,6 +148,21 @@ yargs(hideBin(process.argv))
     }
   )
 
+  // prloom queue
+  .command(
+    "queue <plan-id>",
+    "Queue a draft plan for dispatch",
+    (yargs) =>
+      yargs.positional("plan-id", { type: "string", demandOption: true }),
+    async (argv) => {
+      const { runQueue } = await import("./queue.js");
+      const { resolvePlanId } = await import("../lib/resolver.js");
+      const repoRoot = await getRepoRoot();
+      const planId = await resolvePlanId(repoRoot, argv["plan-id"] as string);
+      await runQueue(repoRoot, planId);
+    }
+  )
+
   // prloom block
   .command(
     "block <plan-id>",
