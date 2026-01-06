@@ -17,9 +17,15 @@ export async function branchExists(
   }
 }
 
-export async function createBranchName(planId: string): Promise<string> {
+export async function createBranchName(baseName: string): Promise<string> {
+  // Ensure the baseName is branch-safe (very basic slugify)
+  const safeName = baseName
+    .toLowerCase()
+    .replace(/[^a-z0-9._/-]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+
   const hash = nanoid(5);
-  return `${planId}-${hash}`;
+  return `${safeName}-${hash}`.toLowerCase();
 }
 
 export async function createWorktree(

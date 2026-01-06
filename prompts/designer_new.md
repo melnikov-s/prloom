@@ -77,4 +77,5 @@ The Worker will run tests and type-checks before each commit automatically.
 ## Important
 
 - The plan template already has a `## Progress Log` section — do NOT duplicate it
-- Leave the frontmatter (`id`, `status`, `agent`, `base_branch`) alone
+- Leave the frontmatter (`id`, `status`, `agent`, `base_branch`) alone, except for the `branch` field
+- **IMPORTANT**: Set the `branch` field to a descriptive, slug-friendly name for this feature (e.g., `fix-pdf-viewer`, `add-resize-handle`). The system will use this to create the git branch.

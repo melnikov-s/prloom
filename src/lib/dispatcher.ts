@@ -147,7 +147,12 @@ async function ingestInboxPlans(
       console.log(`   Base branch: ${baseBranch}`);
 
       // Create branch and worktree
-      const branch = await createBranchName(planId);
+      const branchBase =
+        plan.frontmatter.branch && plan.frontmatter.branch.trim() !== ""
+          ? plan.frontmatter.branch
+          : planId;
+
+      const branch = await createBranchName(branchBase);
       console.log(`   Creating branch: ${branch}`);
       const worktreePath = await createWorktree(
         repoRoot,

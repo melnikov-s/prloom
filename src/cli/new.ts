@@ -2,6 +2,7 @@ import { join } from "path";
 import { existsSync, writeFileSync } from "fs";
 import { loadConfig } from "../lib/config.js";
 import { getAdapter, type AgentName } from "../lib/adapters/index.js";
+import { nanoid } from "nanoid";
 import { generatePlanSkeleton, setStatus } from "../lib/plan.js";
 import { renderDesignerNewPrompt } from "../lib/template.js";
 import { ensureInboxDir, getInboxPath } from "../lib/state.js";
@@ -44,7 +45,7 @@ export async function runNew(
   }
 
   // Generate plan ID if not provided
-  const id = planId ?? `plan-${Date.now()}`;
+  const id = planId ?? `feat-${nanoid(5)}`;
   const planPath = getInboxPath(repoRoot, id);
 
   // Check if plan already exists in inbox

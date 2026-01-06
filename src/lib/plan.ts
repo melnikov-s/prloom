@@ -142,6 +142,7 @@ export function generatePlanSkeleton(
 ): string {
   const frontmatter: Record<string, string> = {
     id,
+    branch: "", // Designer can specify a descriptive branch name here
     status: "draft",
   };
 
