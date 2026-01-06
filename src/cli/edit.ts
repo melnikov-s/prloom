@@ -3,16 +3,55 @@ import { existsSync, readFileSync } from "fs";
 import { loadConfig } from "../lib/config.js";
 import { getAdapter, type AgentName } from "../lib/adapters/index.js";
 import { renderDesignerEditPrompt } from "../lib/template.js";
-import { loadState, getInboxPath } from "../lib/state.js";
+import { listInboxPlanIds, loadState, getInboxPath } from "../lib/state.js";
 import { parsePlan, setStatus } from "../lib/plan.js";
+import { resolvePlanId } from "../lib/resolver.js";
+import { promptSelection } from "../ui/Selection.js";
 import { confirm } from "./prompt.js";
 
 export async function runEdit(
   repoRoot: string,
-  planId: string,
+  planIdInput?: string,
   agentOverride?: string,
   noDesigner?: boolean
 ): Promise<void> {
+  let planId: string;
+
+  if (planIdInput) {
+    planId = await resolvePlanId(repoRoot, planIdInput);
+  } else {
+    // Collect options from inbox and state
+    const inboxIds = listInboxPlanIds(repoRoot);
+    const state = loadState(repoRoot);
+
+    const inboxOptions = inboxIds.map((id) => {
+      const path = getInboxPath(repoRoot, id);
+      const plan = parsePlan(path);
+      return {
+        id,
+        label: id,
+        metadata: `inbox [${plan.frontmatter.status ?? "draft"}]`,
+        color: plan.frontmatter.status === "draft" ? "yellow" : "gray",
+      };
+    });
+
+    const activeOptions = Object.entries(state.plans).map(([id, ps]) => ({
+      id,
+      label: id,
+      metadata: `active [${ps.status ?? "unknown"}]`,
+      color: ps.status === "blocked" ? "red" : "green",
+    }));
+
+    const options = [...inboxOptions, ...activeOptions];
+
+    if (options.length === 0) {
+      console.log("No plans found to edit.");
+      return;
+    }
+
+    planId = await promptSelection("Select a plan to edit:", options);
+  }
+
   const config = loadConfig(repoRoot);
   const state = loadState(repoRoot);
 

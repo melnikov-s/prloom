@@ -87,11 +87,11 @@ yargs(hideBin(process.argv))
 
   // prloom edit
   .command(
-    "edit <plan-id>",
+    "edit [plan-id]",
     "Edit an existing plan",
     (yargs) =>
       yargs
-        .positional("plan-id", { type: "string", demandOption: true })
+        .positional("plan-id", { type: "string" })
         .option("agent", {
           type: "string",
           describe: "Coding agent to use (codex, opencode, claude, manual)",
@@ -103,9 +103,9 @@ yargs(hideBin(process.argv))
         }),
     async (argv) => {
       const repoRoot = await getRepoRoot();
-      const planId = await resolvePlanId(repoRoot, argv["plan-id"] as string);
+      const planIdInput = argv["plan-id"] as string | undefined;
       const { runEdit } = await import("./edit.js");
-      await runEdit(repoRoot, planId, argv.agent, argv["no-designer"]);
+      await runEdit(repoRoot, planIdInput, argv.agent, argv["no-designer"]);
     }
   )
 
@@ -150,86 +150,73 @@ yargs(hideBin(process.argv))
 
   // prloom queue
   .command(
-    "queue <plan-id>",
+    "queue [plan-id]",
     "Queue a draft plan for dispatch",
-    (yargs) =>
-      yargs.positional("plan-id", { type: "string", demandOption: true }),
+    (yargs) => yargs.positional("plan-id", { type: "string" }),
     async (argv) => {
       const { runQueue } = await import("./queue.js");
-      const { resolvePlanId } = await import("../lib/resolver.js");
       const repoRoot = await getRepoRoot();
-      const planId = await resolvePlanId(repoRoot, argv["plan-id"] as string);
-      await runQueue(repoRoot, planId);
+      await runQueue(repoRoot, argv["plan-id"] as string | undefined);
     }
   )
 
   // prloom block
   .command(
-    "block <plan-id>",
+    "block [plan-id]",
     "Block automation for a plan",
-    (yargs) =>
-      yargs.positional("plan-id", { type: "string", demandOption: true }),
+    (yargs) => yargs.positional("plan-id", { type: "string" }),
     async (argv) => {
       const repoRoot = await getRepoRoot();
-      const planId = await resolvePlanId(repoRoot, argv["plan-id"] as string);
       const { runBlock } = await import("./block.js");
-      await runBlock(repoRoot, planId);
+      await runBlock(repoRoot, argv["plan-id"] as string | undefined);
     }
   )
 
   // prloom unblock
   .command(
-    "unblock <plan-id>",
+    "unblock [plan-id]",
     "Unblock automation for a plan",
-    (yargs) =>
-      yargs.positional("plan-id", { type: "string", demandOption: true }),
+    (yargs) => yargs.positional("plan-id", { type: "string" }),
     async (argv) => {
       const repoRoot = await getRepoRoot();
-      const planId = await resolvePlanId(repoRoot, argv["plan-id"] as string);
       const { runUnblock } = await import("./unblock.js");
-      await runUnblock(repoRoot, planId);
+      await runUnblock(repoRoot, argv["plan-id"] as string | undefined);
     }
   )
 
   // prloom open
   .command(
-    "open <plan-id>",
+    "open [plan-id]",
     "Open TUI for manual work (requires blocked status)",
-    (yargs) =>
-      yargs.positional("plan-id", { type: "string", demandOption: true }),
+    (yargs) => yargs.positional("plan-id", { type: "string" }),
     async (argv) => {
       const repoRoot = await getRepoRoot();
-      const planId = await resolvePlanId(repoRoot, argv["plan-id"] as string);
       const { runOpen } = await import("./open.js");
-      await runOpen(repoRoot, planId);
+      await runOpen(repoRoot, argv["plan-id"] as string | undefined);
     }
   )
 
   // prloom watch
   .command(
-    "watch <plan-id>",
+    "watch [plan-id]",
     "Observe a running worker (requires --tmux mode)",
-    (yargs) =>
-      yargs.positional("plan-id", { type: "string", demandOption: true }),
+    (yargs) => yargs.positional("plan-id", { type: "string" }),
     async (argv) => {
       const repoRoot = await getRepoRoot();
-      const planId = await resolvePlanId(repoRoot, argv["plan-id"] as string);
       const { runWatch } = await import("./watch.js");
-      await runWatch(repoRoot, planId);
+      await runWatch(repoRoot, argv["plan-id"] as string | undefined);
     }
   )
 
   // prloom logs
   .command(
-    "logs <plan-id>",
+    "logs [plan-id]",
     "Show session ID for a plan",
-    (yargs) =>
-      yargs.positional("plan-id", { type: "string", demandOption: true }),
+    (yargs) => yargs.positional("plan-id", { type: "string" }),
     async (argv) => {
       const repoRoot = await getRepoRoot();
-      const planId = await resolvePlanId(repoRoot, argv["plan-id"] as string);
       const { runLogs } = await import("./logs.js");
-      await runLogs(repoRoot, planId);
+      await runLogs(repoRoot, argv["plan-id"] as string | undefined);
     }
   )
 

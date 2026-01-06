@@ -24,8 +24,36 @@ async function killTmuxSession(sessionName: string): Promise<void> {
   await execa("tmux", ["kill-session", "-t", sessionName], { reject: false });
 }
 
-export async function runOpen(repoRoot: string, planId: string): Promise<void> {
+import { resolvePlanId } from "../lib/resolver.js";
+import { promptSelection } from "../ui/Selection.js";
+
+export async function runOpen(
+  repoRoot: string,
+  planIdInput?: string
+): Promise<void> {
   const state = loadState(repoRoot);
+  let planId: string;
+
+  if (planIdInput) {
+    planId = await resolvePlanId(repoRoot, planIdInput);
+  } else {
+    const options = Object.entries(state.plans)
+      .map(([id, ps]) => ({
+        id,
+        label: id,
+        metadata: ps.status ?? "unknown",
+        color: ps.status === "blocked" ? "red" : "green",
+      }))
+      .filter((opt) => opt.metadata === "blocked");
+
+    if (options.length === 0) {
+      console.log("No blocked plans found to open.");
+      return;
+    }
+
+    planId = await promptSelection("Select a blocked plan to open:", options);
+  }
+
   const config = loadConfig(repoRoot);
   const ps = state.plans[planId];
 

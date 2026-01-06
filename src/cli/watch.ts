@@ -1,11 +1,37 @@
 import { execa } from "execa";
 import { loadState } from "../lib/state.js";
 
+import { resolvePlanId } from "../lib/resolver.js";
+import { promptSelection } from "../ui/Selection.js";
+
 export async function runWatch(
   repoRoot: string,
-  planId: string
+  planIdInput?: string
 ): Promise<void> {
   const state = loadState(repoRoot);
+  let planId: string;
+
+  if (planIdInput) {
+    planId = await resolvePlanId(repoRoot, planIdInput);
+  } else {
+    const options = Object.entries(state.plans)
+      .map(([id, ps]) => ({
+        id,
+        label: id,
+        metadata: ps.tmuxSession ? `tmux: ${ps.tmuxSession}` : undefined,
+        color: ps.tmuxSession ? "green" : "gray",
+        hasTmux: !!ps.tmuxSession,
+      }))
+      .filter((opt) => opt.hasTmux);
+
+    if (options.length === 0) {
+      console.log("No active tmux sessions found to watch.");
+      return;
+    }
+
+    planId = await promptSelection("Select a plan to watch:", options);
+  }
+
   const ps = state.plans[planId];
 
   if (!ps) {

@@ -1,7 +1,32 @@
 import { loadState } from "../lib/state.js";
+import { resolvePlanId } from "../lib/resolver.js";
+import { promptSelection } from "../ui/Selection.js";
 
-export async function runLogs(repoRoot: string, planId: string): Promise<void> {
+export async function runLogs(
+  repoRoot: string,
+  planIdInput?: string
+): Promise<void> {
   const state = loadState(repoRoot);
+  let planId: string;
+
+  if (planIdInput) {
+    planId = await resolvePlanId(repoRoot, planIdInput);
+  } else {
+    const options = Object.entries(state.plans).map(([id, ps]) => ({
+      id,
+      label: id,
+      metadata: ps.status ?? "unknown",
+      color: ps.status === "blocked" ? "red" : "green",
+    }));
+
+    if (options.length === 0) {
+      console.log("No active plans found.");
+      return;
+    }
+
+    planId = await promptSelection("Select a plan to show logs:", options);
+  }
+
   const ps = state.plans[planId];
 
   if (!ps) {

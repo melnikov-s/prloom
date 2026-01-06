@@ -1,12 +1,42 @@
 import { join } from "path";
 import { existsSync } from "fs";
-import { getInboxPath } from "../lib/state.js";
+import { listInboxPlanIds, getInboxPath } from "../lib/state.js";
 import { parsePlan, setStatus } from "../lib/plan.js";
+import { resolvePlanId } from "../lib/resolver.js";
+import { promptSelection } from "../ui/Selection.js";
 
 export async function runQueue(
   repoRoot: string,
-  planId: string
+  planIdInput?: string
 ): Promise<void> {
+  let planId: string;
+
+  if (planIdInput) {
+    planId = await resolvePlanId(repoRoot, planIdInput);
+  } else {
+    // Show picker for draft plans
+    const inboxIds = listInboxPlanIds(repoRoot);
+    const options = inboxIds
+      .map((id) => {
+        const path = getInboxPath(repoRoot, id);
+        const plan = parsePlan(path);
+        return {
+          id,
+          label: id,
+          metadata: plan.frontmatter.status ?? "draft",
+          color: plan.frontmatter.status === "draft" ? "yellow" : "gray",
+        };
+      })
+      .filter((opt) => opt.metadata === "draft");
+
+    if (options.length === 0) {
+      console.log("No draft plans found in inbox.");
+      return;
+    }
+
+    planId = await promptSelection("Select a plan to queue:", options);
+  }
+
   const inboxPath = getInboxPath(repoRoot, planId);
 
   if (!existsSync(inboxPath)) {
