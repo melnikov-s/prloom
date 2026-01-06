@@ -5,6 +5,7 @@ import { resolveRepoRoot } from "../lib/repo_root.js";
 import { readFileSync } from "fs";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
+import { resolvePlanId } from "../lib/resolver.js";
 
 // Read version from package.json
 const __filename = fileURLToPath(import.meta.url);
@@ -94,13 +95,10 @@ yargs(hideBin(process.argv))
           default: false,
         }),
     async (argv) => {
+      const repoRoot = await getRepoRoot();
+      const planId = await resolvePlanId(repoRoot, argv["plan-id"] as string);
       const { runEdit } = await import("./edit.js");
-      await runEdit(
-        await getRepoRoot(),
-        argv["plan-id"] as string,
-        argv.agent,
-        argv["no-designer"]
-      );
+      await runEdit(repoRoot, planId, argv.agent, argv["no-designer"]);
     }
   )
 
@@ -138,8 +136,10 @@ yargs(hideBin(process.argv))
     (yargs) =>
       yargs.positional("plan-id", { type: "string", demandOption: true }),
     async (argv) => {
+      const repoRoot = await getRepoRoot();
+      const planId = await resolvePlanId(repoRoot, argv["plan-id"] as string);
       const { runBlock } = await import("./block.js");
-      await runBlock(await getRepoRoot(), argv["plan-id"] as string);
+      await runBlock(repoRoot, planId);
     }
   )
 
@@ -150,8 +150,10 @@ yargs(hideBin(process.argv))
     (yargs) =>
       yargs.positional("plan-id", { type: "string", demandOption: true }),
     async (argv) => {
+      const repoRoot = await getRepoRoot();
+      const planId = await resolvePlanId(repoRoot, argv["plan-id"] as string);
       const { runUnblock } = await import("./unblock.js");
-      await runUnblock(await getRepoRoot(), argv["plan-id"] as string);
+      await runUnblock(repoRoot, planId);
     }
   )
 
@@ -162,8 +164,10 @@ yargs(hideBin(process.argv))
     (yargs) =>
       yargs.positional("plan-id", { type: "string", demandOption: true }),
     async (argv) => {
+      const repoRoot = await getRepoRoot();
+      const planId = await resolvePlanId(repoRoot, argv["plan-id"] as string);
       const { runOpen } = await import("./open.js");
-      await runOpen(await getRepoRoot(), argv["plan-id"] as string);
+      await runOpen(repoRoot, planId);
     }
   )
 
@@ -174,8 +178,10 @@ yargs(hideBin(process.argv))
     (yargs) =>
       yargs.positional("plan-id", { type: "string", demandOption: true }),
     async (argv) => {
+      const repoRoot = await getRepoRoot();
+      const planId = await resolvePlanId(repoRoot, argv["plan-id"] as string);
       const { runWatch } = await import("./watch.js");
-      await runWatch(await getRepoRoot(), argv["plan-id"] as string);
+      await runWatch(repoRoot, planId);
     }
   )
 
@@ -186,8 +192,10 @@ yargs(hideBin(process.argv))
     (yargs) =>
       yargs.positional("plan-id", { type: "string", demandOption: true }),
     async (argv) => {
+      const repoRoot = await getRepoRoot();
+      const planId = await resolvePlanId(repoRoot, argv["plan-id"] as string);
       const { runLogs } = await import("./logs.js");
-      await runLogs(await getRepoRoot(), argv["plan-id"] as string);
+      await runLogs(repoRoot, planId);
     }
   )
 
@@ -228,13 +236,15 @@ yargs(hideBin(process.argv))
         }
       } else if (argv.signal) {
         // Signal dispatcher mode
+        const id = await resolvePlanId(repoRoot, planId);
         const { enqueue } = await import("../lib/ipc.js");
-        enqueue(repoRoot, { type: "poll", plan_id: planId });
-        console.log(`Signaled dispatcher to poll feedback for ${planId}`);
+        enqueue(repoRoot, { type: "poll", plan_id: id });
+        console.log(`Signaled dispatcher to poll feedback for ${id}`);
       } else {
         // Display mode - show feedback directly
+        const id = await resolvePlanId(repoRoot, planId);
         const { runPoll } = await import("./poll.js");
-        await runPoll(repoRoot, planId);
+        await runPoll(repoRoot, id);
       }
     }
   )
