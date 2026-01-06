@@ -5,6 +5,8 @@ import {
   prepareLogFiles,
   readExecutionResult,
 } from "./tmux.js";
+import { spawnDetached } from "./process.js";
+import { existsSync } from "fs";
 
 /**
  * Adapter for Claude Code CLI
@@ -20,10 +22,8 @@ export const claudeAdapter: AgentAdapter = {
         prompt
       );
 
-      // Read prompt from file to avoid command-line length limits
       const wrappedCmd = `claude -p "$(cat ${promptFile})" --dangerously-skip-permissions 2>&1 | tee ${logFile}; echo $? > ${exitCodeFile}`;
 
-      // Spawn in detached tmux session
       await execa(
         "tmux",
         [
@@ -40,28 +40,32 @@ export const claudeAdapter: AgentAdapter = {
         { reject: false }
       );
 
-      // Wait for session to complete
-      await waitForTmuxSession(tmux.sessionName);
-      return readExecutionResult(tmux.sessionName);
+      return { tmuxSession: tmux.sessionName };
     }
 
-    // Direct execution (no tmux)
-    const result = await execa(
-      "claude",
-      ["-p", prompt, "--dangerously-skip-permissions"],
-      {
-        cwd,
-        timeout: 0,
-        reject: false,
-      }
+    // Async execution without tmux
+    const { promptFile } = prepareLogFiles(`claude-${Date.now()}`, prompt);
+    const pid = spawnDetached(
+      "bash",
+      [
+        "-c",
+        `claude -p "$(cat '${promptFile}')" --dangerously-skip-permissions`,
+      ],
+      { cwd }
     );
-    return { exitCode: result.exitCode ?? 0 };
+
+    return { pid };
   },
 
   async interactive({ cwd, prompt }): Promise<void> {
-    // Claude Code TUI doesn't accept initial prompt via CLI
-    // User enters prompt after TUI launches
     await execa("claude", [], {
+      cwd,
+      stdio: "inherit",
+    });
+  },
+
+  async resume({ cwd }): Promise<void> {
+    await execa("claude", ["--continue"], {
       cwd,
       stdio: "inherit",
     });

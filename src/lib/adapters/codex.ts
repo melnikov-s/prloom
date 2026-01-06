@@ -5,6 +5,7 @@ import {
   prepareLogFiles,
   readExecutionResult,
 } from "./tmux.js";
+import { spawnDetached } from "./process.js";
 
 /**
  * Adapter for OpenAI Codex CLI
@@ -20,10 +21,8 @@ export const codexAdapter: AgentAdapter = {
         prompt
       );
 
-      // Read prompt from file to avoid command-line length limits
       const wrappedCmd = `codex exec "$(cat ${promptFile})" --full-auto 2>&1 | tee ${logFile}; echo $? > ${exitCodeFile}`;
 
-      // Spawn in detached tmux session
       await execa(
         "tmux",
         [
@@ -40,23 +39,30 @@ export const codexAdapter: AgentAdapter = {
         { reject: false }
       );
 
-      // Wait for session to complete
-      await waitForTmuxSession(tmux.sessionName);
-      return readExecutionResult(tmux.sessionName);
+      return { tmuxSession: tmux.sessionName };
     }
 
-    // Direct execution (no tmux)
-    const result = await execa("codex", ["exec", prompt, "--full-auto"], {
-      cwd,
-      timeout: 0,
-      reject: false,
-    });
-    return { exitCode: result.exitCode ?? 0 };
+    // Async execution without tmux
+    const { promptFile } = prepareLogFiles(`codex-${Date.now()}`, prompt);
+    const pid = spawnDetached(
+      "bash",
+      ["-c", `codex exec "$(cat '${promptFile}')" --full-auto`],
+      { cwd }
+    );
+
+    return { pid };
   },
 
   async interactive({ cwd, prompt }): Promise<void> {
     const args = prompt ? [prompt] : [];
     await execa("codex", args, {
+      cwd,
+      stdio: "inherit",
+    });
+  },
+
+  async resume({ cwd }): Promise<void> {
+    await execa("codex", ["resume", "--last"], {
       cwd,
       stdio: "inherit",
     });

@@ -5,6 +5,7 @@ import {
   prepareLogFiles,
   readExecutionResult,
 } from "./tmux.js";
+import { spawnDetached } from "./process.js";
 import { existsSync } from "fs";
 
 /**
@@ -21,17 +22,14 @@ export const opencodeAdapter: AgentAdapter = {
         prompt
       );
 
-      // Verify prompt file was written
       if (!existsSync(promptFile)) {
         console.error(`   ❌ Failed to write prompt file: ${promptFile}`);
         return { exitCode: 1 };
       }
       console.log(`   📝 Prompt file: ${promptFile}`);
 
-      // Use a script that reads from the file safely
       const wrappedCmd = `opencode run "$(cat '${promptFile}')" 2>&1 | tee "${logFile}"; echo $? > "${exitCodeFile}"`;
 
-      // Spawn in detached tmux session
       const tmuxResult = await execa(
         "tmux",
         [
@@ -53,23 +51,30 @@ export const opencodeAdapter: AgentAdapter = {
         return { exitCode: tmuxResult.exitCode ?? 1 };
       }
 
-      // Wait for session to complete
-      await waitForTmuxSession(tmux.sessionName);
-      return readExecutionResult(tmux.sessionName);
+      return { tmuxSession: tmux.sessionName };
     }
 
-    // Direct execution (no tmux)
-    const result = await execa("opencode", ["run", prompt], {
-      cwd,
-      timeout: 0,
-      reject: false,
-    });
-    return { exitCode: result.exitCode ?? 0 };
+    // Async execution without tmux
+    const { promptFile } = prepareLogFiles(`opencode-${Date.now()}`, prompt);
+    const pid = spawnDetached(
+      "bash",
+      ["-c", `opencode run "$(cat '${promptFile}')"`],
+      { cwd }
+    );
+
+    return { pid };
   },
 
   async interactive({ cwd, prompt }): Promise<void> {
     const args = prompt ? ["--prompt", prompt] : [];
     await execa("opencode", args, {
+      cwd,
+      stdio: "inherit",
+    });
+  },
+
+  async resume({ cwd }): Promise<void> {
+    await execa("opencode", ["--continue"], {
       cwd,
       stdio: "inherit",
     });

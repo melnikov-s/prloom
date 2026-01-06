@@ -1,13 +1,18 @@
 import { execa } from "execa";
 
-export type AgentName = "codex" | "opencode" | "claude" | "manual";
+export type AgentName = "codex" | "opencode" | "claude" | "gemini" | "manual";
 
 export interface TmuxConfig {
   sessionName: string;
 }
 
 export interface ExecutionResult {
-  exitCode: number;
+  /** Exit code (only set when execution completes synchronously or after waiting) */
+  exitCode?: number;
+  /** PID of detached process (for async execution without tmux) */
+  pid?: number;
+  /** Tmux session name (for async execution with tmux) */
+  tmuxSession?: string;
 }
 
 export interface AgentAdapter {
@@ -29,6 +34,12 @@ export interface AgentAdapter {
    * Session is ephemeral - not tracked for resume.
    */
   interactive(opts: { cwd: string; prompt?: string }): Promise<void>;
+
+  /**
+   * Resume the latest session in the given directory.
+   * Falls back to interactive() if not implemented.
+   */
+  resume?(opts: { cwd: string }): Promise<void>;
 }
 
 export function isAgentName(value: string): value is AgentName {
@@ -36,6 +47,7 @@ export function isAgentName(value: string): value is AgentName {
     value === "codex" ||
     value === "opencode" ||
     value === "claude" ||
+    value === "gemini" ||
     value === "manual"
   );
 }
