@@ -8,6 +8,7 @@ import {
   extractBody,
   generatePlanSkeleton,
   setStatus,
+  ensureActiveStatus,
 } from "../../src/lib/plan.js";
 
 const FIXTURE_PATH = join(import.meta.dir, "../fixtures/plans/sample.md");
@@ -215,6 +216,78 @@ Test plan
 
   expect(next).toBeNull();
   expect(plan.todos).toHaveLength(0);
+
+  rmSync(tmpDir, { recursive: true });
+});
+
+// Review status tests
+test("parsePlan parses review status", () => {
+  const tmpDir = mkdtempSync(join(tmpdir(), "prloom-test-"));
+  const planPath = join(tmpDir, "test-plan.md");
+
+  const planContent = `---
+id: review-plan
+status: review
+---
+
+## Objective
+
+Test plan in review
+
+## TODO
+
+- [x] Task done
+
+## Progress Log
+`;
+  writeFileSync(planPath, planContent);
+
+  const plan = parsePlan(planPath);
+  expect(plan.frontmatter.status).toBe("review");
+
+  rmSync(tmpDir, { recursive: true });
+});
+
+test("setStatus changes plan status from active to review", () => {
+  const tmpDir = mkdtempSync(join(tmpdir(), "prloom-test-"));
+  const planPath = join(tmpDir, "test-plan.md");
+  const skeleton = generatePlanSkeleton("test-plan");
+  writeFileSync(planPath, skeleton);
+
+  setStatus(planPath, "active");
+  setStatus(planPath, "review");
+
+  const plan = parsePlan(planPath);
+  expect(plan.frontmatter.status).toBe("review");
+
+  rmSync(tmpDir, { recursive: true });
+});
+
+test("ensureActiveStatus flips review to active", () => {
+  const tmpDir = mkdtempSync(join(tmpdir(), "prloom-test-"));
+  const planPath = join(tmpDir, "test-plan.md");
+
+  const planContent = `---
+id: review-plan
+status: review
+---
+
+## Objective
+
+Test plan
+
+## TODO
+
+- [x] Done task
+
+## Progress Log
+`;
+  writeFileSync(planPath, planContent);
+
+  ensureActiveStatus(planPath);
+
+  const plan = parsePlan(planPath);
+  expect(plan.frontmatter.status).toBe("active");
 
   rmSync(tmpDir, { recursive: true });
 });

@@ -2,7 +2,13 @@ import { readFileSync, writeFileSync } from "fs";
 import matter from "gray-matter";
 import { type AgentName, isAgentName } from "./adapters/index.js";
 
-export type PlanStatus = "draft" | "queued" | "active" | "blocked" | "done";
+export type PlanStatus =
+  | "draft"
+  | "queued"
+  | "active"
+  | "blocked"
+  | "review"
+  | "done";
 
 export interface PlanFrontmatter {
   id: string;
@@ -242,7 +248,11 @@ export function ensureActiveStatus(path: string): void {
   const raw = readFileSync(path, "utf-8");
   const { data, content } = matter(raw);
 
-  if (data.status === "done" || data.status === "queued") {
+  if (
+    data.status === "done" ||
+    data.status === "review" ||
+    data.status === "queued"
+  ) {
     data.status = "active";
     const updated = matter.stringify(content, data);
     writeFileSync(path, updated);

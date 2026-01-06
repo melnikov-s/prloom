@@ -266,6 +266,35 @@ export function ActivityPanel({
   );
 }
 
+interface ErrorPanelProps {
+  planId: string;
+  error: string;
+}
+
+function ErrorPanel({ planId, error }: ErrorPanelProps): React.ReactElement {
+  const logPath = `/tmp/prloom-${planId}/worker.log`;
+
+  return (
+    <Box
+      flexDirection="column"
+      borderStyle="single"
+      borderColor="red"
+      paddingX={1}
+      marginTop={0}
+    >
+      <Text bold color="red">
+        ⚠ ERROR: {planId}
+      </Text>
+      <Box marginTop={1}>
+        <Text wrap="wrap">{error}</Text>
+      </Box>
+      <Box marginTop={1}>
+        <Text dimColor>Log: {logPath}</Text>
+      </Box>
+    </Box>
+  );
+}
+
 interface AppProps {
   uiState: DispatcherUIState;
   planTodos: Map<string, { done: number; total: number }>;
@@ -273,6 +302,11 @@ interface AppProps {
 
 export function App({ uiState, planTodos }: AppProps): React.ReactElement {
   const [selectedIndex] = React.useState(0);
+
+  // Find plans with errors to display
+  const plansWithErrors = Object.entries(uiState.state.plans)
+    .filter(([, ps]) => ps.lastError)
+    .slice(0, 1); // Show first error only for now
 
   return (
     <Box flexDirection="column">
@@ -285,6 +319,9 @@ export function App({ uiState, planTodos }: AppProps): React.ReactElement {
         />
         <ActivityPanel events={uiState.events} />
       </Box>
+      {plansWithErrors.map(([planId, ps]) => (
+        <ErrorPanel key={planId} planId={planId} error={ps.lastError!} />
+      ))}
     </Box>
   );
 }

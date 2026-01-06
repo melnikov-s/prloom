@@ -22,7 +22,7 @@ You are implementing exactly ONE task from this plan.
    - Set frontmatter `status: blocked`
    - Explain the blocker in Session Notes
 5. If this is the final TODO and all tasks are complete:
-   - Set frontmatter `status: done`
+   - Set frontmatter `status: review`
 6. Exit when complete
 
 ## Session Notes Guidance

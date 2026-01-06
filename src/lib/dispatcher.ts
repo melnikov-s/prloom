@@ -390,6 +390,7 @@ export async function processActivePlans(
       if (
         !isManualAgent &&
         plan.frontmatter.status !== "blocked" &&
+        plan.frontmatter.status !== "review" &&
         plan.frontmatter.status !== "done"
       ) {
         const todo = findNextUnchecked(plan);
@@ -567,11 +568,11 @@ export async function processActivePlans(
 
             console.log(`🎉 All TODOs complete for ${planId}`);
             // Only set status if worker didn't already set it to done
-            if (updated.frontmatter.status !== "done") {
-              console.log(`   Setting plan status to: done`);
-              setStatus(planPath, "done");
-              console.log(`   Committing: [prloom] ${planId}: done`);
-              await commitAll(ps.worktree, `[prloom] ${planId}: done`);
+            if (updated.frontmatter.status !== "review") {
+              console.log(`   Setting plan status to: review`);
+              setStatus(planPath, "review");
+              console.log(`   Committing: [prloom] ${planId}: review`);
+              await commitAll(ps.worktree, `[prloom] ${planId}: review`);
               console.log(`   Pushing to origin: ${ps.branch}`);
               await push(ps.worktree, ps.branch);
             }
@@ -593,10 +594,10 @@ export async function processActivePlans(
           }
 
           console.log(`🎉 All TODOs complete for ${planId}`);
-          console.log(`   Setting plan status to: done`);
-          setStatus(planPath, "done");
-          console.log(`   Committing: [prloom] ${planId}: done`);
-          await commitAll(ps.worktree, `[prloom] ${planId}: done`);
+          console.log(`   Setting plan status to: review`);
+          setStatus(planPath, "review");
+          console.log(`   Committing: [prloom] ${planId}: review`);
+          await commitAll(ps.worktree, `[prloom] ${planId}: review`);
           console.log(`   Pushing to origin: ${ps.branch}`);
           await push(ps.worktree, ps.branch);
           if (ps.pr) {
