@@ -49,6 +49,7 @@ test("getAgentNames returns all registered agents", () => {
   expect(names).toContain("codex");
   expect(names).toContain("opencode");
   expect(names).toContain("claude");
+  expect(names).toContain("gemini");
   expect(names).toContain("manual");
-  expect(names.length).toBe(4);
+  expect(names.length).toBe(5);
 });
