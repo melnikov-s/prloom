@@ -53,8 +53,9 @@ export const codexAdapter: AgentAdapter = {
     return { pid };
   },
 
-  async interactive({ cwd, prompt }): Promise<void> {
+  async interactive({ cwd, prompt, model }): Promise<void> {
     const args = prompt ? [prompt] : [];
+    if (model) args.push("-m", model);
     await execa("codex", args, {
       cwd,
       stdio: "inherit",

@@ -33,7 +33,11 @@ export interface AgentAdapter {
    * Launch interactive TUI session (for designer or manual takeover).
    * Session is ephemeral - not tracked for resume.
    */
-  interactive(opts: { cwd: string; prompt?: string }): Promise<void>;
+  interactive(opts: {
+    cwd: string;
+    prompt?: string;
+    model?: string;
+  }): Promise<void>;
 
   /**
    * Resume the latest session in the given directory.

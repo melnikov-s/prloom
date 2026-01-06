@@ -17,7 +17,7 @@ export const manualAdapter: AgentAdapter = {
     return { exitCode: 0 };
   },
 
-  async interactive({ cwd, prompt }): Promise<void> {
+  async interactive({ cwd, prompt, model }): Promise<void> {
     console.log("ℹ️  Manual agent mode: No interactive session to launch.");
     console.log("   Use your IDE (Cursor, Anti-Gravity) to work on this plan.");
   },

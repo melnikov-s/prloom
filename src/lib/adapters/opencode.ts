@@ -65,8 +65,9 @@ export const opencodeAdapter: AgentAdapter = {
     return { pid };
   },
 
-  async interactive({ cwd, prompt }): Promise<void> {
+  async interactive({ cwd, prompt, model }): Promise<void> {
     const args = prompt ? ["--prompt", prompt] : [];
+    if (model) args.push("--model", model);
     await execa("opencode", args, {
       cwd,
       stdio: "inherit",

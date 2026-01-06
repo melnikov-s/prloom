@@ -13,7 +13,8 @@ export async function runNew(
   repoRoot: string,
   planId?: string,
   agentOverride?: string,
-  noDesigner?: boolean
+  noDesigner?: boolean,
+  model?: string
 ): Promise<void> {
   const config = loadConfig(repoRoot);
 
@@ -82,7 +83,7 @@ export async function runNew(
     baseBranch,
     workerAgent
   );
-  await adapter.interactive({ cwd: repoRoot, prompt });
+  await adapter.interactive({ cwd: repoRoot, prompt, model });
 
   console.log("");
   console.log("Designer session ended.");

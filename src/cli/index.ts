@@ -62,6 +62,12 @@ yargs(hideBin(process.argv))
           type: "string",
           describe: "Coding agent to use (codex, opencode, claude, manual)",
         })
+        .option("model", {
+          alias: "m",
+          type: "string",
+          describe:
+            "Model to use for designer agent (e.g., claude-opus-4, gemini-2.5-pro)",
+        })
         .option("no-designer", {
           type: "boolean",
           describe: "Create plan skeleton without launching designer session",
@@ -73,7 +79,8 @@ yargs(hideBin(process.argv))
         await getRepoRoot(),
         argv["plan-id"],
         argv.agent,
-        argv["no-designer"]
+        argv["no-designer"],
+        argv.model
       );
     }
   )

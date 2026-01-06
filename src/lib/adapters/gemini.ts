@@ -66,8 +66,10 @@ export const geminiAdapter: AgentAdapter = {
     return { pid };
   },
 
-  async interactive({ cwd, prompt }): Promise<void> {
-    const args = prompt ? ["-i", prompt] : [];
+  async interactive({ cwd, prompt, model }): Promise<void> {
+    const args: string[] = [];
+    if (model) args.push("--model", model);
+    if (prompt) args.push("-i", prompt);
     await execa("gemini", args, {
       cwd,
       stdio: "inherit",
