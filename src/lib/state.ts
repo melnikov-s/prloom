@@ -14,8 +14,7 @@ export interface PlanState {
   worktree: string;
   branch: string;
   pr?: number;
-  paused: boolean;
-  planRelpath: string; // e.g. "plans/<id>.md"
+  planRelpath: string; // e.g. "prloom/plans/<id>.md"
   baseBranch: string; // e.g. "main" for rebase
 
   /** Active tmux session name when running with --tmux */

@@ -15,12 +15,13 @@ export const codexAdapter: AgentAdapter = {
 
   async execute({ cwd, prompt, tmux }): Promise<ExecutionResult> {
     if (tmux) {
-      const { logFile, exitCodeFile } = prepareLogFiles(cwd);
-
-      // Wrap command to capture output and exit code
-      const wrappedCmd = `codex exec ${JSON.stringify(
+      const { logFile, exitCodeFile, promptFile } = prepareLogFiles(
+        tmux.sessionName,
         prompt
-      )} --full-auto 2>&1 | tee ${logFile}; echo $? > ${exitCodeFile}`;
+      );
+
+      // Read prompt from file to avoid command-line length limits
+      const wrappedCmd = `codex exec "$(cat ${promptFile})" --full-auto 2>&1 | tee ${logFile}; echo $? > ${exitCodeFile}`;
 
       // Spawn in detached tmux session
       await execa(
@@ -41,7 +42,7 @@ export const codexAdapter: AgentAdapter = {
 
       // Wait for session to complete
       await waitForTmuxSession(tmux.sessionName);
-      return readExecutionResult(cwd);
+      return readExecutionResult(tmux.sessionName);
     }
 
     // Direct execution (no tmux)

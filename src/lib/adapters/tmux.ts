@@ -1,39 +1,55 @@
 import { execa } from "execa";
 import { join } from "path";
-import { existsSync, readFileSync, unlinkSync, mkdirSync } from "fs";
+import {
+  existsSync,
+  readFileSync,
+  unlinkSync,
+  mkdirSync,
+  writeFileSync,
+} from "fs";
 import type { ExecutionResult } from "./types.js";
 
 /**
- * Get paths for worker log files.
+ * Get paths for worker log files in /tmp.
  */
-export function getWorkerLogPaths(cwd: string) {
-  const localDir = join(cwd, "prloom", ".local");
+export function getWorkerLogPaths(sessionName: string) {
+  const localDir = join("/tmp", sessionName);
   return {
     localDir,
     logFile: join(localDir, "worker.log"),
     exitCodeFile: join(localDir, "worker.exitcode"),
+    promptFile: join(localDir, "worker.prompt"),
   };
 }
 
 /**
- * Prepare log files directory and clean previous logs.
+ * Prepare log files directory, clean previous logs, and write prompt to file.
  */
-export function prepareLogFiles(cwd: string): {
+export function prepareLogFiles(
+  sessionName: string,
+  prompt: string
+): {
   logFile: string;
   exitCodeFile: string;
+  promptFile: string;
 } {
-  const { localDir, logFile, exitCodeFile } = getWorkerLogPaths(cwd);
+  const { localDir, logFile, exitCodeFile, promptFile } =
+    getWorkerLogPaths(sessionName);
   mkdirSync(localDir, { recursive: true });
   if (existsSync(logFile)) unlinkSync(logFile);
   if (existsSync(exitCodeFile)) unlinkSync(exitCodeFile);
-  return { logFile, exitCodeFile };
+
+  // Write prompt to file to avoid command-line length limits
+  writeFileSync(promptFile, prompt, "utf-8");
+
+  return { logFile, exitCodeFile, promptFile };
 }
 
 /**
  * Read execution result from log files after tmux session ends.
  */
-export function readExecutionResult(cwd: string): ExecutionResult {
-  const { logFile, exitCodeFile } = getWorkerLogPaths(cwd);
+export function readExecutionResult(sessionName: string): ExecutionResult {
+  const { logFile, exitCodeFile } = getWorkerLogPaths(sessionName);
 
   let exitCode = 0;
   if (existsSync(exitCodeFile)) {

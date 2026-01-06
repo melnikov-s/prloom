@@ -15,12 +15,13 @@ export const claudeAdapter: AgentAdapter = {
 
   async execute({ cwd, prompt, tmux }): Promise<ExecutionResult> {
     if (tmux) {
-      const { logFile, exitCodeFile } = prepareLogFiles(cwd);
-
-      // Wrap command to capture output and exit code
-      const wrappedCmd = `claude -p ${JSON.stringify(
+      const { logFile, exitCodeFile, promptFile } = prepareLogFiles(
+        tmux.sessionName,
         prompt
-      )} --dangerously-skip-permissions 2>&1 | tee ${logFile}; echo $? > ${exitCodeFile}`;
+      );
+
+      // Read prompt from file to avoid command-line length limits
+      const wrappedCmd = `claude -p "$(cat ${promptFile})" --dangerously-skip-permissions 2>&1 | tee ${logFile}; echo $? > ${exitCodeFile}`;
 
       // Spawn in detached tmux session
       await execa(
@@ -41,7 +42,7 @@ export const claudeAdapter: AgentAdapter = {
 
       // Wait for session to complete
       await waitForTmuxSession(tmux.sessionName);
-      return readExecutionResult(cwd);
+      return readExecutionResult(tmux.sessionName);
     }
 
     // Direct execution (no tmux)

@@ -131,34 +131,34 @@ yargs(hideBin(process.argv))
     }
   )
 
-  // prloom stop
+  // prloom block
   .command(
-    "stop <plan-id>",
-    "Pause automation for a plan",
+    "block <plan-id>",
+    "Block automation for a plan",
     (yargs) =>
       yargs.positional("plan-id", { type: "string", demandOption: true }),
     async (argv) => {
-      const { runStop } = await import("./stop.js");
-      await runStop(await getRepoRoot(), argv["plan-id"] as string);
+      const { runBlock } = await import("./block.js");
+      await runBlock(await getRepoRoot(), argv["plan-id"] as string);
     }
   )
 
-  // prloom unpause
+  // prloom unblock
   .command(
-    "unpause <plan-id>",
-    "Resume automation for a plan",
+    "unblock <plan-id>",
+    "Unblock automation for a plan",
     (yargs) =>
       yargs.positional("plan-id", { type: "string", demandOption: true }),
     async (argv) => {
-      const { runUnpause } = await import("./unpause.js");
-      await runUnpause(await getRepoRoot(), argv["plan-id"] as string);
+      const { runUnblock } = await import("./unblock.js");
+      await runUnblock(await getRepoRoot(), argv["plan-id"] as string);
     }
   )
 
   // prloom open
   .command(
     "open <plan-id>",
-    "Open TUI for manual work (requires paused)",
+    "Open TUI for manual work (requires blocked status)",
     (yargs) =>
       yargs.positional("plan-id", { type: "string", demandOption: true }),
     async (argv) => {

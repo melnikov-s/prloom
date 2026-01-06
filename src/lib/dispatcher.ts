@@ -187,7 +187,6 @@ async function ingestInboxPlans(
         worktree: worktreePath,
         branch,
         pr,
-        paused: false,
         planRelpath,
         baseBranch,
       };
@@ -255,9 +254,9 @@ async function processActivePlans(
         }
       }
 
-      if (ps.paused) continue;
-
+      // Skip if plan status is blocked
       let plan = parsePlan(planPath);
+      if (plan.frontmatter.status === "blocked") continue;
 
       // Skip automated execution for manual agent plans
       const isManualAgent = plan.frontmatter.agent === "manual";
@@ -328,6 +327,25 @@ async function processActivePlans(
               console.error(
                 `❌ TODO #${todo.index} failed ${MAX_TODO_RETRIES} times, blocking plan`
               );
+
+              // Show the worker log from previous attempts
+              const workerLogPath = join(
+                "/tmp",
+                `prloom-${planId}`,
+                "worker.log"
+              );
+              if (existsSync(workerLogPath)) {
+                console.error(`   Log file: ${workerLogPath}`);
+                const log = readFileSync(workerLogPath, "utf-8");
+                const lines = log.trim().split("\n").slice(-30);
+                console.error(`   Last 30 lines of worker log:`);
+                for (const line of lines) {
+                  console.error(`     ${line}`);
+                }
+              } else {
+                console.error(`   No worker log found at: ${workerLogPath}`);
+              }
+
               const planPath = join(ps.worktree, ps.planRelpath);
               setStatus(planPath, "blocked");
               ps.lastError = `TODO #${todo.index} failed after ${MAX_TODO_RETRIES} retries - worker did not mark it complete`;
@@ -397,7 +415,7 @@ async function processActivePlans(
             console.warn(`   Exit code: ${execResult.exitCode}`);
 
             // Show log file location and content
-            const logPath = join(ps.worktree, "prloom", ".local", "worker.log");
+            const logPath = join("/tmp", `prloom-${planId}`, "worker.log");
             if (existsSync(logPath)) {
               console.warn(`   Log file: ${logPath}`);
               const log = readFileSync(logPath, "utf-8");
@@ -606,11 +624,18 @@ function handleCommand(state: State, cmd: IpcCommand): void {
   if (!ps) return;
 
   if (cmd.type === "stop") {
-    ps.paused = true;
-    console.log(`⏸️ Paused ${cmd.plan_id}`);
+    // Block the plan
+    const planPath = join(ps.worktree, ps.planRelpath);
+    setStatus(planPath, "blocked");
+    console.log(`⏹️ Blocked ${cmd.plan_id}`);
   } else if (cmd.type === "unpause") {
-    ps.paused = false;
-    console.log(`▶️ Unpaused ${cmd.plan_id}`);
+    // Unblock the plan
+    const planPath = join(ps.worktree, ps.planRelpath);
+    setStatus(planPath, "active");
+    // Reset retry counter when unblocking
+    ps.lastTodoIndex = undefined;
+    ps.todoRetryCount = undefined;
+    console.log(`▶️ Unblocked ${cmd.plan_id}`);
   } else if (cmd.type === "poll") {
     // Force a single immediate feedback poll without shifting schedule
     ps.pollOnce = true;
