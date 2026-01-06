@@ -113,7 +113,7 @@ export async function runDispatcher(
   }
 }
 
-async function ingestInboxPlans(
+export async function ingestInboxPlans(
   repoRoot: string,
   worktreesDir: string,
   config: Config,
@@ -132,6 +132,14 @@ async function ingestInboxPlans(
 
       // Skip drafts - designer is still working on them
       if (plan.frontmatter.status === "draft") {
+        continue;
+      }
+
+      // Skip ingestion if no TODOs found - prevents immediate completion loop
+      if (plan.todos.length === 0) {
+        console.error(
+          `⚠️ Plan ${actualId} has zero TODO items, skipping ingestion. Please add at least one task.`
+        );
         continue;
       }
 
@@ -200,7 +208,10 @@ async function ingestInboxPlans(
 
       console.log(`✅ Ingested ${actualId} → PR #${pr}`);
     } catch (error) {
-      console.error(`Failed to ingest ${planId}:`, error);
+      console.error(
+        `❌ Failed to ingest plan ${planId}:`,
+        error instanceof Error ? error.message : error
+      );
     }
   }
 }
@@ -230,7 +241,7 @@ export function getFeedbackPollDecision(opts: {
   };
 }
 
-async function processActivePlans(
+export async function processActivePlans(
   repoRoot: string,
   config: Config,
   state: State,
@@ -463,6 +474,15 @@ async function processActivePlans(
           // Check if all TODOs are now complete
           const remainingTodo = findNextUnchecked(updated);
           if (!remainingTodo) {
+            if (updated.todos.length === 0) {
+              console.error(
+                `❌ Plan ${planId} has zero TODO items, blocking it.`
+              );
+              setStatus(planPath, "blocked");
+              ps.lastError = "Plan has zero TODO items. Please add tasks.";
+              continue;
+            }
+
             console.log(`🎉 All TODOs complete for ${planId}`);
             // Only set status if worker didn't already set it to done
             if (updated.frontmatter.status !== "done") {
@@ -481,6 +501,15 @@ async function processActivePlans(
           }
         } else {
           // All TODOs done
+          if (plan.todos.length === 0) {
+            console.error(
+              `❌ Plan ${planId} has zero TODO items, blocking it.`
+            );
+            setStatus(planPath, "blocked");
+            ps.lastError = "Plan has zero TODO items. Please add tasks.";
+            continue;
+          }
+
           console.log(`🎉 All TODOs complete for ${planId}`);
           console.log(`   Setting plan status to: done`);
           setStatus(planPath, "done");

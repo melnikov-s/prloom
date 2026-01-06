@@ -1,7 +1,6 @@
 import { execa } from "execa";
 import { join, dirname } from "path";
 import { existsSync, copyFileSync, mkdirSync } from "fs";
-import { nanoid } from "nanoid";
 
 export async function branchExists(
   repoRoot: string,
@@ -24,8 +23,7 @@ export async function createBranchName(baseName: string): Promise<string> {
     .replace(/[^a-z0-9._/-]+/g, "-")
     .replace(/^-+|-+$/g, "");
 
-  const hash = nanoid(5);
-  return `${safeName}-${hash}`.toLowerCase();
+  return safeName.toLowerCase();
 }
 
 export async function createWorktree(
@@ -36,6 +34,10 @@ export async function createWorktree(
   remoteName: string = "origin"
 ): Promise<string> {
   const worktreePath = join(worktreesDir, branch);
+
+  if (existsSync(worktreePath)) {
+    throw new Error(`Worktree directory already exists: ${worktreePath}`);
+  }
 
   if (!existsSync(worktreesDir)) {
     mkdirSync(worktreesDir, { recursive: true });
