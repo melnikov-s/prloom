@@ -459,6 +459,26 @@ async function processActivePlans(
             console.log(`⚠️ Plan ${planId} is blocked`);
             ps.lastError = "Worker set status to blocked";
           }
+
+          // Check if all TODOs are now complete
+          const remainingTodo = findNextUnchecked(updated);
+          if (!remainingTodo) {
+            console.log(`🎉 All TODOs complete for ${planId}`);
+            // Only set status if worker didn't already set it to done
+            if (updated.frontmatter.status !== "done") {
+              console.log(`   Setting plan status to: done`);
+              setStatus(planPath, "done");
+              console.log(`   Committing: [prloom] ${planId}: done`);
+              await commitAll(ps.worktree, `[prloom] ${planId}: done`);
+              console.log(`   Pushing to origin: ${ps.branch}`);
+              await push(ps.worktree, ps.branch);
+            }
+            if (ps.pr) {
+              console.log(`   Marking PR #${ps.pr} as ready for review`);
+              await markPRReady(repoRoot, ps.pr);
+            }
+            console.log(`✅ Plan ${planId} complete, PR marked ready`);
+          }
         } else {
           // All TODOs done
           console.log(`🎉 All TODOs complete for ${planId}`);

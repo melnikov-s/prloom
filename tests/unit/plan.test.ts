@@ -153,3 +153,68 @@ test("setStatus preserves other frontmatter fields", () => {
 
   rmSync(tmpDir, { recursive: true });
 });
+
+// findNextUnchecked completion tests
+test("findNextUnchecked returns null when all TODOs are complete", () => {
+  const tmpDir = mkdtempSync(join(tmpdir(), "prloom-test-"));
+  const planPath = join(tmpDir, "test-plan.md");
+
+  // Create a plan with all TODOs marked complete
+  const planContent = `---
+id: completed-plan
+status: active
+---
+
+## Objective
+
+Test plan
+
+## TODO
+
+- [x] First task
+- [x] Second task
+- [x] Third task
+
+## Progress Log
+
+- Completed all tasks
+`;
+  writeFileSync(planPath, planContent);
+
+  const plan = parsePlan(planPath);
+  const next = findNextUnchecked(plan);
+
+  expect(next).toBeNull();
+  expect(plan.todos).toHaveLength(3);
+  expect(plan.todos.every((t) => t.done)).toBe(true);
+
+  rmSync(tmpDir, { recursive: true });
+});
+
+test("findNextUnchecked returns null when TODO section is empty", () => {
+  const tmpDir = mkdtempSync(join(tmpdir(), "prloom-test-"));
+  const planPath = join(tmpDir, "test-plan.md");
+
+  const planContent = `---
+id: empty-plan
+status: active
+---
+
+## Objective
+
+Test plan
+
+## TODO
+
+## Progress Log
+`;
+  writeFileSync(planPath, planContent);
+
+  const plan = parsePlan(planPath);
+  const next = findNextUnchecked(plan);
+
+  expect(next).toBeNull();
+  expect(plan.todos).toHaveLength(0);
+
+  rmSync(tmpDir, { recursive: true });
+});
