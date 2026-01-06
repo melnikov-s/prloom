@@ -118,3 +118,13 @@ test("resolvePlanId: not found throws error", async () => {
     /Plan not found/
   );
 });
+
+test("resolvePlanId: resolves ID from prefixed filename", async () => {
+  const id = "xyz78";
+  const filename = `some-feature-${id}.md`;
+  const planPath = join(repoRoot, "prloom", ".local", "inbox", filename);
+  writeFileSync(planPath, generatePlanSkeleton(id));
+
+  const resolved = await resolvePlanId(repoRoot, id);
+  expect(resolved).toBe(id);
+});

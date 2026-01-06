@@ -171,7 +171,23 @@ export function ensureInboxDir(repoRoot: string): void {
 }
 
 export function getInboxPath(repoRoot: string, planId: string): string {
-  return join(getSwarmDir(repoRoot), INBOX_DIR, `${planId}.md`);
+  const inboxDir = join(getSwarmDir(repoRoot), INBOX_DIR);
+  const exactPath = join(inboxDir, `${planId}.md`);
+
+  if (existsSync(exactPath)) {
+    return exactPath;
+  }
+
+  // Fallback: search for files ending in -<planId>.md
+  if (existsSync(inboxDir)) {
+    const files = readdirSync(inboxDir);
+    const match = files.find((f) => f.endsWith(`-${planId}.md`));
+    if (match) {
+      return join(inboxDir, match);
+    }
+  }
+
+  return exactPath;
 }
 
 export function listInboxPlanIds(repoRoot: string): string[] {

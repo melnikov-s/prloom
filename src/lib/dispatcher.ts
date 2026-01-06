@@ -127,20 +127,15 @@ async function ingestInboxPlans(
     try {
       const plan = parsePlan(inboxPath);
 
-      // Validate: frontmatter id must match filename
-      if (plan.frontmatter.id !== planId) {
-        console.error(
-          `ID mismatch: file ${planId}.md has id: ${plan.frontmatter.id}, skipping`
-        );
-        continue;
-      }
+      // Trust the frontmatter ID for tracking
+      const actualId = plan.frontmatter.id;
 
       // Skip drafts - designer is still working on them
       if (plan.frontmatter.status === "draft") {
         continue;
       }
 
-      console.log(`📥 Ingesting inbox plan: ${planId}`);
+      console.log(`📥 Ingesting inbox plan: ${actualId} (from ${planId}.md)`);
 
       // Determine base branch for this plan
       const baseBranch = plan.frontmatter.base_branch ?? config.base_branch;
@@ -150,7 +145,7 @@ async function ingestInboxPlans(
       const branchBase =
         plan.frontmatter.branch && plan.frontmatter.branch.trim() !== ""
           ? plan.frontmatter.branch
-          : planId;
+          : actualId;
 
       const branch = await createBranchName(branchBase);
       console.log(`   Creating branch: ${branch}`);
@@ -161,7 +156,7 @@ async function ingestInboxPlans(
         baseBranch
       );
       console.log(`   Created worktree: ${worktreePath}`);
-      const planRelpath = `prloom/plans/${planId}.md`;
+      const planRelpath = `prloom/plans/${actualId}.md`;
 
       // Copy plan to worktree
       console.log(`   Copying plan to worktree: ${planRelpath}`);
@@ -173,8 +168,8 @@ async function ingestInboxPlans(
       setStatus(worktreePlanPath, "active");
 
       // Commit and push
-      console.log(`   Committing: [prloom] ${planId}: initial plan`);
-      await commitAll(worktreePath, `[prloom] ${planId}: initial plan`);
+      console.log(`   Committing: [prloom] ${actualId}: initial plan`);
+      await commitAll(worktreePath, `[prloom] ${actualId}: initial plan`);
       console.log(`   Pushing branch to origin: ${branch}`);
       await push(worktreePath, branch);
 
@@ -185,13 +180,13 @@ async function ingestInboxPlans(
         repoRoot,
         branch,
         baseBranch,
-        planId,
+        actualId,
         extractBody(updatedPlan)
       );
       console.log(`   Created draft PR #${pr}`);
 
       // Store in state
-      state.plans[planId] = {
+      state.plans[actualId] = {
         worktree: worktreePath,
         branch,
         pr,
@@ -203,7 +198,7 @@ async function ingestInboxPlans(
       console.log(`   Removing plan from inbox`);
       deleteInboxPlan(repoRoot, planId);
 
-      console.log(`✅ Ingested ${planId} → PR #${pr}`);
+      console.log(`✅ Ingested ${actualId} → PR #${pr}`);
     } catch (error) {
       console.error(`Failed to ingest ${planId}:`, error);
     }

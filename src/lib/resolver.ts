@@ -25,8 +25,15 @@ export async function resolvePlanId(
   const inboxIds = listInboxPlanIds(repoRoot);
 
   // 1. Check for Exact ID match in inbox or state
-  if (inboxIds.includes(input) || state.plans[input]) {
-    matches.add(input);
+  const exactInboxMatch = inboxIds.find(
+    (id) => id === input || id.endsWith(`-${input}`)
+  );
+  if (exactInboxMatch || state.plans[input]) {
+    matches.add(
+      exactInboxMatch
+        ? exactInboxMatch.split("-").pop() || exactInboxMatch
+        : input
+    );
   }
 
   // 2. Check for Exact Branch match in active state
