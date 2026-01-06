@@ -20,6 +20,9 @@ export interface PlanState {
   /** Active tmux session name when running with --tmux */
   tmuxSession?: string;
 
+  /** Active agent process PID when running without tmux */
+  pid?: number;
+
   /** Force a one-time PR feedback poll without shifting schedule */
   pollOnce?: boolean;
 

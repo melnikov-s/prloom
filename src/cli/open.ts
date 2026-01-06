@@ -1,8 +1,28 @@
 import { join } from "path";
-import { loadState } from "../lib/state.js";
+import { execa } from "execa";
+import { loadState, saveState } from "../lib/state.js";
 import { loadConfig } from "../lib/config.js";
 import { parsePlan } from "../lib/plan.js";
 import { getAdapter } from "../lib/adapters/index.js";
+import { isProcessAlive, killProcess } from "../lib/adapters/process.js";
+import { confirm } from "./prompt.js";
+
+/**
+ * Check if a tmux session is currently running.
+ */
+async function isTmuxSessionRunning(sessionName: string): Promise<boolean> {
+  const { exitCode } = await execa("tmux", ["has-session", "-t", sessionName], {
+    reject: false,
+  });
+  return exitCode === 0;
+}
+
+/**
+ * Kill a tmux session.
+ */
+async function killTmuxSession(sessionName: string): Promise<void> {
+  await execa("tmux", ["kill-session", "-t", sessionName], { reject: false });
+}
 
 export async function runOpen(repoRoot: string, planId: string): Promise<void> {
   const state = loadState(repoRoot);
@@ -15,12 +35,40 @@ export async function runOpen(repoRoot: string, planId: string): Promise<void> {
     process.exit(1);
   }
 
-  if (!ps.paused) {
-    console.error(`Plan ${planId} is not paused.`);
-    console.error(
-      "Run 'prloom stop ${planId}' first to avoid automation collision."
-    );
-    process.exit(1);
+  // Check if an agent is currently running for this plan
+  const tmuxRunning =
+    ps.tmuxSession && (await isTmuxSessionRunning(ps.tmuxSession));
+  const pidRunning = ps.pid && isProcessAlive(ps.pid);
+
+  if (tmuxRunning || pidRunning) {
+    const sessionInfo = tmuxRunning
+      ? `tmux session "${ps.tmuxSession}"`
+      : `process ${ps.pid}`;
+    console.log(`⚠️  Agent is currently running (${sessionInfo})`);
+
+    const shouldKill = await confirm("Kill it and take over?");
+    if (!shouldKill) {
+      console.log("Cancelled.");
+      if (tmuxRunning) {
+        console.log("Use 'prloom watch' to observe the running session.");
+      }
+      return;
+    }
+
+    // Kill the running session
+    if (tmuxRunning && ps.tmuxSession) {
+      await killTmuxSession(ps.tmuxSession);
+      ps.tmuxSession = undefined;
+      console.log("Tmux session killed.");
+    }
+    if (pidRunning && ps.pid) {
+      killProcess(ps.pid);
+      ps.pid = undefined;
+      console.log("Process killed.");
+    }
+
+    // Save state with cleared identifiers
+    saveState(repoRoot, state);
   }
 
   // Get the plan's agent from frontmatter or use config default
@@ -29,10 +77,14 @@ export async function runOpen(repoRoot: string, planId: string): Promise<void> {
   const agentName = plan.frontmatter.agent ?? config.agents.default;
   const adapter = getAdapter(agentName);
 
-  console.log(`Opening TUI for ${planId}...`);
+  console.log(`Resuming session for ${planId}...`);
   console.log(`Agent: ${agentName}`);
   console.log(`Worktree: ${ps.worktree}`);
 
-  // Start fresh interactive session (sessions are ephemeral per-TODO)
-  await adapter.interactive({ cwd: ps.worktree });
+  // Resume the latest agent session in this worktree
+  if (adapter.resume) {
+    await adapter.resume({ cwd: ps.worktree });
+  } else {
+    await adapter.interactive({ cwd: ps.worktree });
+  }
 }

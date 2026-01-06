@@ -45,6 +45,12 @@ import {
 } from "./github.js";
 import { getAdapter } from "./adapters/index.js";
 import {
+  isProcessAlive,
+  killProcess,
+  waitForProcess,
+} from "./adapters/process.js";
+import { waitForTmuxSession, readExecutionResult } from "./adapters/tmux.js";
+import {
   renderWorkerPrompt,
   renderTriagePrompt,
   readTriageResultFile,
@@ -387,31 +393,48 @@ export async function processActivePlans(
             ? { sessionName: `prloom-${planId}` }
             : undefined;
 
-          // Track session in state for prloom watch
-          if (tmuxConfig) {
-            ps.tmuxSession = tmuxConfig.sessionName;
-            console.log(
-              `   [spawned in tmux session: ${tmuxConfig.sessionName}]`
-            );
-          }
-
           const execResult = await adapter.execute({
             cwd: ps.worktree,
             prompt,
             tmux: tmuxConfig,
           });
 
-          // Clear tmux session after completion
-          if (tmuxConfig) {
-            ps.tmuxSession = undefined;
+          // Store session identifiers for tracking
+          if (execResult.tmuxSession) {
+            ps.tmuxSession = execResult.tmuxSession;
+            console.log(
+              `   [spawned in tmux session: ${execResult.tmuxSession}]`
+            );
+          } else if (execResult.pid) {
+            ps.pid = execResult.pid;
+            console.log(`   [spawned detached process: ${execResult.pid}]`);
           }
 
-          // Check exit code
-          if (execResult.exitCode !== 0) {
+          // Poll for completion
+          if (execResult.tmuxSession) {
+            await waitForTmuxSession(execResult.tmuxSession);
+            const tmuxResult = readExecutionResult(execResult.tmuxSession);
+            if (tmuxResult.exitCode !== 0) {
+              console.warn(
+                `   ⚠️ Worker exited with code ${tmuxResult.exitCode}`
+              );
+            }
+          } else if (execResult.pid) {
+            await waitForProcess(execResult.pid);
+            console.log(`   Process ${execResult.pid} completed`);
+          } else if (
+            execResult.exitCode !== undefined &&
+            execResult.exitCode !== 0
+          ) {
+            // Synchronous execution with error (e.g., failed to spawn)
             console.warn(
               `   ⚠️ Worker exited with code ${execResult.exitCode}`
             );
           }
+
+          // Clear session identifiers after completion
+          ps.tmuxSession = undefined;
+          ps.pid = undefined;
 
           // Re-parse plan to check if TODO was marked complete
           const updatedPlan = parsePlan(planPath);
