@@ -103,7 +103,7 @@ Create `prloom/config.json`:
     "designer": "codex"
   },
   "worktrees_dir": "prloom/.local/worktrees",
-  "poll_interval_ms": 60000,
+  "github_poll_interval_ms": 60000,
   "base_branch": "main"
 }
 ```

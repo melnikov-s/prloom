@@ -38,7 +38,7 @@ export async function runInit(
     const config = {
       agents: existing.agents,
       worktrees_dir: existing.worktrees_dir,
-      poll_interval_ms: existing.poll_interval_ms,
+      github_poll_interval_ms: existing.github_poll_interval_ms,
       base_branch: defaultBranch,
     };
     writeFileSync(configPath, JSON.stringify(config, null, 2) + "\n");

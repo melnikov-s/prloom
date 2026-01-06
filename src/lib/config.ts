@@ -10,7 +10,7 @@ export interface AgentsConfig {
 export interface Config {
   agents: AgentsConfig;
   worktrees_dir: string;
-  poll_interval_ms: number;
+  github_poll_interval_ms: number;
   base_branch: string;
 }
 
@@ -19,7 +19,7 @@ const DEFAULTS: Config = {
     default: "opencode",
   },
   worktrees_dir: "prloom/.local/worktrees",
-  poll_interval_ms: 60000, // 60 seconds; use `prloom poll <id>` for immediate
+  github_poll_interval_ms: 60000, // 60 seconds for GitHub API rate limits
   base_branch: "main",
 };
 
@@ -44,7 +44,8 @@ export function loadConfig(repoRoot: string): Config {
     return {
       agents,
       worktrees_dir: parsed.worktrees_dir ?? DEFAULTS.worktrees_dir,
-      poll_interval_ms: parsed.poll_interval_ms ?? DEFAULTS.poll_interval_ms,
+      github_poll_interval_ms:
+        parsed.github_poll_interval_ms ?? DEFAULTS.github_poll_interval_ms,
       base_branch:
         typeof parsed.base_branch === "string" && parsed.base_branch.trim()
           ? parsed.base_branch

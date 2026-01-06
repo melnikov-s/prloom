@@ -17,7 +17,7 @@ test("loadConfig returns defaults when no config file exists", () => {
   const config = loadConfig(TEST_DIR);
 
   expect(config.worktrees_dir).toBe("prloom/.local/worktrees");
-  expect(config.poll_interval_ms).toBe(60000);
+  expect(config.github_poll_interval_ms).toBe(60000);
   expect(config.base_branch).toBe("main");
 });
 
@@ -27,7 +27,7 @@ test("loadConfig reads values from prloom/config.json", () => {
     join(TEST_DIR, "prloom", "config.json"),
     JSON.stringify({
       worktrees_dir: "/custom/path",
-      poll_interval_ms: 10000,
+      github_poll_interval_ms: 10000,
       base_branch: "develop",
     })
   );
@@ -35,7 +35,7 @@ test("loadConfig reads values from prloom/config.json", () => {
   const config = loadConfig(TEST_DIR);
 
   expect(config.worktrees_dir).toBe("/custom/path");
-  expect(config.poll_interval_ms).toBe(10000);
+  expect(config.github_poll_interval_ms).toBe(10000);
   expect(config.base_branch).toBe("develop");
 });
 
@@ -49,7 +49,7 @@ test("loadConfig uses defaults for missing fields", () => {
   const config = loadConfig(TEST_DIR);
 
   expect(config.worktrees_dir).toBe("/custom");
-  expect(config.poll_interval_ms).toBe(60000); // default
+  expect(config.github_poll_interval_ms).toBe(60000); // default
   expect(config.base_branch).toBe("develop");
 });
 
@@ -57,7 +57,7 @@ test("resolveWorktreesDir resolves relative path", () => {
   const config = {
     agents: { default: "opencode" as const },
     worktrees_dir: "../worktrees",
-    poll_interval_ms: 60000,
+    github_poll_interval_ms: 60000,
     base_branch: "main",
   };
   const resolved = resolveWorktreesDir("/repo/root", config);

@@ -103,18 +103,12 @@ export async function runDispatcher(
       await processActivePlans(repoRoot, config, state, botLogin, options);
 
       saveState(repoRoot, state);
-      await sleepUntilIpcOrTimeout(
-        repoRoot,
-        state.control_cursor,
-        config.poll_interval_ms
-      );
+
+      // Main loop: check files every 5 seconds
+      await sleepUntilIpcOrTimeout(repoRoot, state.control_cursor, 5000);
     } catch (error) {
       console.error("Dispatcher error:", error);
-      await sleepUntilIpcOrTimeout(
-        repoRoot,
-        state.control_cursor,
-        config.poll_interval_ms
-      );
+      await sleepUntilIpcOrTimeout(repoRoot, state.control_cursor, 5000);
     }
   }
 }
@@ -266,7 +260,7 @@ async function processActivePlans(
       if (ps.pr) {
         const decision = getFeedbackPollDecision({
           now: Date.now(),
-          pollIntervalMs: config.poll_interval_ms,
+          pollIntervalMs: config.github_poll_interval_ms,
           lastPolledAt: ps.lastPolledAt,
           pollOnce: ps.pollOnce,
         });
