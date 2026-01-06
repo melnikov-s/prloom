@@ -113,8 +113,20 @@ yargs(hideBin(process.argv))
         default: false,
       }),
     async (argv) => {
+      const repoRoot = await getRepoRoot();
       const { runDispatcher } = await import("../lib/dispatcher.js");
-      await runDispatcher(await getRepoRoot(), { tmux: argv.tmux });
+      const { renderTUI } = await import("../ui/index.js");
+
+      // Start dispatcher in background
+      runDispatcher(repoRoot, { tmux: argv.tmux, useTUI: true }).catch(
+        (err) => {
+          console.error("Dispatcher error:", err);
+          process.exit(1);
+        }
+      );
+
+      // Render TUI (blocks until quit)
+      await renderTUI(repoRoot);
     }
   )
 

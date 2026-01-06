@@ -55,10 +55,54 @@ import {
   renderTriagePrompt,
   readTriageResultFile,
 } from "./template.js";
+import { dispatcherEvents } from "./events.js";
 
 export interface DispatcherOptions {
   /** Run workers in tmux sessions for observation */
   tmux?: boolean;
+  /** Use TUI instead of console output */
+  useTUI?: boolean;
+}
+
+export type Logger = {
+  info: (msg: string, planId?: string) => void;
+  success: (msg: string, planId?: string) => void;
+  warn: (msg: string, planId?: string) => void;
+  error: (msg: string, planId?: string) => void;
+};
+
+// Logger that routes to TUI events or console
+function createLogger(useTUI: boolean) {
+  return {
+    info: (msg: string, planId?: string) => {
+      if (useTUI) {
+        dispatcherEvents.info(msg, planId);
+      } else {
+        console.log(msg);
+      }
+    },
+    success: (msg: string, planId?: string) => {
+      if (useTUI) {
+        dispatcherEvents.success(msg, planId);
+      } else {
+        console.log(msg);
+      }
+    },
+    warn: (msg: string, planId?: string) => {
+      if (useTUI) {
+        dispatcherEvents.warn(msg, planId);
+      } else {
+        console.warn(msg);
+      }
+    },
+    error: (msg: string, planId?: string) => {
+      if (useTUI) {
+        dispatcherEvents.error(msg, planId);
+      } else {
+        console.error(msg);
+      }
+    },
+  };
 }
 
 export async function runDispatcher(
@@ -67,6 +111,7 @@ export async function runDispatcher(
 ): Promise<void> {
   const config = loadConfig(repoRoot);
   const worktreesDir = resolveWorktreesDir(repoRoot, config);
+  const log = createLogger(options.useTUI ?? false);
 
   acquireLock(repoRoot);
 
@@ -80,17 +125,23 @@ export async function runDispatcher(
 
   let state = loadState(repoRoot);
 
+  // Emit initial state for TUI
+  if (options.useTUI) {
+    dispatcherEvents.start();
+    dispatcherEvents.setState(state);
+  }
+
   // Get bot login for filtering
   let botLogin: string;
   try {
     const user = await getCurrentGitHubUser();
     botLogin = user.login;
   } catch {
-    console.warn("Could not get GitHub user, bot filtering may not work");
+    log.warn("Could not get GitHub user, bot filtering may not work");
     botLogin = "";
   }
 
-  console.log("Dispatcher started. Press Ctrl+C to stop.");
+  log.info("Dispatcher started. Press Ctrl+C to stop.");
 
   while (true) {
     try {
@@ -103,17 +154,23 @@ export async function runDispatcher(
       }
 
       // 2. Ingest inbox plans
-      await ingestInboxPlans(repoRoot, worktreesDir, config, state);
+      await ingestInboxPlans(repoRoot, worktreesDir, config, state, log);
 
       // 3. Process active plans from state
-      await processActivePlans(repoRoot, config, state, botLogin, options);
+      await processActivePlans(repoRoot, config, state, botLogin, options, log);
 
       saveState(repoRoot, state);
+
+      // Emit updated state for TUI
+      if (options.useTUI) {
+        dispatcherEvents.setState(state);
+      }
 
       // Main loop: check files every 5 seconds
       await sleepUntilIpcOrTimeout(repoRoot, state.control_cursor, 5000);
     } catch (error) {
-      console.error("Dispatcher error:", error);
+      log.error(`Dispatcher error: ${error}`);
+
       await sleepUntilIpcOrTimeout(repoRoot, state.control_cursor, 5000);
     }
   }
@@ -123,7 +180,8 @@ export async function ingestInboxPlans(
   repoRoot: string,
   worktreesDir: string,
   config: Config,
-  state: State
+  state: State,
+  log: Logger
 ): Promise<void> {
   const inboxPlanIds = listInboxPlanIds(repoRoot);
 
@@ -252,7 +310,8 @@ export async function processActivePlans(
   config: Config,
   state: State,
   botLogin: string,
-  options: DispatcherOptions = {}
+  options: DispatcherOptions = {},
+  log: Logger
 ): Promise<void> {
   for (const [planId, ps] of Object.entries(state.plans)) {
     try {
