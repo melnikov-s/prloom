@@ -37,7 +37,7 @@ test("saveState and loadState round-trip", () => {
         sessionId: "abc123",
         worktree: "/path/to/worktree",
         branch: "test-plan-xyz",
-        paused: false,
+
         planRelpath: "plans/test-plan.md",
         baseBranch: "develop",
       },
@@ -85,7 +85,7 @@ test("saveShard and loadShard round-trip", () => {
     sessionId: "sess123",
     worktree: "/wt",
     branch: "feat-x",
-    paused: true,
+
     planRelpath: "plans/my-plan.md",
     baseBranch: "develop",
   };
@@ -94,7 +94,6 @@ test("saveShard and loadShard round-trip", () => {
   const loaded = loadShard(TEST_DIR, "my-plan");
 
   expect(loaded?.sessionId).toBe("sess123");
-  expect(loaded?.paused).toBe(true);
 });
 
 test("loadShard returns null for missing shard", () => {

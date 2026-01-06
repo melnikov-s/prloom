@@ -48,10 +48,9 @@ export async function runStatus(repoRoot: string): Promise<void> {
         }
       }
 
-      const paused = ps.paused ? " [PAUSED]" : "";
       const prNum = ps.pr ? `PR #${ps.pr}` : "No PR";
 
-      console.log(`${planId}${paused}`);
+      console.log(`${planId}`);
       console.log(`  Status:   ${status}`);
       console.log(`  Agent:    ${agent}`);
       console.log(`  PR:       ${prNum}`);

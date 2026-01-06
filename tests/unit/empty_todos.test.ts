@@ -6,9 +6,22 @@ import {
   ingestInboxPlans,
   processActivePlans,
 } from "../../src/lib/dispatcher.js";
-import { saveState, loadState, getInboxPath } from "../../src/lib/state.js";
+import {
+  saveState,
+  loadState,
+  getInboxPath,
+  type State,
+} from "../../src/lib/state.js";
 import { generatePlanSkeleton, setStatus } from "../../src/lib/plan.js";
 import { loadConfig } from "../../src/lib/config.js";
+
+// No-op logger for tests
+const noopLogger = {
+  info: () => {},
+  success: () => {},
+  warn: () => {},
+  error: () => {},
+};
 
 let repoRoot: string;
 
@@ -36,7 +49,7 @@ status: queued
   const config = loadConfig(repoRoot);
   const state = loadState(repoRoot);
 
-  await ingestInboxPlans(repoRoot, "/tmp/worktrees", config, state);
+  await ingestInboxPlans(repoRoot, "/tmp/worktrees", config, state, noopLogger);
 
   // Verify it was NOT ingested (still in inbox, not in state)
   expect(Object.keys(state.plans)).not.toContain(id);
@@ -63,7 +76,7 @@ status: active
   writeFileSync(planPath, content);
 
   const config = loadConfig(repoRoot);
-  const state = {
+  const state: State = {
     control_cursor: 0,
     plans: {
       [id]: {
@@ -76,10 +89,10 @@ status: active
   };
 
   // processActivePlans expects botLogin
-  await processActivePlans(repoRoot, config, state, "bot-user");
+  await processActivePlans(repoRoot, config, state, "bot-user", {}, noopLogger);
 
   // Verify it was blocked
   const updatedContent = (await import("fs")).readFileSync(planPath, "utf-8");
   expect(updatedContent).toContain("status: blocked");
-  expect(state.plans[id].lastError).toContain("zero TODO items");
+  expect(state.plans[id]!.lastError).toContain("zero TODO items");
 });
