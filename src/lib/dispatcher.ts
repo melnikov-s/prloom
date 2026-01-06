@@ -355,14 +355,6 @@ async function processActivePlans(
               setStatus(planPath, "blocked");
               ps.lastError = `TODO #${todo.index} failed after ${MAX_TODO_RETRIES} retries - worker did not mark it complete`;
 
-              if (ps.pr) {
-                console.log(`   Posting blocked notification to PR #${ps.pr}`);
-                await postPRComment(
-                  repoRoot,
-                  ps.pr,
-                  `❌ **Plan blocked**: TODO #${todo.index} failed after ${MAX_TODO_RETRIES} attempts.\n\nThe worker did not mark this TODO as complete. Please investigate manually.\n\n\`\`\`\nprloom unpause ${planId}\n\`\`\``
-                );
-              }
               continue;
             }
           } else {
@@ -454,16 +446,6 @@ async function processActivePlans(
             await push(ps.worktree, ps.branch);
           } else {
             console.log(`   No changes to commit`);
-          }
-
-          // Post completion comment
-          if (ps.pr) {
-            console.log(`   Posting completion comment to PR #${ps.pr}`);
-            await postPRComment(
-              repoRoot,
-              ps.pr,
-              `\u2705 Completed TODO #${todo.index}: ${todo.text}`
-            );
           }
 
           // Re-parse and check status
