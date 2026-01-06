@@ -45,7 +45,7 @@ export async function runNew(
   }
 
   // Generate plan ID if not provided
-  const id = planId ?? `feat-${nanoid(5)}`;
+  const id = planId ?? nanoid(5);
   const planPath = getInboxPath(repoRoot, id);
 
   // Check if plan already exists in inbox
