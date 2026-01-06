@@ -30,9 +30,9 @@ Add user authentication with email/password login.
 - [ ] Add login/signup API routes
 - [ ] Add session middleware
 
-## Progress Log
+## Session Notes
 
-<!-- Append entries as you complete work -->
+<!-- Append notable observations here -->
 ```
 
 ## Plan Lifecycle
@@ -40,7 +40,7 @@ Add user authentication with email/password login.
 1. **Create** - `prloom new <id> --agent manual --no-designer` creates a plan in `.prloom/inbox/<id>.md`
 2. **Edit** - Fill in the Objective, Context, and TODO sections
 3. **Dispatch** - When `prloom start` runs, the plan is moved to a git worktree and a draft PR is opened
-4. **Execute** - Complete each TODO, mark checkboxes, append to Progress Log
+4. **Execute** - Complete each TODO, mark checkboxes, add Session Notes if notable
 5. **Complete** - When all TODOs are done, the PR is marked ready for review
 
 ## CLI Commands
@@ -113,12 +113,12 @@ For each unchecked item (`- [ ] ...`):
 1. Read the task description
 2. Implement the change in code
 3. Mark the checkbox: `- [x] Task description`
-4. Add a progress entry:
+4. (Optional) Add a Session Note if you encountered something notable:
 
    ```
-   ## Progress Log
+   ## Session Notes
 
-   - 2026-01-04: Completed users table migration
+   - ⚠️ better-auth requires explicit session cleanup on logout
    ```
 
 5. Run any tests listed in the Context section

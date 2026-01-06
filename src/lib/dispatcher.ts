@@ -144,29 +144,37 @@ async function ingestInboxPlans(
 
       // Determine base branch for this plan
       const baseBranch = plan.frontmatter.base_branch ?? config.base_branch;
+      console.log(`   Base branch: ${baseBranch}`);
 
       // Create branch and worktree
       const branch = await createBranchName(planId);
+      console.log(`   Creating branch: ${branch}`);
       const worktreePath = await createWorktree(
         repoRoot,
         worktreesDir,
         branch,
         baseBranch
       );
+      console.log(`   Created worktree: ${worktreePath}`);
       const planRelpath = `prloom/plans/${planId}.md`;
 
       // Copy plan to worktree
+      console.log(`   Copying plan to worktree: ${planRelpath}`);
       copyFileToWorktree(inboxPath, worktreePath, planRelpath);
 
       // Set status to active in worktree plan
       const worktreePlanPath = join(worktreePath, planRelpath);
+      console.log(`   Setting plan status to: active`);
       setStatus(worktreePlanPath, "active");
 
       // Commit and push
+      console.log(`   Committing: [prloom] ${planId}: initial plan`);
       await commitAll(worktreePath, `[prloom] ${planId}: initial plan`);
+      console.log(`   Pushing branch to origin: ${branch}`);
       await push(worktreePath, branch);
 
       // Create draft PR
+      console.log(`   Creating draft PR...`);
       const updatedPlan = parsePlan(worktreePlanPath);
       const pr = await createDraftPR(
         repoRoot,
@@ -175,6 +183,7 @@ async function ingestInboxPlans(
         planId,
         extractBody(updatedPlan)
       );
+      console.log(`   Created draft PR #${pr}`);
 
       // Store in state
       state.plans[planId] = {
@@ -186,6 +195,7 @@ async function ingestInboxPlans(
       };
 
       // Delete inbox plan (not archive)
+      console.log(`   Removing plan from inbox`);
       deleteInboxPlan(repoRoot, planId);
 
       console.log(`✅ Ingested ${planId} → PR #${pr}`);
@@ -341,10 +351,12 @@ async function processActivePlans(
               }
 
               const planPath = join(ps.worktree, ps.planRelpath);
+              console.log(`   Setting plan status to: blocked`);
               setStatus(planPath, "blocked");
               ps.lastError = `TODO #${todo.index} failed after ${MAX_TODO_RETRIES} retries - worker did not mark it complete`;
 
               if (ps.pr) {
+                console.log(`   Posting blocked notification to PR #${ps.pr}`);
                 await postPRComment(
                   repoRoot,
                   ps.pr,
@@ -432,26 +444,32 @@ async function processActivePlans(
           console.log(`   ✓ TODO #${todo.index} marked complete`);
 
           // Commit and push
+          console.log(`   Committing: [prloom] ${planId}: TODO #${todo.index}`);
           const committed = await commitAll(
             ps.worktree,
             `[prloom] ${planId}: TODO #${todo.index}`
           );
           if (committed) {
+            console.log(`   Pushing to origin: ${ps.branch}`);
             await push(ps.worktree, ps.branch);
+          } else {
+            console.log(`   No changes to commit`);
           }
 
           // Post completion comment
           if (ps.pr) {
+            console.log(`   Posting completion comment to PR #${ps.pr}`);
             await postPRComment(
               repoRoot,
               ps.pr,
-              `✅ Completed TODO #${todo.index}: ${todo.text}`
+              `\u2705 Completed TODO #${todo.index}: ${todo.text}`
             );
           }
 
           // Re-parse and check status
           const updated = parsePlan(planPath);
           if (ps.pr) {
+            console.log(`   Updating PR #${ps.pr} body`);
             await updatePRBody(repoRoot, ps.pr, extractBody(updated));
           }
 
@@ -461,10 +479,15 @@ async function processActivePlans(
           }
         } else {
           // All TODOs done
+          console.log(`🎉 All TODOs complete for ${planId}`);
+          console.log(`   Setting plan status to: done`);
           setStatus(planPath, "done");
+          console.log(`   Committing: [prloom] ${planId}: done`);
           await commitAll(ps.worktree, `[prloom] ${planId}: done`);
+          console.log(`   Pushing to origin: ${ps.branch}`);
           await push(ps.worktree, ps.branch);
           if (ps.pr) {
+            console.log(`   Marking PR #${ps.pr} as ready for review`);
             await markPRReady(repoRoot, ps.pr);
           }
           console.log(`✅ Plan ${planId} complete, PR marked ready`);
@@ -516,13 +539,19 @@ async function runTriage(
   const prompt = renderTriagePrompt(repoRoot, plan, feedback);
 
   console.log(`🔍 Running triage for ${plan.frontmatter.id}...`);
+  console.log(`   Using agent: ${triageAgent}`);
 
   // Build tmux config if enabled
   const tmuxConfig = options.tmux
     ? { sessionName: `prloom-triage-${plan.frontmatter.id}` }
     : undefined;
 
+  if (tmuxConfig) {
+    console.log(`   Spawning in tmux session: ${tmuxConfig.sessionName}`);
+  }
+
   await adapter.execute({ cwd: ps.worktree, prompt, tmux: tmuxConfig });
+  console.log(`   Triage agent completed`);
 
   // Read and process triage result
   try {
@@ -534,16 +563,19 @@ async function runTriage(
       const rebaseResult = await rebaseOnBaseBranch(ps.worktree, ps.baseBranch);
 
       if (rebaseResult.hasConflicts) {
+        console.log(`   Rebase conflict detected, blocking plan`);
         const planPath = join(ps.worktree, ps.planRelpath);
+        console.log(`   Setting plan status to: blocked`);
         setStatus(planPath, "blocked");
         ps.lastError = `Rebase conflict: ${rebaseResult.conflictFiles?.join(
           ", "
         )}`;
 
+        console.log(`   Posting rebase conflict comment to PR #${ps.pr}`);
         await postPRComment(
           repoRoot,
           ps.pr!,
-          `⚠️ **Rebase conflict detected**
+          `\u26a0\ufe0f **Rebase conflict detected**
 
 The following files have conflicts:
 \`\`\`
@@ -582,29 +614,37 @@ ${rebaseResult.conflictFiles?.join("\n")}
 The plan is now **blocked** until conflicts are resolved.`
         );
       } else if (rebaseResult.success) {
+        console.log(`   Force pushing rebased branch: ${ps.branch}`);
         await forcePush(ps.worktree, ps.branch);
-        console.log(`  Rebased and force-pushed`);
+        console.log(`   Rebased and force-pushed`);
       }
     }
 
     // Post triage reply
+    console.log(`   Posting triage reply to PR #${ps.pr}`);
     await postPRComment(repoRoot, ps.pr!, result.reply_markdown);
-    console.log(`  Posted triage reply`);
+    console.log(`   Posted triage reply`);
 
     // Commit any changes from triage
+    console.log(`   Committing: [prloom] ${plan.frontmatter.id}: triage`);
     const committed = await commitAll(
       ps.worktree,
       `[prloom] ${plan.frontmatter.id}: triage`
     );
     if (committed) {
+      console.log(`   Pushing to origin: ${ps.branch}`);
       await push(ps.worktree, ps.branch);
+    } else {
+      console.log(`   No changes to commit from triage`);
     }
   } catch (error) {
-    console.error(`Triage failed:`, error);
+    console.error(`   Triage failed:`, error);
     const planPath = join(ps.worktree, ps.planRelpath);
+    console.log(`   Setting plan status to: blocked`);
     setStatus(planPath, "blocked");
     ps.lastError = `Triage failed: ${error}`;
 
+    console.log(`   Posting triage error comment to PR #${ps.pr}`);
     await postPRComment(
       repoRoot,
       ps.pr!,
@@ -620,16 +660,20 @@ function handleCommand(state: State, cmd: IpcCommand): void {
   if (cmd.type === "stop") {
     // Block the plan
     const planPath = join(ps.worktree, ps.planRelpath);
+    console.log(`⏹️ Stopping ${cmd.plan_id}`);
+    console.log(`   Setting plan status to: blocked`);
     setStatus(planPath, "blocked");
-    console.log(`⏹️ Blocked ${cmd.plan_id}`);
+    console.log(`   Plan blocked`);
   } else if (cmd.type === "unpause") {
     // Unblock the plan
     const planPath = join(ps.worktree, ps.planRelpath);
+    console.log(`▶️ Unpausing ${cmd.plan_id}`);
+    console.log(`   Setting plan status to: active`);
     setStatus(planPath, "active");
     // Reset retry counter when unblocking
     ps.lastTodoIndex = undefined;
     ps.todoRetryCount = undefined;
-    console.log(`▶️ Unblocked ${cmd.plan_id}`);
+    console.log(`   Plan unblocked, retry counter reset`);
   } else if (cmd.type === "poll") {
     // Force a single immediate feedback poll without shifting schedule
     ps.pollOnce = true;
