@@ -1,18 +1,8 @@
 import { readFileSync, writeFileSync } from "fs";
 import matter from "gray-matter";
 
-export type PlanStatus =
-  | "draft"
-  | "queued"
-  | "active"
-  | "blocked"
-  | "review"
-  | "reviewing"
-  | "done";
-
 export interface PlanFrontmatter {
   id: string;
-  status: PlanStatus;
   branch?: string;
   pr?: number;
   base_branch?: string;
@@ -42,7 +32,6 @@ export function parsePlan(path: string): Plan {
 
   const frontmatter: PlanFrontmatter = {
     id: data.id ?? "",
-    status: data.status ?? "queued",
     branch: data.branch,
     pr: data.pr,
     base_branch:
@@ -113,20 +102,6 @@ export function findNextUnchecked(plan: Plan): TodoItem | null {
   return plan.todos.find((t) => !t.done) ?? null;
 }
 
-/**
- * Set the status in plan frontmatter.
- * NOTE: This should only be used for inbox/pre-ingestion plans.
- * Once a plan is active, the dispatcher owns the status in state.json.
- */
-export function setStatus(path: string, status: PlanStatus): void {
-  const raw = readFileSync(path, "utf-8");
-  const parsed = matter(raw);
-
-  parsed.data.status = status;
-  const updated = matter.stringify(parsed.content, parsed.data);
-  writeFileSync(path, updated);
-}
-
 export function setBranch(path: string, branch: string): void {
   const raw = readFileSync(path, "utf-8");
   const { data, content } = matter(raw);
@@ -162,12 +137,12 @@ export function extractBody(plan: Plan): string {
 /**
  * Generate a plan skeleton with deterministic frontmatter.
  * The designer agent will fill in the content sections.
+ * Status is NOT in frontmatter - it's tracked in state.inbox.
  */
 export function generatePlanSkeleton(id: string, baseBranch?: string): string {
   const frontmatter: Record<string, string> = {
     id,
     branch: "", // Designer can specify a descriptive branch name here
-    status: "draft",
   };
 
   if (baseBranch) {

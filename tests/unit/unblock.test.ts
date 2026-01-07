@@ -32,6 +32,7 @@ test("saveState persists retry counters", () => {
         todoRetryCount: 5,
       },
     },
+    inbox: {},
   };
 
   saveState(TEST_DIR, state);
@@ -56,6 +57,7 @@ test("saveState with undefined retry counters clears them", () => {
         todoRetryCount: 5,
       },
     },
+    inbox: {},
   };
   saveState(TEST_DIR, stateWithCounters);
 
@@ -73,6 +75,7 @@ test("saveState with undefined retry counters clears them", () => {
         todoRetryCount: undefined,
       },
     },
+    inbox: {},
   };
   saveState(TEST_DIR, stateReset);
 

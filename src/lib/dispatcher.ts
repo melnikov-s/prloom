@@ -649,11 +649,6 @@ export async function processActivePlans(
             await updatePRBody(repoRoot, ps.pr, extractBody(updated));
           }
 
-          if (updated.frontmatter.status === "blocked") {
-            log.warn(`⚠️ Plan ${planId} is blocked`, planId);
-            ps.lastError = "Worker set status to blocked";
-          }
-
           // Check if all TODOs are now complete
           const remainingTodo = findNextUnchecked(updated);
           if (!remainingTodo) {

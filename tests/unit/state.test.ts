@@ -43,6 +43,7 @@ test("saveState and loadState round-trip", () => {
         status: "active",
       },
     },
+    inbox: {},
   };
 
   saveState(TEST_DIR, state);

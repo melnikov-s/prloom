@@ -7,23 +7,13 @@ import {
   findNextUnchecked,
   extractBody,
   generatePlanSkeleton,
-  setStatus,
 } from "../../src/lib/plan.js";
 
 const FIXTURE_PATH = join(import.meta.dir, "../fixtures/plans/sample.md");
-const DRAFT_FIXTURE_PATH = join(
-  import.meta.dir,
-  "../fixtures/plans/draft-sample.md"
-);
 
 test("parsePlan extracts frontmatter id", () => {
   const plan = parsePlan(FIXTURE_PATH);
   expect(plan.frontmatter.id).toBe("sample");
-});
-
-test("parsePlan extracts frontmatter status", () => {
-  const plan = parsePlan(FIXTURE_PATH);
-  expect(plan.frontmatter.status).toBe("queued");
 });
 
 test("parsePlan extracts objective section", () => {
@@ -70,7 +60,7 @@ test("generatePlanSkeleton creates valid frontmatter", () => {
   const skeleton = generatePlanSkeleton("test-plan");
 
   expect(skeleton).toContain("id: test-plan");
-  expect(skeleton).toContain("status: draft");
+  expect(skeleton).not.toContain("status:");
   expect(skeleton).toContain("## Objective");
   expect(skeleton).toContain("## TODO");
 });
@@ -82,7 +72,6 @@ test("parsePlan strips HTML comments from title", () => {
   // Plan with only HTML comment placeholder in title section
   const planContent = `---
 id: test-plan
-status: queued
 ---
 
 ## Title
@@ -114,7 +103,6 @@ test("parsePlan extracts actual title when provided", () => {
 
   const planContent = `---
 id: test-plan
-status: queued
 ---
 
 ## Title
@@ -152,64 +140,6 @@ test("generatePlanSkeleton omits base_branch when not provided", () => {
   expect(skeleton).not.toContain("base_branch:");
 });
 
-// Draft status tests
-test("parsePlan parses draft status", () => {
-  const plan = parsePlan(DRAFT_FIXTURE_PATH);
-  expect(plan.frontmatter.status).toBe("draft");
-  expect(plan.frontmatter.id).toBe("draft-sample");
-});
-
-test("setStatus changes plan status from draft to queued", () => {
-  // Create a temp plan file
-  const tmpDir = mkdtempSync(join(tmpdir(), "prloom-test-"));
-  const planPath = join(tmpDir, "test-plan.md");
-  const skeleton = generatePlanSkeleton("test-plan");
-  writeFileSync(planPath, skeleton);
-
-  // Verify starts as draft
-  let plan = parsePlan(planPath);
-  expect(plan.frontmatter.status).toBe("draft");
-
-  // Change to queued
-  setStatus(planPath, "queued");
-  plan = parsePlan(planPath);
-  expect(plan.frontmatter.status).toBe("queued");
-
-  // Cleanup
-  rmSync(tmpDir, { recursive: true });
-});
-
-test("setStatus changes plan status from queued to active", () => {
-  const tmpDir = mkdtempSync(join(tmpdir(), "prloom-test-"));
-  const planPath = join(tmpDir, "test-plan.md");
-  const skeleton = generatePlanSkeleton("test-plan");
-  writeFileSync(planPath, skeleton);
-
-  setStatus(planPath, "queued");
-  setStatus(planPath, "active");
-
-  const plan = parsePlan(planPath);
-  expect(plan.frontmatter.status).toBe("active");
-
-  rmSync(tmpDir, { recursive: true });
-});
-
-test("setStatus preserves other frontmatter fields", () => {
-  const tmpDir = mkdtempSync(join(tmpdir(), "prloom-test-"));
-  const planPath = join(tmpDir, "test-plan.md");
-  const skeleton = generatePlanSkeleton("my-plan", "main");
-  writeFileSync(planPath, skeleton);
-
-  setStatus(planPath, "queued");
-
-  const plan = parsePlan(planPath);
-  expect(plan.frontmatter.status).toBe("queued");
-  expect(plan.frontmatter.id).toBe("my-plan");
-  expect(plan.frontmatter.base_branch).toBe("main");
-
-  rmSync(tmpDir, { recursive: true });
-});
-
 // findNextUnchecked completion tests
 test("findNextUnchecked returns null when all TODOs are complete", () => {
   const tmpDir = mkdtempSync(join(tmpdir(), "prloom-test-"));
@@ -218,7 +148,6 @@ test("findNextUnchecked returns null when all TODOs are complete", () => {
   // Create a plan with all TODOs marked complete
   const planContent = `---
 id: completed-plan
-status: active
 ---
 
 ## Objective
@@ -253,7 +182,6 @@ test("findNextUnchecked returns null when TODO section is empty", () => {
 
   const planContent = `---
 id: empty-plan
-status: active
 ---
 
 ## Objective
@@ -275,56 +203,12 @@ Test plan
   rmSync(tmpDir, { recursive: true });
 });
 
-// Review status tests
-test("parsePlan parses review status", () => {
-  const tmpDir = mkdtempSync(join(tmpdir(), "prloom-test-"));
-  const planPath = join(tmpDir, "test-plan.md");
-
-  const planContent = `---
-id: review-plan
-status: review
----
-
-## Objective
-
-Test plan in review
-
-## TODO
-
-- [x] Task done
-
-## Progress Log
-`;
-  writeFileSync(planPath, planContent);
-
-  const plan = parsePlan(planPath);
-  expect(plan.frontmatter.status).toBe("review");
-
-  rmSync(tmpDir, { recursive: true });
-});
-
-test("setStatus changes plan status from active to review", () => {
-  const tmpDir = mkdtempSync(join(tmpdir(), "prloom-test-"));
-  const planPath = join(tmpDir, "test-plan.md");
-  const skeleton = generatePlanSkeleton("test-plan");
-  writeFileSync(planPath, skeleton);
-
-  setStatus(planPath, "active");
-  setStatus(planPath, "review");
-
-  const plan = parsePlan(planPath);
-  expect(plan.frontmatter.status).toBe("review");
-
-  rmSync(tmpDir, { recursive: true });
-});
-
 test("parsePlan parses blocked marker [b]", () => {
   const tmpDir = mkdtempSync(join(tmpdir(), "prloom-test-"));
   const planPath = join(tmpDir, "test-plan.md");
 
   const planContent = `---
 id: blocked-todo-plan
-status: active
 ---
 
 ## TODO

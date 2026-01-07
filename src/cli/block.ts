@@ -1,5 +1,4 @@
 import { join } from "path";
-import { setStatus } from "../lib/plan.js";
 import { loadState, saveState } from "../lib/state.js";
 
 import { resolvePlanId } from "../lib/resolver.js";

@@ -39,6 +39,7 @@ test("resolvePlanId: exact ID match (state)", async () => {
         status: "active",
       },
     },
+    inbox: {},
   });
 
   const resolved = await resolvePlanId(repoRoot, id);
@@ -54,7 +55,6 @@ test("resolvePlanId: descriptive branch match (inbox)", async () => {
   const content = `---
 id: ${id}
 branch: ${branchName}
-status: draft
 ---
 ## Objective
 Test
@@ -79,6 +79,7 @@ test("resolvePlanId: fully qualified branch match (state)", async () => {
         status: "active",
       },
     },
+    inbox: {},
   });
 
   const resolved = await resolvePlanId(repoRoot, fullBranch);
@@ -96,7 +97,6 @@ test("resolvePlanId: ambiguous match throws error", async () => {
     `---
 id: ${id1}
 branch: ${branchName}
-status: draft
 ---`
   );
 
@@ -106,7 +106,6 @@ status: draft
     `---
 id: ${id2}
 branch: ${branchName}
-status: draft
 ---`
   );
 
