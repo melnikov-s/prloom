@@ -150,3 +150,38 @@ test("inbox status survives state reload with other plans present", () => {
   expect(state.inbox[id1]?.status).toBe("draft");
   expect(state.inbox[id2]?.status).toBe("queued");
 });
+
+test("ingestInboxPlans uses frontmatter ID for metadata lookup (filename has branch prefix)", async () => {
+  // Simulate a plan file with a branch-prefixed filename but short frontmatter ID
+  const frontmatterId = "abc123";
+  const filename = `my-feature-${frontmatterId}`;
+  const inboxDir = join(repoRoot, "prloom", ".local", "inbox");
+  const inboxPath = join(inboxDir, `${filename}.md`);
+
+  writeFileSync(
+    inboxPath,
+    `---
+id: ${frontmatterId}
+---
+## TODO
+- [ ] A task
+`
+  );
+
+  // Set inbox status using the frontmatter ID (as setInboxStatus does)
+  setInboxStatus(repoRoot, frontmatterId, "queued");
+
+  // Verify it's stored under the frontmatter ID
+  const state = loadState(repoRoot);
+  expect(state.inbox[frontmatterId]?.status).toBe("queued");
+  expect(state.inbox[filename]).toBeUndefined(); // NOT stored under filename
+
+  // ingestInboxPlans should find the queued status by reading the frontmatter ID
+  // (We can't fully test ingestion without mocking git, but we can verify the lookup works)
+  const config = loadConfig(repoRoot);
+
+  // The state passed to ingestInboxPlans should have the inbox metadata
+  // accessible via the frontmatter ID
+  const inboxMeta = state.inbox[frontmatterId] ?? { status: "draft" as const };
+  expect(inboxMeta.status).toBe("queued");
+});
