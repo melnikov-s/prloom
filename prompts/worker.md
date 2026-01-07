@@ -2,7 +2,9 @@
 
 You are implementing exactly ONE TODO item from this plan.
 
-Your output should be suitable for a single, focused commit. Do NOT create commits yourself — the dispatcher will commit and push after you mark the TODO complete.
+> [!CAUTION] > **CRITICAL: You MUST update the plan file before exiting.**
+>
+> The dispatcher detects completion by reading the checkbox. If you don't mark `[x]`, the system will retry indefinitely.
 
 ## Title
 
@@ -28,21 +30,22 @@ Your output should be suitable for a single, focused commit. Do NOT create commi
 
 {{plan_progress_log}}
 
-
 ## Rules
 
-1. Implement only the specified TODO item
-2. Do NOT create commits yourself (the dispatcher commits after you mark the TODO complete)
-3. Update the plan file:
-   - Mark the TODO item as `[x]` (or `[b]` if blocked)
-   - Append exactly ONE bullet to `## Progress Log` describing the result in 1 sentence
+1. **Update the plan file** (REQUIRED before exiting):
+   - Open the plan file and change your TODO from `[ ]` to `[x]`
+   - If blocked, mark as `[b]` instead
+   - Append ONE bullet to `## Progress Log` summarizing what you did
+2. Implement only the specified TODO item
+3. Do NOT create commits yourself — the dispatcher commits after detecting `[x]`
 4. Run tests if specified in the Context section
-5. Exit when done with the task. The system detects completion from the checkbox.
+5. Exit when done. The system detects completion from the checkbox.
 
 ## Important
 
 - Do NOT work on other TODOs, only the one specified above
 - If tests are specified, they must pass before marking complete
+- **If you complete the work but forget to mark `[x]`, the task will be retried**
 
 ---
 
