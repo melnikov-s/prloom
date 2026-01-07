@@ -37,7 +37,7 @@ Add user authentication with email/password login.
 
 ## Plan Lifecycle
 
-1. **Create** - `prloom new <id> --agent manual --no-designer` creates a plan in `.prloom/inbox/<id>.md`
+1. **Create** - `prloom new <id> --agent manual --no-designer` creates a plan in `prloom/.local/inbox/<id>.md`
 2. **Edit** - Fill in the Objective, Context, and TODO sections
 3. **Dispatch** - When `prloom start` runs, the plan is moved to a git worktree and a draft PR is opened
 4. **Execute** - Complete each TODO, mark checkboxes, add Session Notes if notable
@@ -63,7 +63,7 @@ prloom new my-feature --agent manual --no-designer
 Output:
 
 ```
-Created plan in inbox: .prloom/inbox/my-feature.md
+Created plan in inbox: prloom/.local/inbox/my-feature.md
 Base branch: main
 Worker agent: manual
 
@@ -71,7 +71,7 @@ Plan skeleton created. Edit manually or use your IDE.
 Run 'prloom start' to dispatch when ready.
 ```
 
-The plan is now at `.prloom/inbox/my-feature.md`. Edit it to add your Objective, Context, and TODOs.
+The plan is now at `prloom/.local/inbox/my-feature.md`. Edit it to add your Objective, Context, and TODOs.
 
 ## Finding Your Worktree
 
@@ -95,7 +95,7 @@ my-feature
   Agent:    manual
   PR:       PR #42
   Worktree: /Users/dev/.prloom-worktrees/my-feature
-  Plan:     /Users/dev/.prloom-worktrees/my-feature/plans/my-feature.md
+  Plan:     /Users/dev/.prloom-worktrees/my-feature/prloom/.local/plan.md
 
 ────────────────────────────────────────────────────────────
 COMMANDS:
@@ -104,7 +104,7 @@ COMMANDS:
   prloom edit <id> --no-designer                Get plan path
 ```
 
-Open the worktree directory in your editor. The plan file is at `plans/<id>.md`.
+Open the worktree directory in your editor. The plan file is at `prloom/.local/plan.md`.
 
 ## Completing a TODO
 
@@ -158,7 +158,7 @@ NEXT STEPS:
   4. Commit and push changes
 
 Worktree: /Users/dev/.prloom-worktrees/my-feature
-Plan:     /Users/dev/.prloom-worktrees/my-feature/plans/my-feature.md
+Plan:     /Users/dev/.prloom-worktrees/my-feature/prloom/.local/plan.md
 ```
 
 Address the feedback by adding TODO items and implementing fixes.

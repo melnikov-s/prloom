@@ -64,19 +64,19 @@ bun run build
 ### Commands
 
 - `prloom init`
-  - Initializes `.prloom/`, ensures `.prloom/` is gitignored, and writes `prloom.config.json`.
+  - Initializes `prloom/`, ensures `prloom/.local/` is gitignored, and writes `prloom/config.json`.
 - `prloom new [plan-id] [--agent <codex|opencode|claude>]`
-  - Creates `.prloom/inbox/<id>.md` and launches an interactive designer session.
+  - Creates `prloom/.local/inbox/<id>.md` and launches an interactive designer session.
 - `prloom start`
   - Starts the dispatcher loop (ingests inbox plans, runs TODOs, polls PR feedback).
 - `prloom status`
-  - Shows inbox plans and active plans tracked in `.prloom/state.json`.
+  - Shows inbox plans and active plans tracked in `prloom/.local/state.json`.
 - `prloom edit <plan-id> [--agent <...>]`
-  - Edits a plan either in inbox (pre-dispatch) or in the plan’s worktree (post-dispatch).
+  - Edits a plan either in inbox (pre-dispatch) or in the plan's worktree (post-dispatch).
 - `prloom stop <plan-id>` / `prloom unpause <plan-id>`
   - Pauses/resumes automation for an active plan.
 - `prloom open <plan-id>`
-  - Opens the configured agent’s interactive TUI in the plan worktree (requires paused).
+  - Opens the configured agent's interactive TUI in the plan worktree (requires paused).
 - `prloom poll [plan-id]`
   - Forces an immediate PR-feedback poll.
   - With `<plan-id>`: poll once for that plan without shifting its schedule.
