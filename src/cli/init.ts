@@ -2,8 +2,8 @@ import { execa } from "execa";
 import { mkdirSync, existsSync, readFileSync, writeFileSync } from "fs";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
-import { createInterface } from "readline";
 import { loadConfig } from "../lib/config.js";
+import { confirm } from "./prompt.js";
 
 const SWARM_START_TAG = "<!-- SWARM_INSTRUCTIONS_START -->";
 const SWARM_END_TAG = "<!-- SWARM_INSTRUCTIONS_END -->";
@@ -82,14 +82,12 @@ async function promptIdeInstructionFiles(repoRoot: string): Promise<void> {
 
   console.log("");
 
-  const wantCursor = await promptYesNo(
-    "Append prloom instructions to CURSOR.md?"
-  );
+  const wantCursor = await confirm("Append prloom instructions to CURSOR.md?");
   if (wantCursor) {
     appendSwarmInstructions(repoRoot, "CURSOR.md", agentTemplate);
   }
 
-  const wantAntigravity = await promptYesNo(
+  const wantAntigravity = await confirm(
     "Append prloom instructions to ANTIGRAVITY.md?"
   );
   if (wantAntigravity) {
@@ -158,20 +156,6 @@ function appendSwarmInstructions(
 
 function escapeRegex(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-async function promptYesNo(question: string): Promise<boolean> {
-  const rl = createInterface({
-    input: process.stdin,
-    output: process.stdout,
-  });
-
-  return new Promise((resolve) => {
-    rl.question(`${question} (y/n) `, (answer) => {
-      rl.close();
-      resolve(answer.toLowerCase().startsWith("y"));
-    });
-  });
 }
 
 async function ensureGhInstalled(): Promise<void> {
