@@ -14,7 +14,7 @@ export interface PlanState {
   worktree: string;
   branch: string;
   pr?: number;
-  planRelpath: string; // e.g. "prloom/plans/<id>.md"
+  planRelpath: string; // e.g. "prloom/.local/plan.md" (gitignored)
   baseBranch: string; // e.g. "main" for rebase
 
   /** Plan execution status - owned by dispatcher, not frontmatter */

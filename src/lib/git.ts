@@ -166,6 +166,18 @@ export async function commitAll(
   }
 }
 
+/**
+ * Create an empty commit (for initializing PR branches).
+ */
+export async function commitEmpty(
+  worktreePath: string,
+  message: string
+): Promise<void> {
+  await execa("git", ["commit", "--allow-empty", "-m", message], {
+    cwd: worktreePath,
+  });
+}
+
 export async function push(
   worktreePath: string,
   branch: string

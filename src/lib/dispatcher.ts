@@ -18,6 +18,7 @@ import {
   createBranchName,
   createWorktree,
   commitAll,
+  commitEmpty,
   push,
   copyFileToWorktree,
   ensureWorktreePrloomDir,
@@ -240,29 +241,30 @@ export async function ingestInboxPlans(
         );
       }
       log.info(`   Created worktree: ${worktreePath}`);
-      const planRelpath = `prloom/plans/${actualId}.md`;
 
-      // Copy plan to worktree
-      log.info(`   Copying plan to worktree: ${planRelpath}`);
+      // Plan stays in .local/ - not committed to repo
+      // Copy to worktree's local dir for worker access
+      const planRelpath = `prloom/.local/plan.md`;
+      log.info(`   Copying plan to worktree local: ${planRelpath}`);
       copyFileToWorktree(inboxPath, worktreePath, planRelpath);
 
-      // Commit and push
+      // Create empty initial commit and push to create PR
       const worktreePlanPath = join(worktreePath, planRelpath);
-      log.info(`   Committing: [prloom] ${actualId}: initial plan`);
-      await commitAll(worktreePath, `[prloom] ${actualId}: initial plan`);
+      const planForPR = parsePlan(worktreePlanPath);
+      const prTitle = planForPR.title || actualId;
+      log.info(`   Creating initial commit: [prloom] ${actualId}`);
+      await commitEmpty(worktreePath, `[prloom] ${actualId}\n\n${extractBody(planForPR)}`);
       log.info(`   Pushing branch to origin: ${branch}`);
       await push(worktreePath, branch);
 
       // Create draft PR
       log.info(`   Creating draft PR...`);
-      const updatedPlan = parsePlan(worktreePlanPath);
-      const prTitle = updatedPlan.title || actualId;
       const pr = await createDraftPR(
         repoRoot,
         branch,
         baseBranch,
         prTitle,
-        extractBody(updatedPlan)
+        extractBody(planForPR)
       );
       log.info(`   Created draft PR #${pr}`);
 

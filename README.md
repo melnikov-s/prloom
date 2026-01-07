@@ -9,10 +9,12 @@ You write a plan (a Markdown checklist), `prloom` turns it into a dedicated git 
 ## How It Works
 
 - Plans start locally in `prloom/.local/inbox/` (gitignored; clean `git status`).
-- The dispatcher ingests a plan into a new branch/worktree at `prloom/plans/<id>.md` and opens a draft PR.
-- The worker agent executes exactly one TODO per iteration and updates the plan in-branch.
+- The dispatcher ingests a plan into a new branch/worktree and opens a draft PR.
+- The plan file stays in `prloom/.local/plan.md` (never committed) — the PR description contains the Objective, Context, and Progress Log.
+- The worker agent executes exactly one TODO per iteration and updates the local plan file.
 - PR comments/reviews trigger a triage agent which updates the plan with new TODOs and posts a reply.
 - When all TODOs are complete, the PR is marked ready; you merge when satisfied.
+- On squash merge, the plan content is preserved in the commit message.
 
 ## Requirements
 
@@ -116,10 +118,12 @@ You can provide repository-specific context to agents by creating markdown files
 repo/
 ├── prloom/
 │   ├── config.json   # Configuration
-│   ├── plans/        # Committed plans (on PR branches)
 │   ├── planner.md    # Appended to designer prompts
 │   ├── worker.md     # Appended to worker prompts
 │   └── .local/       # Gitignored (runtime state)
+│       ├── inbox/    # Plans awaiting dispatch
+│       ├── plan.md   # Active plan (per worktree)
+│       └── worktrees/
 ```
 
 - **`prloom/planner.md`**: Architecture info, coding conventions, design patterns
@@ -130,4 +134,4 @@ These files are appended to the respective agent prompts automatically.
 ## Notes
 
 - Runtime state is stored under `prloom/.local/` (gitignored).
-- The plan file is committed on the PR branch at `prloom/plans/<id>.md` and lands on the configured `base_branch` when you merge the PR.
+- Plan files are never committed to the repository — the PR description and squash commit message serve as the permanent record.

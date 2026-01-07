@@ -155,7 +155,17 @@ export function setPR(path: string, pr: number): void {
 }
 
 export function extractBody(plan: Plan): string {
-  return `## Objective\n\n${plan.objective}\n\n## Progress Log\n\n${plan.progressLog}`;
+  let body = `## Objective\n\n${plan.objective}`;
+
+  if (plan.context) {
+    body += `\n\n## Context\n\n${plan.context}`;
+  }
+
+  if (plan.progressLog) {
+    body += `\n\n## Progress Log\n\n${plan.progressLog}`;
+  }
+
+  return body;
 }
 
 /**
