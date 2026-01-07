@@ -8,8 +8,11 @@ import {
   unlinkSync,
   readdirSync,
 } from "fs";
+import type { AgentName } from "./adapters/index.js";
 
 export interface PlanState {
+  /** Agent to use for this plan */
+  agent?: AgentName;
   sessionId?: string;
   worktree: string;
   branch: string;
@@ -212,5 +215,45 @@ export function deleteInboxPlan(repoRoot: string, planId: string): void {
   const inboxPath = getInboxPath(repoRoot, planId);
   if (existsSync(inboxPath)) {
     unlinkSync(inboxPath);
+  }
+  // Also delete metadata file if it exists
+  const metaPath = inboxPath.replace(/\.md$/, ".json");
+  if (existsSync(metaPath)) {
+    unlinkSync(metaPath);
+  }
+}
+
+// Inbox metadata
+
+export interface InboxMeta {
+  agent?: AgentName;
+}
+
+export function saveInboxMeta(
+  repoRoot: string,
+  planId: string,
+  meta: InboxMeta
+): void {
+  const inboxPath = getInboxPath(repoRoot, planId);
+  const metaPath = inboxPath.replace(/\.md$/, ".json");
+  writeFileSync(metaPath, JSON.stringify(meta, null, 2));
+}
+
+export function loadInboxMeta(
+  repoRoot: string,
+  planId: string
+): InboxMeta | null {
+  const inboxPath = getInboxPath(repoRoot, planId);
+  const metaPath = inboxPath.replace(/\.md$/, ".json");
+
+  if (!existsSync(metaPath)) {
+    return null;
+  }
+
+  try {
+    const raw = readFileSync(metaPath, "utf-8");
+    return JSON.parse(raw);
+  } catch {
+    return null;
   }
 }

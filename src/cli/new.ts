@@ -5,7 +5,7 @@ import { getAdapter, type AgentName } from "../lib/adapters/index.js";
 import { nanoid } from "nanoid";
 import { generatePlanSkeleton, setStatus, parsePlan } from "../lib/plan.js";
 import { renderDesignerNewPrompt } from "../lib/template.js";
-import { ensureInboxDir, getInboxPath } from "../lib/state.js";
+import { ensureInboxDir, getInboxPath, saveInboxMeta } from "../lib/state.js";
 import { getCurrentBranch, ensureRemoteBranchExists } from "../lib/git.js";
 import { confirm } from "./prompt.js";
 
@@ -57,8 +57,11 @@ export async function runNew(
   }
 
   // Create plan skeleton with deterministic frontmatter (status: draft)
-  const skeleton = generatePlanSkeleton(id, workerAgent, baseBranch);
+  const skeleton = generatePlanSkeleton(id, baseBranch);
   writeFileSync(planPath, skeleton);
+
+  // Save agent to inbox metadata
+  saveInboxMeta(repoRoot, id, { agent: workerAgent });
 
   console.log(`Created plan in inbox: ${planPath}`);
   console.log(`Base branch: ${baseBranch}`);
@@ -97,6 +100,12 @@ export async function runNew(
       const newPath = join(dirname(planPath), descriptiveName);
       if (planPath !== newPath) {
         renameSync(planPath, newPath);
+        // Also rename the metadata file
+        const oldMetaPath = planPath.replace(/\.md$/, ".json");
+        const newMetaPath = newPath.replace(/\.md$/, ".json");
+        if (existsSync(oldMetaPath)) {
+          renameSync(oldMetaPath, newMetaPath);
+        }
         currentPlanPath = newPath;
         console.log(`Renamed plan to: ${descriptiveName}`);
       }

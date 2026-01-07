@@ -9,6 +9,7 @@ import {
   listInboxPlanIds,
   getInboxPath,
   deleteInboxPlan,
+  loadInboxMeta,
   type State,
   type PlanState,
 } from "./state.js";
@@ -202,6 +203,7 @@ export async function ingestInboxPlans(
 
     try {
       const plan = parsePlan(inboxPath);
+      const inboxMeta = loadInboxMeta(repoRoot, planId);
 
       // Trust the frontmatter ID for tracking
       const actualId = plan.frontmatter.id;
@@ -274,6 +276,7 @@ export async function ingestInboxPlans(
 
       // Store in state with active status
       state.plans[actualId] = {
+        agent: inboxMeta?.agent,
         worktree: worktreePath,
         branch,
         pr,
@@ -364,7 +367,7 @@ export async function processActivePlans(
       }
 
       // Skip automated execution for manual agent plans
-      const isManualAgent = plan.frontmatter.agent === "manual";
+      const isManualAgent = ps.agent === "manual";
 
       // Poll and triage feedback (even if status=done)
       // Throttle to avoid GitHub rate limits
@@ -511,7 +514,7 @@ export async function processActivePlans(
           );
 
           const prompt = renderWorkerPrompt(repoRoot, plan, todo);
-          const agentName = plan.frontmatter.agent ?? config.agents.default;
+          const agentName = ps.agent ?? config.agents.default;
           const adapter = getAdapter(agentName);
 
           // Build tmux config if available and not explicitly disabled

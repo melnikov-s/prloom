@@ -1,5 +1,4 @@
 import { join } from "path";
-import { existsSync } from "fs";
 import { loadState, listInboxPlanIds, getInboxPath } from "../lib/state.js";
 import { parsePlan } from "../lib/plan.js";
 
@@ -40,16 +39,7 @@ export async function runStatus(repoRoot: string): Promise<void> {
 
       // Status comes from dispatcher state (authoritative)
       const status = ps.status;
-      let agent = "—";
-
-      if (existsSync(planPath)) {
-        try {
-          const plan = parsePlan(planPath);
-          agent = plan.frontmatter.agent ?? "default";
-        } catch {
-          // Plan file exists but couldn't be parsed
-        }
-      }
+      const agent = ps.agent ?? "default";
 
       const prNum = ps.pr ? `PR #${ps.pr}` : "No PR";
 

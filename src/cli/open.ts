@@ -1,8 +1,6 @@
-import { join } from "path";
 import { execa } from "execa";
 import { loadState, saveState } from "../lib/state.js";
 import { loadConfig } from "../lib/config.js";
-import { parsePlan } from "../lib/plan.js";
 import { getAdapter } from "../lib/adapters/index.js";
 import { isProcessAlive, killProcess } from "../lib/adapters/process.js";
 import { confirm } from "./prompt.js";
@@ -99,10 +97,8 @@ export async function runOpen(
     saveState(repoRoot, state);
   }
 
-  // Get the plan's agent from frontmatter or use config default
-  const planPath = join(ps.worktree, ps.planRelpath);
-  const plan = parsePlan(planPath);
-  const agentName = plan.frontmatter.agent ?? config.agents.default;
+  // Get the plan's agent from state or use config default
+  const agentName = ps.agent ?? config.agents.default;
   const adapter = getAdapter(agentName);
 
   console.log(`Resuming session for ${planId}...`);

@@ -139,24 +139,17 @@ Test objective
   rmSync(tmpDir, { recursive: true });
 });
 
-test("generatePlanSkeleton includes agent when provided", () => {
-  const skeleton = generatePlanSkeleton("test-plan", "codex");
-
-  expect(skeleton).toContain("id: test-plan");
-  expect(skeleton).toContain("agent: codex");
-});
-
 test("generatePlanSkeleton includes base_branch when provided", () => {
-  const skeleton = generatePlanSkeleton("test-plan", "codex", "release/1.2");
+  const skeleton = generatePlanSkeleton("test-plan", "release/1.2");
 
   expect(skeleton).toContain("id: test-plan");
   expect(skeleton).toContain("base_branch: release/1.2");
 });
 
-test("generatePlanSkeleton omits agent when not provided", () => {
+test("generatePlanSkeleton omits base_branch when not provided", () => {
   const skeleton = generatePlanSkeleton("test-plan");
 
-  expect(skeleton).not.toContain("agent:");
+  expect(skeleton).not.toContain("base_branch:");
 });
 
 // Draft status tests
@@ -204,7 +197,7 @@ test("setStatus changes plan status from queued to active", () => {
 test("setStatus preserves other frontmatter fields", () => {
   const tmpDir = mkdtempSync(join(tmpdir(), "prloom-test-"));
   const planPath = join(tmpDir, "test-plan.md");
-  const skeleton = generatePlanSkeleton("my-plan", "codex", "main");
+  const skeleton = generatePlanSkeleton("my-plan", "main");
   writeFileSync(planPath, skeleton);
 
   setStatus(planPath, "queued");
@@ -212,7 +205,6 @@ test("setStatus preserves other frontmatter fields", () => {
   const plan = parsePlan(planPath);
   expect(plan.frontmatter.status).toBe("queued");
   expect(plan.frontmatter.id).toBe("my-plan");
-  expect(plan.frontmatter.agent).toBe("codex");
   expect(plan.frontmatter.base_branch).toBe("main");
 
   rmSync(tmpDir, { recursive: true });

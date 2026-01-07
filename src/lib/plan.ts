@@ -1,6 +1,5 @@
 import { readFileSync, writeFileSync } from "fs";
 import matter from "gray-matter";
-import { type AgentName, isAgentName } from "./adapters/index.js";
 
 export type PlanStatus =
   | "draft"
@@ -13,7 +12,6 @@ export type PlanStatus =
 export interface PlanFrontmatter {
   id: string;
   status: PlanStatus;
-  agent?: AgentName;
   branch?: string;
   pr?: number;
   base_branch?: string;
@@ -44,7 +42,6 @@ export function parsePlan(path: string): Plan {
   const frontmatter: PlanFrontmatter = {
     id: data.id ?? "",
     status: data.status ?? "queued",
-    agent: parseAgentField(data.agent),
     branch: data.branch,
     pr: data.pr,
     base_branch:
@@ -111,13 +108,6 @@ function parseTodos(section: string): TodoItem[] {
   return todos;
 }
 
-function parseAgentField(value: unknown): AgentName | undefined {
-  if (typeof value === "string" && isAgentName(value)) {
-    return value;
-  }
-  return undefined;
-}
-
 export function findNextUnchecked(plan: Plan): TodoItem | null {
   return plan.todos.find((t) => !t.done) ?? null;
 }
@@ -172,20 +162,12 @@ export function extractBody(plan: Plan): string {
  * Generate a plan skeleton with deterministic frontmatter.
  * The designer agent will fill in the content sections.
  */
-export function generatePlanSkeleton(
-  id: string,
-  agent?: AgentName,
-  baseBranch?: string
-): string {
+export function generatePlanSkeleton(id: string, baseBranch?: string): string {
   const frontmatter: Record<string, string> = {
     id,
     branch: "", // Designer can specify a descriptive branch name here
     status: "draft",
   };
-
-  if (agent) {
-    frontmatter.agent = agent;
-  }
 
   if (baseBranch) {
     frontmatter.base_branch = baseBranch;
