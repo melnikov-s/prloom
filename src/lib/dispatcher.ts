@@ -14,7 +14,6 @@ import {
   listInboxPlanIds,
   getInboxPath,
   deleteInboxPlan,
-  getInboxMeta,
   deleteInboxMeta,
   type State,
   type PlanState,
@@ -222,7 +221,8 @@ export async function ingestInboxPlans(
 
     try {
       const plan = parsePlan(inboxPath);
-      const inboxMeta = getInboxMeta(repoRoot, planId);
+      // Use passed-in state.inbox directly (already reloaded from disk by dispatcher loop)
+      const inboxMeta = state.inbox[planId] ?? { status: "draft" as const };
 
       // Trust the frontmatter ID for tracking
       const actualId = plan.frontmatter.id;
