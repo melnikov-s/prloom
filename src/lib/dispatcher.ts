@@ -12,7 +12,7 @@ import {
   type State,
   type PlanState,
 } from "./state.js";
-import { consume, type IpcCommand } from "./ipc.js";
+import { consume, getControlPath, type IpcCommand } from "./ipc.js";
 import { parsePlan, findNextUnchecked, extractBody } from "./plan.js";
 import {
   createBranchName,
@@ -897,7 +897,7 @@ async function sleepUntilIpcOrTimeout(
   cursor: number,
   timeoutMs: number
 ): Promise<void> {
-  const controlPath = join(repoRoot, ".prloom", "control.jsonl");
+  const controlPath = getControlPath(repoRoot);
   const started = Date.now();
 
   while (Date.now() - started < timeoutMs) {
