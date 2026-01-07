@@ -52,7 +52,9 @@ export function parsePlan(path: string): Plan {
   };
 
   // Extract sections
-  const title = extractSection(content, "Title") ?? "";
+  // Strip HTML comments from title so placeholder comments don't become PR titles
+  const rawTitle = extractSection(content, "Title") ?? "";
+  const title = stripHtmlComments(rawTitle);
   const objective = extractSection(content, "Objective") ?? "";
   const context = extractSection(content, "Context") ?? "";
   const progressLog = extractSection(content, "Progress Log") ?? "";
@@ -77,6 +79,14 @@ function extractSection(content: string, heading: string): string | null {
   const regex = new RegExp(`## ${heading}\\s*\\n([\\s\\S]*?)(?=\\n## |$)`, "i");
   const match = content.match(regex);
   return match ? match[1]!.trim() : null;
+}
+
+/**
+ * Strip HTML comments from content.
+ * Used to clean up placeholder comments that shouldn't appear in output.
+ */
+function stripHtmlComments(content: string): string {
+  return content.replace(/<!--[\s\S]*?-->/g, "").trim();
 }
 
 function parseTodos(section: string): TodoItem[] {

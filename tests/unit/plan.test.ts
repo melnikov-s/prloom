@@ -75,6 +75,70 @@ test("generatePlanSkeleton creates valid frontmatter", () => {
   expect(skeleton).toContain("## TODO");
 });
 
+test("parsePlan strips HTML comments from title", () => {
+  const tmpDir = mkdtempSync(join(tmpdir(), "prloom-test-"));
+  const planPath = join(tmpDir, "test-plan.md");
+
+  // Plan with only HTML comment placeholder in title section
+  const planContent = `---
+id: test-plan
+status: queued
+---
+
+## Title
+
+<!-- Short PR title (e.g., "Fix PDF viewer pagination") -->
+
+## Objective
+
+Test objective
+
+## TODO
+
+- [ ] Do something
+
+## Progress Log
+`;
+  writeFileSync(planPath, planContent);
+
+  const plan = parsePlan(planPath);
+  // Title should be empty after stripping HTML comments
+  expect(plan.title).toBe("");
+
+  rmSync(tmpDir, { recursive: true });
+});
+
+test("parsePlan extracts actual title when provided", () => {
+  const tmpDir = mkdtempSync(join(tmpdir(), "prloom-test-"));
+  const planPath = join(tmpDir, "test-plan.md");
+
+  const planContent = `---
+id: test-plan
+status: queued
+---
+
+## Title
+
+Add dark mode support for the dashboard
+
+## Objective
+
+Test objective
+
+## TODO
+
+- [ ] Do something
+
+## Progress Log
+`;
+  writeFileSync(planPath, planContent);
+
+  const plan = parsePlan(planPath);
+  expect(plan.title).toBe("Add dark mode support for the dashboard");
+
+  rmSync(tmpDir, { recursive: true });
+});
+
 test("generatePlanSkeleton includes agent when provided", () => {
   const skeleton = generatePlanSkeleton("test-plan", "codex");
 
