@@ -66,18 +66,6 @@ export async function runNew(
   console.log(`Base branch: ${baseBranch}`);
   console.log(`Worker agent: ${workerAgent}`);
 
-  // Verify placement prompt
-  console.log("");
-  console.log("📍 Verify plan placement:");
-  console.log(`   Plan: ${planPath}`);
-  const placementOk = await confirm("Is this location correct?");
-  if (!placementOk) {
-    console.log(
-      "Exiting. Please move the plan file and use 'prloom edit' to continue."
-    );
-    process.exit(0);
-  }
-
   // Skip designer session if --no-designer flag is used
   if (noDesigner) {
     console.log("");
