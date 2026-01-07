@@ -16,16 +16,18 @@ export const opencodeAdapter: AgentAdapter = {
   name: "opencode",
 
   async execute({ cwd, prompt, tmux }): Promise<ExecutionResult> {
+    // Use session name for log paths - fall back to timestamp-based name if not provided
+    const sessionName = tmux?.sessionName ?? `opencode-${Date.now()}`;
+    const { logFile, exitCodeFile, promptFile } = prepareLogFiles(
+      sessionName,
+      prompt
+    );
+
+    if (!existsSync(promptFile)) {
+      return { exitCode: 1 };
+    }
+
     if (tmux) {
-      const { logFile, exitCodeFile, promptFile } = prepareLogFiles(
-        tmux.sessionName,
-        prompt
-      );
-
-      if (!existsSync(promptFile)) {
-        return { exitCode: 1 };
-      }
-
       const wrappedCmd = `opencode run "$(cat '${promptFile}')" 2>&1 | tee "${logFile}"; echo $? > "${exitCodeFile}"`;
 
       const tmuxResult = await execa(
@@ -51,12 +53,11 @@ export const opencodeAdapter: AgentAdapter = {
       return { tmuxSession: tmux.sessionName };
     }
 
-    // Async execution without tmux
-    const { promptFile } = prepareLogFiles(`opencode-${Date.now()}`, prompt);
+    // Async execution without tmux - logs still go to the same location
     const pid = spawnDetached(
       "bash",
       ["-c", `opencode run "$(cat '${promptFile}')"`],
-      { cwd }
+      { cwd, logFile }
     );
 
     return { pid };
