@@ -1,12 +1,12 @@
 import { test, expect, beforeEach, afterEach } from "bun:test";
 import { mkdirSync, rmSync, readFileSync } from "fs";
-import { join } from "path";
-import { enqueue, consume } from "../../src/lib/ipc.js";
+import { dirname } from "path";
+import { enqueue, consume, getControlPath } from "../../src/lib/ipc.js";
 
 const TEST_DIR = "/tmp/prloom-test-ipc";
 
 beforeEach(() => {
-  mkdirSync(join(TEST_DIR, "prloom", ".local"), { recursive: true });
+  mkdirSync(dirname(getControlPath(TEST_DIR)), { recursive: true });
 });
 
 afterEach(() => {
@@ -16,10 +16,7 @@ afterEach(() => {
 test("enqueue appends command to control.jsonl", () => {
   enqueue(TEST_DIR, { type: "stop", plan_id: "test-plan" });
 
-  const content = readFileSync(
-    join(TEST_DIR, "prloom", ".local", "control.jsonl"),
-    "utf-8"
-  );
+  const content = readFileSync(getControlPath(TEST_DIR), "utf-8");
   const line = JSON.parse(content.trim());
 
   expect(line.type).toBe("stop");

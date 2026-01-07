@@ -15,7 +15,8 @@ export interface IpcCommand {
 
 const CONTROL_FILE = "control.jsonl";
 
-function getControlPath(repoRoot: string): string {
+/** Returns the path to the IPC control file for a given repo root. */
+export function getControlPath(repoRoot: string): string {
   return join(repoRoot, "prloom", ".local", CONTROL_FILE);
 }
 
