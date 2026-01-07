@@ -7,6 +7,7 @@ export type PlanStatus =
   | "active"
   | "blocked"
   | "review"
+  | "reviewing"
   | "done";
 
 export interface PlanFrontmatter {

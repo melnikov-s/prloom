@@ -15,7 +15,9 @@ import { existsSync } from "fs";
 export const geminiAdapter: AgentAdapter = {
   name: "gemini",
 
-  async execute({ cwd, prompt, tmux }): Promise<ExecutionResult> {
+  async execute({ cwd, prompt, tmux, model }): Promise<ExecutionResult> {
+    const modelArg = model ? `--model '${model}'` : "";
+    
     if (tmux) {
       const { logFile, exitCodeFile, promptFile } = prepareLogFiles(
         tmux.sessionName,
@@ -26,7 +28,7 @@ export const geminiAdapter: AgentAdapter = {
         return { exitCode: 1 };
       }
 
-      const wrappedCmd = `gemini --yolo "$(cat '${promptFile}')" 2>&1 | tee "${logFile}"; echo $? > "${exitCodeFile}"`;
+      const wrappedCmd = `gemini ${modelArg} --yolo "$(cat '${promptFile}')" 2>&1 | tee "${logFile}"; echo $? > "${exitCodeFile}"`;
 
       const tmuxResult = await execa(
         "tmux",
@@ -56,7 +58,7 @@ export const geminiAdapter: AgentAdapter = {
     const { promptFile } = prepareLogFiles(`gemini-${Date.now()}`, prompt);
     const pid = spawnDetached(
       "bash",
-      ["-c", `gemini --yolo "$(cat '${promptFile}')"`],
+      ["-c", `gemini ${modelArg} --yolo "$(cat '${promptFile}')"`],
       { cwd }
     );
 

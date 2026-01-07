@@ -9,7 +9,7 @@ import type { AgentAdapter, ExecutionResult } from "./types.js";
 export const manualAdapter: AgentAdapter = {
   name: "manual",
 
-  async execute({ cwd, prompt, tmux }): Promise<ExecutionResult> {
+  async execute({ cwd, prompt, tmux, model }): Promise<ExecutionResult> {
     return { exitCode: 0 };
   },
 

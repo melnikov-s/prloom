@@ -1,7 +1,7 @@
 import { test, expect, beforeEach, afterEach } from "bun:test";
 import { mkdirSync, rmSync, writeFileSync } from "fs";
 import { join } from "path";
-import { loadConfig, resolveWorktreesDir } from "../../src/lib/config.js";
+import { loadConfig, resolveWorktreesDir, getAgentConfig } from "../../src/lib/config.js";
 
 const TEST_DIR = "/tmp/prloom-test-config";
 
@@ -55,7 +55,7 @@ test("loadConfig uses defaults for missing fields", () => {
 
 test("resolveWorktreesDir resolves relative path", () => {
   const config = {
-    agents: { default: "opencode" as const },
+    agents: { default: { agent: "opencode" as const } },
     worktrees_dir: "../worktrees",
     github_poll_interval_ms: 60000,
     base_branch: "main",
@@ -68,7 +68,7 @@ test("resolveWorktreesDir resolves relative path", () => {
 test("loadConfig returns default agents when not specified", () => {
   const config = loadConfig(TEST_DIR);
 
-  expect(config.agents.default).toBe("opencode");
+  expect(config.agents.default.agent).toBe("opencode");
   expect(config.agents.designer).toBeUndefined();
 });
 
@@ -78,8 +78,8 @@ test("loadConfig reads agents from config file", () => {
     join(TEST_DIR, "prloom", "config.json"),
     JSON.stringify({
       agents: {
-        default: "claude",
-        designer: "codex",
+        default: { agent: "claude" },
+        designer: { agent: "codex" },
       },
       base_branch: "develop",
     })
@@ -87,8 +87,8 @@ test("loadConfig reads agents from config file", () => {
 
   const config = loadConfig(TEST_DIR);
 
-  expect(config.agents.default).toBe("claude");
-  expect(config.agents.designer).toBe("codex");
+  expect(config.agents.default.agent).toBe("claude");
+  expect(config.agents.designer?.agent).toBe("codex");
 });
 
 test("loadConfig ignores invalid agent names", () => {
@@ -97,8 +97,8 @@ test("loadConfig ignores invalid agent names", () => {
     join(TEST_DIR, "prloom", "config.json"),
     JSON.stringify({
       agents: {
-        default: "invalid-agent",
-        designer: "codex",
+        default: { agent: "invalid-agent" },
+        designer: { agent: "codex" },
       },
       base_branch: "develop",
     })
@@ -107,6 +107,51 @@ test("loadConfig ignores invalid agent names", () => {
   const config = loadConfig(TEST_DIR);
 
   // Falls back to default since "invalid-agent" isn't valid
-  expect(config.agents.default).toBe("opencode");
-  expect(config.agents.designer).toBe("codex");
+  expect(config.agents.default.agent).toBe("opencode");
+  expect(config.agents.designer?.agent).toBe("codex");
+});
+
+test("loadConfig reads agent model from config file", () => {
+  mkdirSync(join(TEST_DIR, "prloom"), { recursive: true });
+  writeFileSync(
+    join(TEST_DIR, "prloom", "config.json"),
+    JSON.stringify({
+      agents: {
+        default: { agent: "opencode", model: "gpt-4" },
+        reviewer: { agent: "claude", model: "claude-sonnet-4-20250514" },
+      },
+    })
+  );
+
+  const config = loadConfig(TEST_DIR);
+
+  expect(config.agents.default.agent).toBe("opencode");
+  expect(config.agents.default.model).toBe("gpt-4");
+  expect(config.agents.reviewer?.agent).toBe("claude");
+  expect(config.agents.reviewer?.model).toBe("claude-sonnet-4-20250514");
+});
+
+test("getAgentConfig returns stage config or falls back to default", () => {
+  mkdirSync(join(TEST_DIR, "prloom"), { recursive: true });
+  writeFileSync(
+    join(TEST_DIR, "prloom", "config.json"),
+    JSON.stringify({
+      agents: {
+        default: { agent: "opencode", model: "gpt-4" },
+        reviewer: { agent: "claude", model: "claude-sonnet-4-20250514" },
+      },
+    })
+  );
+
+  const config = loadConfig(TEST_DIR);
+
+  // Reviewer is configured
+  const reviewerConfig = getAgentConfig(config, "reviewer");
+  expect(reviewerConfig.agent).toBe("claude");
+  expect(reviewerConfig.model).toBe("claude-sonnet-4-20250514");
+
+  // Worker is not configured, falls back to default
+  const workerConfig = getAgentConfig(config, "worker");
+  expect(workerConfig.agent).toBe("opencode");
+  expect(workerConfig.model).toBe("gpt-4");
 });

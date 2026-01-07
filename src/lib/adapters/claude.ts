@@ -15,14 +15,16 @@ import { existsSync } from "fs";
 export const claudeAdapter: AgentAdapter = {
   name: "claude",
 
-  async execute({ cwd, prompt, tmux }): Promise<ExecutionResult> {
+  async execute({ cwd, prompt, tmux, model }): Promise<ExecutionResult> {
+    const modelArg = model ? `--model '${model}'` : "";
+    
     if (tmux) {
       const { logFile, exitCodeFile, promptFile } = prepareLogFiles(
         tmux.sessionName,
         prompt
       );
 
-      const wrappedCmd = `claude -p "$(cat ${promptFile})" --dangerously-skip-permissions 2>&1 | tee ${logFile}; echo $? > ${exitCodeFile}`;
+      const wrappedCmd = `claude -p "$(cat ${promptFile})" ${modelArg} --dangerously-skip-permissions 2>&1 | tee ${logFile}; echo $? > ${exitCodeFile}`;
 
       const tmuxResult = await execa(
         "tmux",
@@ -53,7 +55,7 @@ export const claudeAdapter: AgentAdapter = {
       "bash",
       [
         "-c",
-        `claude -p "$(cat '${promptFile}')" --dangerously-skip-permissions`,
+        `claude -p "$(cat '${promptFile}')" ${modelArg} --dangerously-skip-permissions`,
       ],
       { cwd }
     );

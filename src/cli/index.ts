@@ -281,6 +281,18 @@ yargs(hideBin(process.argv))
     }
   )
 
+  // prloom review
+  .command(
+    "review [plan-id]",
+    "Trigger AI code review for a plan in review status",
+    (yargs) => yargs.positional("plan-id", { type: "string" }),
+    async (argv) => {
+      const repoRoot = await getRepoRoot();
+      const { runReview } = await import("./review.js");
+      await runReview(repoRoot, argv["plan-id"] as string | undefined);
+    }
+  )
+
   .demandCommand(1, "You need to specify a command")
   .strict()
   .help()

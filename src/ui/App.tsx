@@ -62,6 +62,8 @@ function getStatusColor(status: string): string {
       return "red";
     case "review":
       return "cyan";
+    case "reviewing":
+      return "magenta";
     case "done":
       return "gray";
     default:
@@ -79,6 +81,8 @@ function getStatusEmoji(status: string): string {
       return "🔴";
     case "review":
       return "👀";
+    case "reviewing":
+      return "🔍";
     case "done":
       return "✅";
     default:
@@ -211,7 +215,7 @@ function PlanHeader(): React.ReactElement {
 interface ActionDef {
   label: string;
   key: string;
-  ipcType?: "stop" | "unpause" | "poll" | "launch_poll";
+  ipcType?: "stop" | "unpause" | "poll" | "launch_poll" | "review";
   command?: string;
   showFor?: (status: string) => boolean;
 }
@@ -221,7 +225,7 @@ const ACTIONS: ActionDef[] = [
     label: "Block",
     key: "block",
     ipcType: "stop",
-    showFor: (status) => status !== "blocked" && status !== "done",
+    showFor: (status) => status !== "blocked" && status !== "done" && status !== "reviewing",
   },
   {
     label: "Unblock",
@@ -230,16 +234,22 @@ const ACTIONS: ActionDef[] = [
     showFor: (status) => status === "blocked",
   },
   {
+    label: "Review",
+    key: "review",
+    ipcType: "review",
+    showFor: (status) => status === "review",
+  },
+  {
     label: "Poll",
     key: "poll",
     ipcType: "poll",
-    showFor: () => true,
+    showFor: (status) => status !== "reviewing",
   },
   {
     label: "Watch",
     key: "watch",
     command: "watch",
-    showFor: (status) => status === "active",
+    showFor: (status) => status === "active" || status === "reviewing",
   },
   {
     label: "Logs",

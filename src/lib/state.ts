@@ -21,7 +21,7 @@ export interface PlanState {
   baseBranch: string; // e.g. "main" for rebase
 
   /** Plan execution status - owned by dispatcher, not frontmatter */
-  status: "active" | "blocked" | "review" | "done";
+  status: "active" | "blocked" | "review" | "reviewing" | "done";
 
   /** Active tmux session name when running with --tmux */
   tmuxSession?: string;
@@ -31,6 +31,9 @@ export interface PlanState {
 
   /** Force a one-time PR feedback poll without shifting schedule */
   pollOnce?: boolean;
+
+  /** Flag to trigger a review agent run */
+  pendingReview?: boolean;
 
   // Cursors for incremental PR feedback polling
   lastIssueCommentId?: number;

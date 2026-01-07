@@ -2,9 +2,19 @@ import { join, resolve } from "path";
 import { existsSync, readFileSync } from "fs";
 import { type AgentName, isAgentName } from "./adapters/index.js";
 
+export interface AgentStageConfig {
+  agent: AgentName;
+  model?: string;
+}
+
+export type AgentStage = "designer" | "worker" | "reviewer" | "triage";
+
 export interface AgentsConfig {
-  default: AgentName;
-  designer?: AgentName;
+  default: AgentStageConfig;
+  designer?: AgentStageConfig;
+  worker?: AgentStageConfig;
+  reviewer?: AgentStageConfig;
+  triage?: AgentStageConfig;
 }
 
 export interface Config {
@@ -16,7 +26,7 @@ export interface Config {
 
 const DEFAULTS: Config = {
   agents: {
-    default: "opencode",
+    default: { agent: "opencode" },
   },
   worktrees_dir: "prloom/.local/worktrees",
   github_poll_interval_ms: 60000, // 60 seconds for GitHub API rate limits
@@ -37,8 +47,11 @@ export function loadConfig(repoRoot: string): Config {
     // Parse agents config
     const agents: AgentsConfig = {
       default:
-        parseAgentName(parsed.agents?.default) ?? DEFAULTS.agents.default,
-      designer: parseAgentName(parsed.agents?.designer),
+        parseAgentStageConfig(parsed.agents?.default) ?? DEFAULTS.agents.default,
+      designer: parseAgentStageConfig(parsed.agents?.designer),
+      worker: parseAgentStageConfig(parsed.agents?.worker),
+      reviewer: parseAgentStageConfig(parsed.agents?.reviewer),
+      triage: parseAgentStageConfig(parsed.agents?.triage),
     };
 
     return {
@@ -56,11 +69,33 @@ export function loadConfig(repoRoot: string): Config {
   }
 }
 
+function parseAgentStageConfig(value: unknown): AgentStageConfig | undefined {
+  if (typeof value === "object" && value !== null) {
+    const obj = value as Record<string, unknown>;
+    const agentName = parseAgentName(obj.agent);
+    if (agentName) {
+      return {
+        agent: agentName,
+        model: typeof obj.model === "string" ? obj.model : undefined,
+      };
+    }
+  }
+  return undefined;
+}
+
 function parseAgentName(value: unknown): AgentName | undefined {
   if (typeof value === "string" && isAgentName(value)) {
     return value;
   }
   return undefined;
+}
+
+/**
+ * Get the agent configuration for a specific stage.
+ * Falls back to the default config if the stage is not configured.
+ */
+export function getAgentConfig(config: Config, stage: AgentStage): AgentStageConfig {
+  return config.agents[stage] ?? config.agents.default;
 }
 
 export function resolveWorktreesDir(repoRoot: string, config: Config): string {

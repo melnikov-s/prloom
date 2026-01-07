@@ -14,14 +14,16 @@ import { spawnDetached } from "./process.js";
 export const codexAdapter: AgentAdapter = {
   name: "codex",
 
-  async execute({ cwd, prompt, tmux }): Promise<ExecutionResult> {
+  async execute({ cwd, prompt, tmux, model }): Promise<ExecutionResult> {
+    const modelArg = model ? `-m '${model}'` : "";
+    
     if (tmux) {
       const { logFile, exitCodeFile, promptFile } = prepareLogFiles(
         tmux.sessionName,
         prompt
       );
 
-      const wrappedCmd = `codex exec "$(cat ${promptFile})" --full-auto 2>&1 | tee ${logFile}; echo $? > ${exitCodeFile}`;
+      const wrappedCmd = `codex exec "$(cat ${promptFile})" ${modelArg} --full-auto 2>&1 | tee ${logFile}; echo $? > ${exitCodeFile}`;
 
       const tmuxResult = await execa(
         "tmux",
@@ -50,7 +52,7 @@ export const codexAdapter: AgentAdapter = {
     const { promptFile } = prepareLogFiles(`codex-${Date.now()}`, prompt);
     const pid = spawnDetached(
       "bash",
-      ["-c", `codex exec "$(cat '${promptFile}')" --full-auto`],
+      ["-c", `codex exec "$(cat '${promptFile}')" ${modelArg} --full-auto`],
       { cwd }
     );
 

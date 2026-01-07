@@ -1,11 +1,11 @@
 import { join, dirname } from "path";
 import { existsSync, writeFileSync, renameSync } from "fs";
-import { loadConfig } from "../lib/config.js";
+import { loadConfig, getAgentConfig } from "../lib/config.js";
 import { getAdapter, type AgentName } from "../lib/adapters/index.js";
 import { nanoid } from "nanoid";
 import { generatePlanSkeleton, setStatus, parsePlan } from "../lib/plan.js";
 import { renderDesignerNewPrompt } from "../lib/template.js";
-import { ensureInboxDir, getInboxPath, saveInboxMeta } from "../lib/state.js";
+import { ensureInboxDir, getInboxPath } from "../lib/state.js";
 import { getCurrentBranch, ensureRemoteBranchExists } from "../lib/git.js";
 import { confirm } from "./prompt.js";
 
@@ -22,13 +22,12 @@ export async function runNew(
   ensureInboxDir(repoRoot);
 
   // Resolve designer agent: CLI flag > config.designer > config.default
-  const designerAgent =
-    (agentOverride as AgentName) ??
-    config.agents.designer ??
-    config.agents.default;
+  const designerConfig = getAgentConfig(config, "designer");
+  const designerAgent = (agentOverride as AgentName) ?? designerConfig.agent;
 
   // Resolve worker agent: CLI flag > config.default
-  const workerAgent = (agentOverride as AgentName) ?? config.agents.default;
+  const workerConfig = getAgentConfig(config, "worker");
+  const workerAgent = (agentOverride as AgentName) ?? workerConfig.agent;
 
   // Determine base branch for this plan (current branch)
   const baseBranch = await getCurrentBranch(repoRoot);
@@ -60,9 +59,6 @@ export async function runNew(
   const skeleton = generatePlanSkeleton(id, baseBranch);
   writeFileSync(planPath, skeleton);
 
-  // Save agent to inbox metadata
-  saveInboxMeta(repoRoot, id, { agent: workerAgent });
-
   console.log(`Created plan in inbox: ${planPath}`);
   console.log(`Base branch: ${baseBranch}`);
   console.log(`Worker agent: ${workerAgent}`);
@@ -86,7 +82,7 @@ export async function runNew(
     baseBranch,
     workerAgent
   );
-  await adapter.interactive({ cwd: repoRoot, prompt, model });
+  await adapter.interactive({ cwd: repoRoot, prompt, model: model ?? designerConfig.model });
 
   console.log("");
   console.log("Designer session ended.");
@@ -100,12 +96,6 @@ export async function runNew(
       const newPath = join(dirname(planPath), descriptiveName);
       if (planPath !== newPath) {
         renameSync(planPath, newPath);
-        // Also rename the metadata file
-        const oldMetaPath = planPath.replace(/\.md$/, ".json");
-        const newMetaPath = newPath.replace(/\.md$/, ".json");
-        if (existsSync(oldMetaPath)) {
-          renameSync(oldMetaPath, newMetaPath);
-        }
         currentPlanPath = newPath;
         console.log(`Renamed plan to: ${descriptiveName}`);
       }

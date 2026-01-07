@@ -1,6 +1,6 @@
 import { execa } from "execa";
 import { loadState, saveState } from "../lib/state.js";
-import { loadConfig } from "../lib/config.js";
+import { loadConfig, getAgentConfig } from "../lib/config.js";
 import { getAdapter } from "../lib/adapters/index.js";
 import { isProcessAlive, killProcess } from "../lib/adapters/process.js";
 import { confirm } from "./prompt.js";
@@ -98,7 +98,8 @@ export async function runOpen(
   }
 
   // Get the plan's agent from state or use config default
-  const agentName = ps.agent ?? config.agents.default;
+  const workerConfig = getAgentConfig(config, "worker");
+  const agentName = ps.agent ?? workerConfig.agent;
   const adapter = getAdapter(agentName);
 
   console.log(`Resuming session for ${planId}...`);

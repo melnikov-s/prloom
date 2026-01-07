@@ -8,7 +8,7 @@ import {
 } from "fs";
 
 export interface IpcCommand {
-  type: "stop" | "unpause" | "poll" | "launch_poll";
+  type: "stop" | "unpause" | "poll" | "launch_poll" | "review";
   plan_id: string;
   ts: string;
 }

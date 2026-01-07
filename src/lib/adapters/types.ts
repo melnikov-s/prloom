@@ -27,6 +27,7 @@ export interface AgentAdapter {
     cwd: string;
     prompt: string;
     tmux?: TmuxConfig;
+    model?: string;
   }): Promise<ExecutionResult>;
 
   /**

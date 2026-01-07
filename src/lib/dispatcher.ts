@@ -1,6 +1,6 @@
 import { join } from "path";
 import { existsSync, statSync, readFileSync } from "fs";
-import { loadConfig, resolveWorktreesDir, type Config } from "./config.js";
+import { loadConfig, resolveWorktreesDir, getAgentConfig, type Config } from "./config.js";
 import {
   loadState,
   saveState,
@@ -39,6 +39,7 @@ import {
   postPRComment,
   filterNewFeedback,
   getMaxFeedbackIds,
+  submitPRReview,
   type PRFeedback,
 } from "./github.js";
 import { getAdapter } from "./adapters/index.js";
@@ -56,6 +57,8 @@ import {
   renderWorkerPrompt,
   renderTriagePrompt,
   readTriageResultFile,
+  renderReviewPrompt,
+  readReviewResultFile,
 } from "./template.js";
 import { dispatcherEvents } from "./events.js";
 
@@ -360,14 +363,24 @@ export async function processActivePlans(
         }
       }
 
-      // Skip if plan status is blocked
+      // Skip if plan status is blocked or reviewing
       let plan = parsePlan(planPath);
-      if (ps.status === "blocked") {
+      if (ps.status === "blocked" || ps.status === "reviewing") {
         continue;
       }
 
       // Skip automated execution for manual agent plans
       const isManualAgent = ps.agent === "manual";
+
+      // Handle pending review request (only valid when status is "review")
+      if (ps.pendingReview && ps.status === "review") {
+        ps.pendingReview = undefined;
+        await runReviewAgent(repoRoot, config, ps, plan, options, log);
+        // Re-parse plan in case review agent modified it
+        plan = parsePlan(planPath);
+        // Skip the rest of processing for this iteration
+        continue;
+      }
 
       // Poll and triage feedback (even if status=done)
       // Throttle to avoid GitHub rate limits
@@ -514,7 +527,8 @@ export async function processActivePlans(
           );
 
           const prompt = renderWorkerPrompt(repoRoot, plan, todo);
-          const agentName = ps.agent ?? config.agents.default;
+          const workerConfig = getAgentConfig(config, "worker");
+          const agentName = ps.agent ?? workerConfig.agent;
           const adapter = getAdapter(agentName);
 
           // Build tmux config if available and not explicitly disabled
@@ -527,6 +541,7 @@ export async function processActivePlans(
             cwd: ps.worktree,
             prompt,
             tmux: tmuxConfig,
+            model: workerConfig.model,
           });
 
           // Store session identifiers for tracking
@@ -722,15 +737,15 @@ async function runTriage(
   // Ensure .prloom directory exists in worktree
   ensureWorktreePrloomDir(ps.worktree);
 
-  const triageAgent = config.agents.designer ?? config.agents.default;
-  const adapter = getAdapter(triageAgent);
+  const triageConfig = getAgentConfig(config, "triage");
+  const adapter = getAdapter(triageConfig.agent);
   const prompt = renderTriagePrompt(repoRoot, ps.worktree, plan, feedback);
 
   log.info(
     `🔍 Running triage for ${plan.frontmatter.id}...`,
     plan.frontmatter.id
   );
-  log.info(`   Using agent: ${triageAgent}`, plan.frontmatter.id);
+  log.info(`   Using agent: ${triageConfig.agent}`, plan.frontmatter.id);
 
   // Build tmux config if available and not explicitly disabled
   const useTmux = (options.tmux !== false) && await hasTmux();
@@ -745,7 +760,7 @@ async function runTriage(
     );
   }
 
-  await adapter.execute({ cwd: ps.worktree, prompt, tmux: tmuxConfig });
+  await adapter.execute({ cwd: ps.worktree, prompt, tmux: tmuxConfig, model: triageConfig.model });
   log.info(`   Triage agent completed`, plan.frontmatter.id);
 
   // Read and process triage result
@@ -864,6 +879,113 @@ The plan is now **blocked** until conflicts are resolved.`
   }
 }
 
+/**
+ * Run the review agent to review the PR and post comments to GitHub.
+ * The review agent examines the diff and posts a GitHub review with inline comments.
+ * After posting, the triage flow will pick up the review comments as new feedback.
+ */
+async function runReviewAgent(
+  repoRoot: string,
+  config: Config,
+  ps: PlanState,
+  plan: ReturnType<typeof parsePlan>,
+  options: DispatcherOptions = {},
+  log: Logger
+): Promise<void> {
+  if (!ps.pr) {
+    log.error(`   Cannot review: no PR associated with plan`, plan.frontmatter.id);
+    return;
+  }
+
+  // Ensure .prloom directory exists in worktree
+  ensureWorktreePrloomDir(ps.worktree);
+
+  // Set status to reviewing
+  ps.status = "reviewing";
+  log.info(
+    `🔍 Running review agent for ${plan.frontmatter.id}...`,
+    plan.frontmatter.id
+  );
+
+  const reviewerConfig = getAgentConfig(config, "reviewer");
+  const adapter = getAdapter(reviewerConfig.agent);
+  const prompt = renderReviewPrompt(
+    repoRoot,
+    plan,
+    ps.pr,
+    ps.branch,
+    ps.baseBranch
+  );
+
+  log.info(`   Using agent: ${reviewerConfig.agent}`, plan.frontmatter.id);
+
+  // Build tmux config if available and not explicitly disabled
+  const useTmux = (options.tmux !== false) && await hasTmux();
+  const tmuxConfig = useTmux
+    ? { sessionName: `prloom-review-${plan.frontmatter.id}` }
+    : undefined;
+
+  if (tmuxConfig) {
+    log.info(
+      `   Spawning in tmux session: ${tmuxConfig.sessionName}`,
+      plan.frontmatter.id
+    );
+  }
+
+  try {
+    await adapter.execute({
+      cwd: ps.worktree,
+      prompt,
+      tmux: tmuxConfig,
+      model: reviewerConfig.model,
+    });
+    log.info(`   Review agent completed`, plan.frontmatter.id);
+
+    // Read and process review result
+    const result = readReviewResultFile(ps.worktree);
+
+    log.info(
+      `   Verdict: ${result.verdict}, ${result.comments.length} inline comments`,
+      plan.frontmatter.id
+    );
+
+    // Submit review to GitHub (all comments posted atomically)
+    log.info(`   Submitting review to PR #${ps.pr}`, plan.frontmatter.id);
+    await submitPRReview(repoRoot, ps.pr, {
+      verdict: result.verdict,
+      summary: result.summary,
+      comments: result.comments,
+    });
+    log.success(`   Review submitted to GitHub`, plan.frontmatter.id);
+
+    // Set status back to active - the triage flow will pick up the review
+    // comments on the next poll cycle
+    ps.status = "active";
+
+    // Force an immediate poll to pick up our own review comments
+    ps.pollOnce = true;
+    log.info(
+      `   Scheduled poll to process review feedback`,
+      plan.frontmatter.id
+    );
+  } catch (error) {
+    log.error(`   Review failed: ${error}`, plan.frontmatter.id);
+    log.info(`   Setting plan status to: blocked`, plan.frontmatter.id);
+    ps.status = "blocked";
+    ps.lastError = `Review failed: ${error}`;
+
+    log.info(
+      `   Posting review error comment to PR #${ps.pr}`,
+      plan.frontmatter.id
+    );
+    await postPRComment(
+      repoRoot,
+      ps.pr,
+      `⚠️ Review agent failed to produce a valid result file. Human attention needed.\n\nError: ${error}`
+    );
+  }
+}
+
 function handleCommand(state: State, cmd: IpcCommand, log: Logger): void {
   const ps = state.plans[cmd.plan_id];
   if (!ps) return;
@@ -894,6 +1016,17 @@ function handleCommand(state: State, cmd: IpcCommand, log: Logger): void {
       `🔄 Launching immediate poll (reset schedule) for ${cmd.plan_id}`,
       cmd.plan_id
     );
+  } else if (cmd.type === "review") {
+    // Trigger a review agent run (only valid when status is "review")
+    if (ps.status !== "review") {
+      log.warn(
+        `⚠️ Cannot review ${cmd.plan_id}: status is "${ps.status}", expected "review"`,
+        cmd.plan_id
+      );
+      return;
+    }
+    ps.pendingReview = true;
+    log.info(`🔍 Review scheduled for ${cmd.plan_id}`, cmd.plan_id);
   }
 }
 

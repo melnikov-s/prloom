@@ -289,3 +289,64 @@ export function getMaxFeedbackIds(feedback: PRFeedback[]): FeedbackCursors {
 
   return result;
 }
+
+// Submit PR Review with comments
+
+export interface ReviewComment {
+  path: string;
+  line: number;
+  body: string;
+}
+
+export interface ReviewSubmission {
+  verdict: "approve" | "request_changes" | "comment";
+  summary: string;
+  comments: ReviewComment[];
+}
+
+/**
+ * Submit a PR review with inline comments.
+ * All comments are posted atomically as a single review.
+ */
+export async function submitPRReview(
+  repoRoot: string,
+  prNumber: number,
+  review: ReviewSubmission
+): Promise<void> {
+  // Map verdict to GitHub event name
+  const eventMap = {
+    approve: "APPROVE",
+    request_changes: "REQUEST_CHANGES",
+    comment: "COMMENT",
+  };
+  const event = eventMap[review.verdict];
+
+  // Build the review payload
+  // GitHub API: POST /repos/{owner}/{repo}/pulls/{pull_number}/reviews
+  const payload = {
+    body: `${BOT_MARKER}\n${review.summary}`,
+    event,
+    comments: review.comments.map((c) => ({
+      path: c.path,
+      line: c.line,
+      body: c.body,
+    })),
+  };
+
+  // Use gh api to submit the review
+  await execa(
+    "gh",
+    [
+      "api",
+      `repos/{owner}/{repo}/pulls/${prNumber}/reviews`,
+      "--method",
+      "POST",
+      "--input",
+      "-",
+    ],
+    {
+      cwd: repoRoot,
+      input: JSON.stringify(payload),
+    }
+  );
+}
