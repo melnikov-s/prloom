@@ -634,6 +634,10 @@ export async function processActivePlans(
             log.success(`🎉 All TODOs complete for ${planId}`, planId);
             log.info(`   Setting plan status to: review`, planId);
             ps.status = "review";
+            // Emit state update immediately so TUI shows review status
+            if (options.useTUI) {
+              dispatcherEvents.setState(state);
+            }
             if (ps.pr) {
               log.info(`   Marking PR #${ps.pr} as ready for review`, planId);
               await markPRReady(repoRoot, ps.pr);
@@ -655,6 +659,10 @@ export async function processActivePlans(
           log.success(`🎉 All TODOs complete for ${planId}`, planId);
           log.info(`   Setting plan status to: review`, planId);
           ps.status = "review";
+          // Emit state update immediately so TUI shows review status
+          if (options.useTUI) {
+            dispatcherEvents.setState(state);
+          }
           if (ps.pr) {
             log.info(`   Marking PR #${ps.pr} as ready for review`, planId);
             await markPRReady(repoRoot, ps.pr);
