@@ -210,7 +210,9 @@ export function PlanPanel({
           <Text dimColor>(no active plans)</Text>
         ) : (
           <>
-            <PlanHeader />
+            <Box marginBottom={1}>
+              <PlanHeader />
+            </Box>
             {planIds.map((planId, idx) => {
               const ps = uiState.state.plans[planId]!;
               const todos = planTodos.get(planId) ?? { done: 0, total: 0 };
