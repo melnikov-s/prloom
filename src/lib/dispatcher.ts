@@ -221,11 +221,12 @@ export async function ingestInboxPlans(
 
     try {
       const plan = parsePlan(inboxPath);
-      // Use passed-in state.inbox directly (already reloaded from disk by dispatcher loop)
-      const inboxMeta = state.inbox[planId] ?? { status: "draft" as const };
 
-      // Trust the frontmatter ID for tracking
+      // Trust the frontmatter ID for tracking (and inbox metadata lookup)
       const actualId = plan.frontmatter.id;
+
+      // Use frontmatter ID to look up inbox status (matches how setInboxStatus stores it)
+      const inboxMeta = state.inbox[actualId] ?? { status: "draft" as const };
 
       // Skip drafts - designer is still working on them
       // Status is now tracked in state.inbox, not frontmatter
@@ -316,7 +317,7 @@ export async function ingestInboxPlans(
       // Delete inbox plan file and state entry
       log.info(`   Removing plan from inbox`);
       deleteInboxPlan(repoRoot, planId);
-      delete state.inbox[planId];
+      delete state.inbox[actualId];
 
       log.success(`✅ Ingested ${actualId} → PR #${pr}`);
     } catch (error) {
