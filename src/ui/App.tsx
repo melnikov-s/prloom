@@ -354,7 +354,6 @@ export function App({ uiState, planTodos }: AppProps): React.ReactElement {
 
   return (
     <Box flexDirection="column">
-      <Header startedAt={uiState.startedAt} />
       <Box flexDirection="column">
         <ActivityPanel events={uiState.events} />
         <PlanPanel uiState={uiState} planTodos={planTodos} />
@@ -362,6 +361,7 @@ export function App({ uiState, planTodos }: AppProps): React.ReactElement {
       {plansWithErrors.map(([planId, ps]) => (
         <ErrorPanel key={planId} planId={planId} error={ps.lastError!} />
       ))}
+      <Header startedAt={uiState.startedAt} />
     </Box>
   );
 }
