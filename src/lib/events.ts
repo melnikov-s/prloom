@@ -13,6 +13,7 @@ export interface DispatcherUIState {
   events: DispatcherEvent[];
   startedAt: Date;
   isRunning: boolean;
+  repoUrl?: string;
 }
 
 class DispatcherEvents extends EventEmitter {
@@ -20,10 +21,16 @@ class DispatcherEvents extends EventEmitter {
   private maxEvents = 100;
   private startedAt: Date = new Date();
   private currentState: State = { control_cursor: 0, plans: {} };
+  private repoUrl?: string;
 
   start(): void {
     this.startedAt = new Date();
     this.events = [];
+  }
+
+  setRepoUrl(url: string | null): void {
+    this.repoUrl = url ?? undefined;
+    this.emit("update", this.getUIState());
   }
 
   setState(state: State): void {
@@ -70,6 +77,7 @@ class DispatcherEvents extends EventEmitter {
       events: [...this.events],
       startedAt: this.startedAt,
       isRunning: true,
+      repoUrl: this.repoUrl,
     };
   }
 

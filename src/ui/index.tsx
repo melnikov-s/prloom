@@ -47,15 +47,16 @@ function TUIRunner({ repoRoot }: TUIRunnerProps): React.ReactElement {
     };
   }, []);
 
-  // Periodic refresh to update uptime and poll state file
+  // Periodic refresh to update uptime (forces re-render for timer)
   React.useEffect(() => {
     const interval = setInterval(() => {
-      const state = loadState(repoRoot);
-      dispatcherEvents.setState(state);
+      // Just trigger a re-render for uptime display
+      // State updates come from dispatcher events, not polling disk
+      setUIState((prev) => ({ ...prev }));
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [repoRoot]);
+  }, []);
 
   return <App uiState={uiState} planTodos={planTodos} />;
 }

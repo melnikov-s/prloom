@@ -23,6 +23,7 @@ import {
   ensureWorktreePrloomDir,
   rebaseOnBaseBranch,
   forcePush,
+  getGitHubRepoUrl,
 } from "./git.js";
 import {
   createDraftPR,
@@ -124,6 +125,9 @@ export async function runDispatcher(
   if (options.useTUI) {
     dispatcherEvents.start();
     dispatcherEvents.setState(state);
+    // Fetch repo URL for PR links
+    const repoUrl = await getGitHubRepoUrl(repoRoot);
+    dispatcherEvents.setRepoUrl(repoUrl);
   }
 
   // Get bot login for filtering
@@ -149,7 +153,14 @@ export async function runDispatcher(
       }
 
       // 2. Ingest inbox plans
-      await ingestInboxPlans(repoRoot, worktreesDir, config, state, log);
+      await ingestInboxPlans(
+        repoRoot,
+        worktreesDir,
+        config,
+        state,
+        log,
+        options
+      );
 
       // 3. Process active plans from state
       await processActivePlans(repoRoot, config, state, botLogin, options, log);
@@ -176,7 +187,8 @@ export async function ingestInboxPlans(
   worktreesDir: string,
   config: Config,
   state: State,
-  log: Logger
+  log: Logger,
+  options: DispatcherOptions = {}
 ): Promise<void> {
   const inboxPlanIds = listInboxPlanIds(repoRoot);
 
@@ -263,6 +275,11 @@ export async function ingestInboxPlans(
         baseBranch,
         status: "active",
       };
+
+      // Emit state update immediately so TUI shows the plan
+      if (options.useTUI) {
+        dispatcherEvents.setState(state);
+      }
 
       // Delete inbox plan (not archive)
       log.info(`   Removing plan from inbox`);

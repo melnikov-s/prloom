@@ -40,8 +40,10 @@ export function Header({ startedAt }: HeaderProps): React.ReactElement {
 
 interface PlanRowProps {
   id: string;
+  branch: string;
   status: string;
   pr?: number;
+  repoUrl?: string;
   todosDone: number;
   todosTotal: number;
   error?: string;
@@ -56,6 +58,8 @@ function getStatusColor(status: string): string {
       return "yellow";
     case "blocked":
       return "red";
+    case "review":
+      return "cyan";
     case "done":
       return "gray";
     default:
@@ -71,6 +75,8 @@ function getStatusEmoji(status: string): string {
       return "🟡";
     case "blocked":
       return "🔴";
+    case "review":
+      return "👀";
     case "done":
       return "✅";
     default:
@@ -101,10 +107,18 @@ function ProgressBar({
   );
 }
 
+// Column widths for alignment
+const COL_ID = 10;
+const COL_BRANCH = 28;
+const COL_STATUS = 12;
+const COL_PROGRESS = 14;
+
 function PlanRow({
   id,
+  branch,
   status,
   pr,
+  repoUrl,
   todosDone,
   todosTotal,
   error,
@@ -113,30 +127,67 @@ function PlanRow({
   const indicator = selected ? "▸" : " ";
   const statusColor = getStatusColor(status);
   const statusEmoji = getStatusEmoji(status);
+  const prUrl = pr && repoUrl ? `${repoUrl}/pull/${pr}` : pr ? `#${pr}` : "—";
 
   return (
     <Box>
       <Text>{indicator} </Text>
-      <Box width={16}>
-        <Text>{id.slice(0, 14)}</Text>
+      <Box width={COL_ID}>
+        <Text>{id.slice(0, COL_ID - 2)}</Text>
       </Box>
-      <Box width={12}>
+      <Box width={COL_BRANCH}>
+        <Text dimColor>{branch.slice(0, COL_BRANCH - 2)}</Text>
+      </Box>
+      <Box width={COL_STATUS}>
         <Text>
           {statusEmoji}{" "}
           <Text color={statusColor}>{status.slice(0, 7).padEnd(7)}</Text>
         </Text>
       </Box>
-      <Box width={8}>
-        <Text dimColor>{pr ? `#${pr}` : "—"}</Text>
-      </Box>
-      <Box width={14}>
+      <Box width={COL_PROGRESS}>
         <ProgressBar done={todosDone} total={todosTotal} />
       </Box>
+      <Box>
+        <Text dimColor>{prUrl}</Text>
+      </Box>
       {error && (
-        <Box>
+        <Box marginLeft={1}>
           <Text color="red">{error.slice(0, 20)}</Text>
         </Box>
       )}
+    </Box>
+  );
+}
+
+function PlanHeader(): React.ReactElement {
+  return (
+    <Box>
+      <Text> </Text>
+      <Box width={COL_ID}>
+        <Text bold dimColor>
+          ID
+        </Text>
+      </Box>
+      <Box width={COL_BRANCH}>
+        <Text bold dimColor>
+          BRANCH
+        </Text>
+      </Box>
+      <Box width={COL_STATUS}>
+        <Text bold dimColor>
+          STATUS
+        </Text>
+      </Box>
+      <Box width={COL_PROGRESS}>
+        <Text bold dimColor>
+          PROGRESS
+        </Text>
+      </Box>
+      <Box>
+        <Text bold dimColor>
+          PR
+        </Text>
+      </Box>
     </Box>
   );
 }
@@ -168,24 +219,27 @@ export function PlanPanel({
         {planIds.length === 0 ? (
           <Text dimColor>(no active plans)</Text>
         ) : (
-          planIds.map((planId, idx) => {
-            const ps = uiState.state.plans[planId]!;
-            const todos = planTodos.get(planId) ?? { done: 0, total: 0 };
-            // We'll need to read the plan status from somewhere
-            // For now, use a placeholder
-            return (
-              <PlanRow
-                key={planId}
-                id={planId}
-                status="active"
-                pr={ps.pr}
-                todosDone={todos.done}
-                todosTotal={todos.total}
-                error={ps.lastError}
-                selected={idx === selectedIndex}
-              />
-            );
-          })
+          <>
+            <PlanHeader />
+            {planIds.map((planId, idx) => {
+              const ps = uiState.state.plans[planId]!;
+              const todos = planTodos.get(planId) ?? { done: 0, total: 0 };
+              return (
+                <PlanRow
+                  key={planId}
+                  id={planId}
+                  branch={ps.branch}
+                  status={ps.status ?? "active"}
+                  pr={ps.pr}
+                  repoUrl={uiState.repoUrl}
+                  todosDone={todos.done}
+                  todosTotal={todos.total}
+                  error={ps.lastError}
+                  selected={idx === selectedIndex}
+                />
+              );
+            })}
+          </>
         )}
       </Box>
     </Box>

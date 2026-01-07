@@ -2,6 +2,43 @@ import { execa } from "execa";
 import { join, dirname } from "path";
 import { existsSync, copyFileSync, mkdirSync } from "fs";
 
+/**
+ * Parse a git remote URL to a GitHub web URL.
+ * Exported for testing.
+ */
+export function parseGitRemoteToGitHubUrl(remoteUrl: string): string | null {
+  const url = remoteUrl.trim();
+
+  // Handle SSH format: git@github.com:owner/repo.git
+  if (url.startsWith("git@github.com:")) {
+    const path = url.replace("git@github.com:", "").replace(/\.git$/, "");
+    return `https://github.com/${path}`;
+  }
+
+  // Handle HTTPS format: https://github.com/owner/repo.git
+  if (url.startsWith("https://github.com/")) {
+    return url.replace(/\.git$/, "");
+  }
+
+  return null;
+}
+
+/**
+ * Get the GitHub web URL for the repository (e.g., https://github.com/owner/repo)
+ */
+export async function getGitHubRepoUrl(
+  repoRoot: string
+): Promise<string | null> {
+  try {
+    const { stdout } = await execa("git", ["remote", "get-url", "origin"], {
+      cwd: repoRoot,
+    });
+    return parseGitRemoteToGitHubUrl(stdout);
+  } catch {
+    return null;
+  }
+}
+
 export async function branchExists(
   repoRoot: string,
   planId: string

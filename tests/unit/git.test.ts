@@ -1,5 +1,9 @@
 import { test, expect, describe, beforeEach, afterEach } from "bun:test";
-import { createBranchName, createWorktree } from "../../src/lib/git.js";
+import {
+  createBranchName,
+  createWorktree,
+  parseGitRemoteToGitHubUrl,
+} from "../../src/lib/git.js";
 import { mkdirSync, rmSync, existsSync } from "fs";
 import { join } from "path";
 import { execSync } from "child_process";
@@ -101,4 +105,52 @@ test("createBranchName handles empty leading/trailing dashes", async () => {
   const branch = await createBranchName(name);
 
   expect(branch).toBe("feature-name");
+});
+
+describe("parseGitRemoteToGitHubUrl", () => {
+  test("parses SSH URL with .git suffix", () => {
+    const result = parseGitRemoteToGitHubUrl("git@github.com:owner/repo.git");
+    expect(result).toBe("https://github.com/owner/repo");
+  });
+
+  test("parses SSH URL without .git suffix", () => {
+    const result = parseGitRemoteToGitHubUrl("git@github.com:owner/repo");
+    expect(result).toBe("https://github.com/owner/repo");
+  });
+
+  test("parses HTTPS URL with .git suffix", () => {
+    const result = parseGitRemoteToGitHubUrl(
+      "https://github.com/owner/repo.git"
+    );
+    expect(result).toBe("https://github.com/owner/repo");
+  });
+
+  test("parses HTTPS URL without .git suffix", () => {
+    const result = parseGitRemoteToGitHubUrl("https://github.com/owner/repo");
+    expect(result).toBe("https://github.com/owner/repo");
+  });
+
+  test("handles whitespace in URL", () => {
+    const result = parseGitRemoteToGitHubUrl(
+      "  git@github.com:owner/repo.git\n"
+    );
+    expect(result).toBe("https://github.com/owner/repo");
+  });
+
+  test("returns null for non-GitHub SSH URL", () => {
+    const result = parseGitRemoteToGitHubUrl("git@gitlab.com:owner/repo.git");
+    expect(result).toBeNull();
+  });
+
+  test("returns null for non-GitHub HTTPS URL", () => {
+    const result = parseGitRemoteToGitHubUrl(
+      "https://gitlab.com/owner/repo.git"
+    );
+    expect(result).toBeNull();
+  });
+
+  test("returns null for empty string", () => {
+    const result = parseGitRemoteToGitHubUrl("");
+    expect(result).toBeNull();
+  });
 });
