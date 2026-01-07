@@ -162,6 +162,6 @@ test("renderTriagePrompt includes inReplyToId thread context", () => {
     },
   ];
 
-  const prompt = renderTriagePrompt("/repo", plan, feedback);
+  const prompt = renderTriagePrompt("/repo", "/worktree", plan, feedback);
   expect(prompt).toContain("In reply to comment #100");
 });

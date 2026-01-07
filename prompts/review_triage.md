@@ -70,7 +70,7 @@ If any comment mentions rebase, update branch, or similar:
 
 ## Step 3: Write the Result File
 
-After processing, you MUST write `prloom/.local/triage-result.json`:
+After processing, you MUST write `{{result_path}}`:
 
 ```json
 {
@@ -94,7 +94,7 @@ After processing, you MUST write `prloom/.local/triage-result.json`:
 
 ## Critical Rules
 
-1. You MUST write `prloom/.local/triage-result.json` even if you add no TODOs
+1. You MUST write `{{result_path}}` even if you add no TODOs
 2. The result file must contain valid JSON only, no markdown wrapper
 3. Failure to write the result file will mark the plan as blocked
 4. **Questions should be answered, not converted to TODOs**

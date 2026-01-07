@@ -724,7 +724,7 @@ async function runTriage(
 
   const triageAgent = config.agents.designer ?? config.agents.default;
   const adapter = getAdapter(triageAgent);
-  const prompt = renderTriagePrompt(repoRoot, plan, feedback);
+  const prompt = renderTriagePrompt(repoRoot, ps.worktree, plan, feedback);
 
   log.info(
     `🔍 Running triage for ${plan.frontmatter.id}...`,
