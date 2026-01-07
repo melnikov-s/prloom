@@ -279,10 +279,10 @@ export async function ingestInboxPlans(
       const worktreePlanPath = join(worktreePath, planRelpath);
       const planForPR = parsePlan(worktreePlanPath);
       const prTitle = planForPR.title || actualId;
-      log.info(`   Creating initial commit: [prloom] ${actualId}`);
+      log.info(`   Creating initial commit: ${prTitle}`);
       await commitEmpty(
         worktreePath,
-        `[prloom] ${actualId}\n\n${extractBody(planForPR)}`
+        `${prTitle}\n\n${extractBody(planForPR)}`
       );
       log.info(`   Pushing branch to origin: ${branch}`);
       await push(worktreePath, branch);
