@@ -14,6 +14,10 @@ agent: manual
 base_branch: main
 ---
 
+## Title
+
+Add email/password authentication
+
 ## Objective
 
 Add user authentication with email/password login.
@@ -30,9 +34,9 @@ Add user authentication with email/password login.
 - [ ] Add login/signup API routes
 - [ ] Add session middleware
 
-## Session Notes
+## Progress Log
 
-<!-- Append notable observations here -->
+<!-- Append entries here -->
 ```
 
 ## Plan Lifecycle

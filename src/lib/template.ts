@@ -28,6 +28,15 @@ export function loadAgentContext(
   return readFileSync(contextPath, "utf-8");
 }
 
+function formatPlanTodos(todos: TodoItem[]): string {
+  return todos
+    .map((t) => {
+      const marker = t.done ? "x" : t.blocked ? "b" : " ";
+      return `- [${marker}] ${t.text}`;
+    })
+    .join("\n");
+}
+
 export function renderWorkerPrompt(
   repoRoot: string,
   plan: Plan,
@@ -35,7 +44,15 @@ export function renderWorkerPrompt(
 ): string {
   const template = loadTemplate(repoRoot, "worker");
   const compiled = Handlebars.compile(template);
+
+  const planTodos = formatPlanTodos(plan.todos);
+
   let prompt = compiled({
+    plan_title: plan.title || plan.frontmatter.id,
+    plan_objective: plan.objective,
+    plan_context: plan.context,
+    plan_todos: planTodos,
+    plan_progress_log: plan.progressLog,
     current_todo: `TODO #${todo.index + 1}: ${todo.text}`,
     plan: plan.raw,
   });

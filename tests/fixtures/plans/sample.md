@@ -4,6 +4,10 @@ status: queued
 base_branch: develop
 ---
 
+## Title
+
+Sample plan fixture
+
 ## Objective
 
 This is a sample plan for testing.

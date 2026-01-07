@@ -3,6 +3,10 @@ id: draft-sample
 status: draft
 ---
 
+## Title
+
+Draft plan fixture
+
 ## Objective
 
 This is a draft plan for testing.

@@ -34,7 +34,10 @@ test("renderWorkerPrompt uses built-in template", () => {
   const prompt = renderWorkerPrompt("/does-not-matter", plan, todo);
 
   expect(prompt).toContain("TODO #1: First task");
-  expect(prompt).toContain("# Plan");
+  expect(prompt).toContain("## Title");
+  expect(prompt).toContain("Sample plan fixture");
+  // Full plan is embedded under the plan's own headings.
+  expect(prompt).toContain("## TODO");
   expect(prompt).toContain("sample");
 });
 

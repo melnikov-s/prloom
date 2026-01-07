@@ -1,43 +1,43 @@
-# Worker Instructions
+# Worker: Build One Commit
 
-You are implementing exactly ONE task from this plan.
+You are implementing exactly ONE TODO item from this plan.
+
+Your output should be suitable for a single, focused commit. Do NOT create commits yourself — the dispatcher will commit and push after you mark the TODO complete.
+
+## Title
+
+{{plan_title}}
+
+## Objective
+
+{{plan_objective}}
 
 ## Your Task
 
 {{current_todo}}
 
+## Context
+
+{{plan_context}}
+
+## TODO
+
+{{plan_todos}}
+
+## Progress Log
+
+{{plan_progress_log}}
+
+
 ## Rules
 
-1. Implement only the specified task
-2. Update the plan file:
-   - Mark the task as `[x]`
-   - Add a Session Note **only if** you encountered something notable:
-     - Surprising codebase behavior or edge cases
-     - Non-obvious decisions you made (and why)
-     - Workarounds or known issues left in place
-     - Gotchas that future workers should know
-   - If nothing notable happened, skip the note — the commit is the record
-3. Run tests if specified in the Context section
-4. If you complete the task successfully:
-   - Mark the task as `[x]`
-   - Add a Session Note about notable decisions or codebase behavior
-5. If you are stuck or cannot complete the task:
-   - Mark the task as `[b]` (Blocked)
-   - Explain the blocker in Session Notes
-6. Exit when done with the task. The system detects completion from the checkbox.
-
-## Session Notes Guidance
-
-**Good notes** (knowledge transfer):
-
-- "⚠️ `ViewerStore` maintains its own cache when no shared cache is provided — intentional for test isolation"
-- "Used polling instead of webhooks because the API doesn't support real-time updates"
-- "The `relativeCurrentPage` calc assumes 1-indexed; underlying library uses 0-indexed"
-
-**Bad notes** (just changelog):
-
-- "Added PdfBucketCache.ts and mounted it on PageStore" — _this is what git log shows_
-- "Refactored ViewerStore to use the new cache" — _redundant with commit message_
+1. Implement only the specified TODO item
+2. Do NOT create commits yourself (the dispatcher commits after you mark the TODO complete)
+3. Update the plan file:
+   - Mark the TODO item as `[x]` (or `[b]` if blocked)
+   - Append exactly ONE bullet to `## Progress Log` describing the result in 1 sentence
+4. Run tests if specified in the Context section
+5. Exit when done with the task. The system detects completion from the checkbox.
 
 ## Important
 
@@ -46,6 +46,6 @@ You are implementing exactly ONE task from this plan.
 
 ---
 
-# Plan
+## Full Plan
 
 {{plan}}
