@@ -47,7 +47,6 @@ interface PlanRowProps {
   todosDone: number;
   todosTotal: number;
   error?: string;
-  selected?: boolean;
 }
 
 function getStatusColor(status: string): string {
@@ -122,16 +121,13 @@ function PlanRow({
   todosDone,
   todosTotal,
   error,
-  selected,
 }: PlanRowProps): React.ReactElement {
-  const indicator = selected ? "▸" : " ";
   const statusColor = getStatusColor(status);
   const statusEmoji = getStatusEmoji(status);
   const prUrl = pr && repoUrl ? `${repoUrl}/pull/${pr}` : pr ? `#${pr}` : "—";
 
   return (
     <Box>
-      <Text>{indicator} </Text>
       <Box width={COL_ID}>
         <Text>{id.slice(0, COL_ID - 2)}</Text>
       </Box>
@@ -162,7 +158,6 @@ function PlanRow({
 function PlanHeader(): React.ReactElement {
   return (
     <Box>
-      <Text> </Text>
       <Box width={COL_ID}>
         <Text bold dimColor>
           ID
@@ -194,13 +189,11 @@ function PlanHeader(): React.ReactElement {
 
 interface PlanPanelProps {
   uiState: DispatcherUIState;
-  selectedIndex: number;
   planTodos: Map<string, { done: number; total: number }>;
 }
 
 export function PlanPanel({
   uiState,
-  selectedIndex,
   planTodos,
 }: PlanPanelProps): React.ReactElement {
   const planIds = Object.keys(uiState.state.plans);
@@ -210,10 +203,7 @@ export function PlanPanel({
     <Box flexDirection="column" flexGrow={1} borderStyle="single" paddingX={1}>
       <Box>
         <Text bold>PLANS</Text>
-        <Text dimColor>
-          {" "}
-          [{selectedIndex + 1}/{planCount}]
-        </Text>
+        <Text dimColor> [{planCount}]</Text>
       </Box>
       <Box marginTop={1} flexDirection="column">
         {planIds.length === 0 ? (
@@ -235,7 +225,6 @@ export function PlanPanel({
                   todosDone={todos.done}
                   todosTotal={todos.total}
                   error={ps.lastError}
-                  selected={idx === selectedIndex}
                 />
               );
             })}
@@ -356,8 +345,6 @@ interface AppProps {
 }
 
 export function App({ uiState, planTodos }: AppProps): React.ReactElement {
-  const [selectedIndex] = React.useState(0);
-
   // Find plans with errors to display
   const plansWithErrors = Object.entries(uiState.state.plans)
     .filter(([, ps]) => ps.lastError)
@@ -368,11 +355,7 @@ export function App({ uiState, planTodos }: AppProps): React.ReactElement {
       <Header startedAt={uiState.startedAt} />
       <Box flexDirection="column">
         <ActivityPanel events={uiState.events} />
-        <PlanPanel
-          uiState={uiState}
-          selectedIndex={selectedIndex}
-          planTodos={planTodos}
-        />
+        <PlanPanel uiState={uiState} planTodos={planTodos} />
       </Box>
       {plansWithErrors.map(([planId, ps]) => (
         <ErrorPanel key={planId} planId={planId} error={ps.lastError!} />
