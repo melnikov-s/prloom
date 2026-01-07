@@ -6,10 +6,7 @@ import {
   releaseLock,
   loadState,
   saveState,
-  saveShard,
-  loadShard,
   type State,
-  type PlanState,
 } from "../../src/lib/state.js";
 
 const TEST_DIR = "/tmp/prloom-test-state";
@@ -80,26 +77,4 @@ test("releaseLock removes lock file", () => {
 
   const lockPath = join(TEST_DIR, "prloom", ".local", "lock");
   expect(existsSync(lockPath)).toBe(false);
-});
-
-test("saveShard and loadShard round-trip", () => {
-  const ps: PlanState = {
-    sessionId: "sess123",
-    worktree: "/wt",
-    branch: "feat-x",
-
-    planRelpath: "plans/my-plan.md",
-    baseBranch: "develop",
-    status: "active",
-  };
-
-  saveShard(TEST_DIR, "my-plan", ps);
-  const loaded = loadShard(TEST_DIR, "my-plan");
-
-  expect(loaded?.sessionId).toBe("sess123");
-});
-
-test("loadShard returns null for missing shard", () => {
-  const loaded = loadShard(TEST_DIR, "nonexistent");
-  expect(loaded).toBeNull();
 });

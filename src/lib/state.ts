@@ -61,7 +61,6 @@ export interface State {
 const SWARM_DIR = "prloom/.local";
 const STATE_FILE = "state.json";
 const LOCK_FILE = "lock";
-const PLANS_DIR = "plans";
 
 function getSwarmDir(repoRoot: string): string {
   return join(repoRoot, SWARM_DIR);
@@ -71,10 +70,6 @@ function ensureSwarmDir(repoRoot: string): void {
   const dir = getSwarmDir(repoRoot);
   if (!existsSync(dir)) {
     mkdirSync(dir, { recursive: true });
-  }
-  const plansDir = join(dir, PLANS_DIR);
-  if (!existsSync(plansDir)) {
-    mkdirSync(plansDir, { recursive: true });
   }
 }
 
@@ -145,36 +140,6 @@ export function saveState(repoRoot: string, state: State): void {
 
   writeFileSync(tempPath, JSON.stringify(state, null, 2));
   renameSync(tempPath, statePath);
-}
-
-// Shards
-
-export function saveShard(
-  repoRoot: string,
-  planId: string,
-  ps: PlanState
-): void {
-  ensureSwarmDir(repoRoot);
-  const shardPath = join(getSwarmDir(repoRoot), PLANS_DIR, `${planId}.json`);
-  const tempPath = shardPath + ".tmp";
-
-  writeFileSync(tempPath, JSON.stringify(ps, null, 2));
-  renameSync(tempPath, shardPath);
-}
-
-export function loadShard(repoRoot: string, planId: string): PlanState | null {
-  const shardPath = join(getSwarmDir(repoRoot), PLANS_DIR, `${planId}.json`);
-
-  if (!existsSync(shardPath)) {
-    return null;
-  }
-
-  try {
-    const raw = readFileSync(shardPath, "utf-8");
-    return JSON.parse(raw);
-  } catch {
-    return null;
-  }
 }
 
 // Inbox
