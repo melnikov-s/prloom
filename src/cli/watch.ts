@@ -43,7 +43,7 @@ export async function runWatch(
   if (!ps.tmuxSession) {
     console.error(`No active tmux session for ${planId}`);
     console.error(
-      "This plan may not be running, or dispatcher wasn't started with --tmux"
+      "This plan may not be running, or tmux is not installed on this system"
     );
     process.exit(1);
   }

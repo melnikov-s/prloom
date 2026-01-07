@@ -23,7 +23,7 @@ export const codexAdapter: AgentAdapter = {
 
       const wrappedCmd = `codex exec "$(cat ${promptFile})" --full-auto 2>&1 | tee ${logFile}; echo $? > ${exitCodeFile}`;
 
-      await execa(
+      const tmuxResult = await execa(
         "tmux",
         [
           "new-session",
@@ -38,6 +38,10 @@ export const codexAdapter: AgentAdapter = {
         ],
         { reject: false }
       );
+
+      if (tmuxResult.exitCode !== 0) {
+        return { exitCode: tmuxResult.exitCode ?? 1 };
+      }
 
       return { tmuxSession: tmux.sessionName };
     }

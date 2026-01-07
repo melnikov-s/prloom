@@ -9,6 +9,22 @@ import {
 } from "fs";
 import type { ExecutionResult } from "./types.js";
 
+let cachedHasTmux: boolean | undefined;
+
+/**
+ * Check if tmux is installed on the system.
+ */
+export async function hasTmux(): Promise<boolean> {
+  if (cachedHasTmux !== undefined) return cachedHasTmux;
+  try {
+    const { exitCode } = await execa("tmux", ["-V"], { reject: false });
+    cachedHasTmux = exitCode === 0;
+  } catch {
+    cachedHasTmux = false;
+  }
+  return cachedHasTmux;
+}
+
 /**
  * Get paths for worker log files in /tmp.
  */

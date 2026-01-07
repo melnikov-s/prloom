@@ -116,8 +116,8 @@ yargs(hideBin(process.argv))
     (yargs) =>
       yargs.option("tmux", {
         type: "boolean",
-        describe: "Run workers in tmux sessions for observation",
-        default: false,
+        describe: "Run workers in tmux sessions (auto-enabled if tmux is installed)",
+        default: true,
       }),
     async (argv) => {
       const repoRoot = await getRepoRoot();
@@ -199,7 +199,7 @@ yargs(hideBin(process.argv))
   // prloom watch
   .command(
     "watch [plan-id]",
-    "Observe a running worker (requires --tmux mode)",
+    "Observe a running worker",
     (yargs) => yargs.positional("plan-id", { type: "string" }),
     async (argv) => {
       const repoRoot = await getRepoRoot();

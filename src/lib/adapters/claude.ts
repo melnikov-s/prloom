@@ -24,7 +24,7 @@ export const claudeAdapter: AgentAdapter = {
 
       const wrappedCmd = `claude -p "$(cat ${promptFile})" --dangerously-skip-permissions 2>&1 | tee ${logFile}; echo $? > ${exitCodeFile}`;
 
-      await execa(
+      const tmuxResult = await execa(
         "tmux",
         [
           "new-session",
@@ -39,6 +39,10 @@ export const claudeAdapter: AgentAdapter = {
         ],
         { reject: false }
       );
+
+      if (tmuxResult.exitCode !== 0) {
+        return { exitCode: tmuxResult.exitCode ?? 1 };
+      }
 
       return { tmuxSession: tmux.sessionName };
     }

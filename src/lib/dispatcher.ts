@@ -46,7 +46,11 @@ import {
   killProcess,
   waitForProcess,
 } from "./adapters/process.js";
-import { waitForTmuxSession, readExecutionResult } from "./adapters/tmux.js";
+import {
+  waitForTmuxSession,
+  readExecutionResult,
+  hasTmux,
+} from "./adapters/tmux.js";
 import {
   renderWorkerPrompt,
   renderTriagePrompt,
@@ -510,8 +514,9 @@ export async function processActivePlans(
           const agentName = plan.frontmatter.agent ?? config.agents.default;
           const adapter = getAdapter(agentName);
 
-          // Build tmux config if enabled
-          const tmuxConfig = options.tmux
+          // Build tmux config if available and not explicitly disabled
+          const useTmux = (options.tmux !== false) && await hasTmux();
+          const tmuxConfig = useTmux
             ? { sessionName: `prloom-${planId}` }
             : undefined;
 
@@ -724,8 +729,9 @@ async function runTriage(
   );
   log.info(`   Using agent: ${triageAgent}`, plan.frontmatter.id);
 
-  // Build tmux config if enabled
-  const tmuxConfig = options.tmux
+  // Build tmux config if available and not explicitly disabled
+  const useTmux = (options.tmux !== false) && await hasTmux();
+  const tmuxConfig = useTmux
     ? { sessionName: `prloom-triage-${plan.frontmatter.id}` }
     : undefined;
 
