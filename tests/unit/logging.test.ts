@@ -12,9 +12,9 @@ test("dispatcherEvents: logs and emits updates", () => {
 
   const events = dispatcherEvents.getEvents();
   expect(events).toHaveLength(1);
-  expect(events[0].message).toBe("test message");
-  expect(events[0].planId).toBe("plan-123");
-  expect(events[0].type).toBe("info");
+  expect(events[0]!.message).toBe("test message");
+  expect(events[0]!.planId).toBe("plan-123");
+  expect(events[0]!.type).toBe("info");
 
   // Verify emit was called (for update and event)
   expect(updateSpy).toHaveBeenCalled();
@@ -30,5 +30,5 @@ test("dispatcherEvents: maintains max events", () => {
 
   const events = dispatcherEvents.getEvents();
   expect(events.length).toBeLessThanOrEqual(100);
-  expect(events[0].message).toBe("msg 109");
+  expect(events[0]!.message).toBe("msg 109");
 });

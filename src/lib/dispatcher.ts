@@ -214,14 +214,19 @@ export async function ingestInboxPlans(
           ? plan.frontmatter.branch
           : actualId;
 
-      const branch = await createBranchName(branchBase);
-      log.info(`   Creating branch: ${branch}`);
-      const worktreePath = await createWorktree(
+      const desiredBranch = await createBranchName(branchBase);
+      log.info(`   Creating branch: ${desiredBranch}`);
+      const { worktreePath, branch } = await createWorktree(
         repoRoot,
         worktreesDir,
-        branch,
+        desiredBranch,
         baseBranch
       );
+      if (branch !== desiredBranch) {
+        log.info(
+          `   Branch name adjusted to: ${branch} (original already existed)`
+        );
+      }
       log.info(`   Created worktree: ${worktreePath}`);
       const planRelpath = `prloom/plans/${actualId}.md`;
 

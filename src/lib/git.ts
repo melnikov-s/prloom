@@ -26,19 +26,18 @@ export async function createBranchName(baseName: string): Promise<string> {
   return safeName.toLowerCase();
 }
 
+export interface CreateWorktreeResult {
+  worktreePath: string;
+  branch: string;
+}
+
 export async function createWorktree(
   repoRoot: string,
   worktreesDir: string,
   branch: string,
   baseBranch: string,
   remoteName: string = "origin"
-): Promise<string> {
-  const worktreePath = join(worktreesDir, branch);
-
-  if (existsSync(worktreePath)) {
-    throw new Error(`Worktree directory already exists: ${worktreePath}`);
-  }
-
+): Promise<CreateWorktreeResult> {
   if (!existsSync(worktreesDir)) {
     mkdirSync(worktreesDir, { recursive: true });
   }
@@ -46,15 +45,56 @@ export async function createWorktree(
   // Ensure the base branch exists on the remote and is up-to-date.
   await execa("git", ["fetch", remoteName, baseBranch], { cwd: repoRoot });
 
-  // Create branch from remote base branch and add worktree.
+  // Try creating with original branch name first
+  const originalWorktreePath = join(worktreesDir, branch);
+
+  if (!existsSync(originalWorktreePath)) {
+    try {
+      await execa(
+        "git",
+        [
+          "worktree",
+          "add",
+          "-b",
+          branch,
+          originalWorktreePath,
+          `${remoteName}/${baseBranch}`,
+        ],
+        {
+          cwd: repoRoot,
+        }
+      );
+      return { worktreePath: originalWorktreePath, branch };
+    } catch (error) {
+      // Check if error is due to branch already existing
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      if (!errorMessage.includes("already exists")) {
+        throw error;
+      }
+      // Branch exists, fall through to retry with suffix
+    }
+  }
+
+  // Retry with unique suffix
+  const uniqueId = Math.random().toString(36).substring(2, 7);
+  const suffixedBranch = `${branch}-${uniqueId}`;
+  const suffixedWorktreePath = join(worktreesDir, suffixedBranch);
+
+  if (existsSync(suffixedWorktreePath)) {
+    throw new Error(
+      `Worktree directory already exists: ${suffixedWorktreePath}`
+    );
+  }
+
   await execa(
     "git",
     [
       "worktree",
       "add",
       "-b",
-      branch,
-      worktreePath,
+      suffixedBranch,
+      suffixedWorktreePath,
       `${remoteName}/${baseBranch}`,
     ],
     {
@@ -62,7 +102,7 @@ export async function createWorktree(
     }
   );
 
-  return worktreePath;
+  return { worktreePath: suffixedWorktreePath, branch: suffixedBranch };
 }
 
 export async function commitAll(
