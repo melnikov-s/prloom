@@ -1,26 +1,141 @@
-import React from "react";
-import { render } from "ink";
+import React, { useState, useEffect, useCallback } from "react";
+import { render, useInput, useApp } from "ink";
 import { join } from "path";
 import { existsSync } from "fs";
-import { App } from "./App.js";
+import { execa } from "execa";
+import { App, getAvailableActions, type ActionDef } from "./App.js";
 import { dispatcherEvents, type DispatcherUIState } from "../lib/events.js";
 import { loadState } from "../lib/state.js";
 import { parsePlan } from "../lib/plan.js";
+import { enqueue } from "../lib/ipc.js";
 
 interface TUIRunnerProps {
   repoRoot: string;
 }
 
 function TUIRunner({ repoRoot }: TUIRunnerProps): React.ReactElement {
-  const [uiState, setUIState] = React.useState<DispatcherUIState>(
+  const { exit } = useApp();
+
+  const [uiState, setUIState] = useState<DispatcherUIState>(
     dispatcherEvents.getUIState()
   );
-  const [planTodos, setPlanTodos] = React.useState<
+  const [planTodos, setPlanTodos] = useState<
     Map<string, { done: number; total: number }>
   >(new Map());
 
+  // Navigation state
+  const [selectedPlanIndex, setSelectedPlanIndex] = useState(0);
+  const [expandedPlanId, setExpandedPlanId] = useState<string | null>(null);
+  const [selectedActionIndex, setSelectedActionIndex] = useState(0);
+  const [isInActionMode, setIsInActionMode] = useState(false);
+
+  // Get plan IDs for navigation
+  const planIds = Object.keys(uiState.state.plans);
+  const planCount = planIds.length;
+
+  // Get current plan info
+  const currentPlanId = planIds[selectedPlanIndex];
+  const currentPlan = currentPlanId
+    ? uiState.state.plans[currentPlanId]
+    : undefined;
+  const currentStatus = currentPlan?.status ?? "active";
+  const availableActions = getAvailableActions(currentStatus);
+
+  // Execute an action for a plan
+  const executeAction = useCallback(
+    async (action: ActionDef, planId: string) => {
+      if (action.ipcType) {
+        // Send IPC command
+        enqueue(repoRoot, { type: action.ipcType, plan_id: planId });
+      } else if (action.command) {
+        // For watch/logs, we need to spawn a new process
+        // Since we're in the TUI, we'll exit and run the command
+        exit();
+        const { spawn } = await import("child_process");
+        spawn("prloom", [action.command, planId], {
+          stdio: "inherit",
+          detached: true,
+        });
+      }
+    },
+    [repoRoot, exit]
+  );
+
+  // Handle keyboard input
+  useInput((input, key) => {
+    // Quit
+    if (input === "q" || (key.ctrl && input === "c")) {
+      exit();
+      return;
+    }
+
+    // No plans - no navigation
+    if (planCount === 0) return;
+
+    if (isInActionMode && expandedPlanId) {
+      // In action mode - navigate between actions
+      if (key.leftArrow) {
+        setSelectedActionIndex((prev) =>
+          prev > 0 ? prev - 1 : availableActions.length - 1
+        );
+      } else if (key.rightArrow) {
+        setSelectedActionIndex((prev) =>
+          prev < availableActions.length - 1 ? prev + 1 : 0
+        );
+      } else if (key.upArrow) {
+        // Go back to plan selection (collapse)
+        setIsInActionMode(false);
+        setExpandedPlanId(null);
+        setSelectedActionIndex(0);
+      } else if (input === " ") {
+        // Execute the selected action
+        const action = availableActions[selectedActionIndex];
+        if (action && expandedPlanId) {
+          executeAction(action, expandedPlanId);
+        }
+      }
+    } else {
+      // In plan selection mode
+      if (key.upArrow) {
+        setSelectedPlanIndex((prev) =>
+          prev > 0 ? prev - 1 : planCount - 1
+        );
+        // If moving to a different plan while one is expanded, collapse it
+        if (expandedPlanId) {
+          setExpandedPlanId(null);
+          setSelectedActionIndex(0);
+        }
+      } else if (key.downArrow) {
+        setSelectedPlanIndex((prev) =>
+          prev < planCount - 1 ? prev + 1 : 0
+        );
+        // If moving to a different plan while one is expanded, collapse it
+        if (expandedPlanId) {
+          setExpandedPlanId(null);
+          setSelectedActionIndex(0);
+        }
+      } else if (input === " ") {
+        // Space - toggle expand/collapse
+        const planId = planIds[selectedPlanIndex];
+        if (planId) {
+          if (expandedPlanId === planId) {
+            // Already expanded - collapse
+            setExpandedPlanId(null);
+            setIsInActionMode(false);
+            setSelectedActionIndex(0);
+          } else {
+            // Expand and enter action mode
+            setExpandedPlanId(planId);
+            setIsInActionMode(true);
+            setSelectedActionIndex(0);
+          }
+        }
+      }
+    }
+  });
+
   // Update state when dispatcher emits updates
-  React.useEffect(() => {
+  useEffect(() => {
     const handleUpdate = (newState: DispatcherUIState) => {
       setUIState(newState);
 
@@ -47,8 +162,21 @@ function TUIRunner({ repoRoot }: TUIRunnerProps): React.ReactElement {
     };
   }, []);
 
+  // Keep selected index in bounds when plans change
+  useEffect(() => {
+    if (selectedPlanIndex >= planCount && planCount > 0) {
+      setSelectedPlanIndex(planCount - 1);
+    }
+    // If expanded plan no longer exists, collapse
+    if (expandedPlanId && !planIds.includes(expandedPlanId)) {
+      setExpandedPlanId(null);
+      setIsInActionMode(false);
+      setSelectedActionIndex(0);
+    }
+  }, [planIds, planCount, selectedPlanIndex, expandedPlanId]);
+
   // Periodic refresh to update uptime (forces re-render for timer)
-  React.useEffect(() => {
+  useEffect(() => {
     const interval = setInterval(() => {
       // Just trigger a re-render for uptime display
       // State updates come from dispatcher events, not polling disk
@@ -58,7 +186,16 @@ function TUIRunner({ repoRoot }: TUIRunnerProps): React.ReactElement {
     return () => clearInterval(interval);
   }, []);
 
-  return <App uiState={uiState} planTodos={planTodos} />;
+  return (
+    <App
+      uiState={uiState}
+      planTodos={planTodos}
+      selectedPlanIndex={selectedPlanIndex}
+      expandedPlanId={expandedPlanId}
+      selectedActionIndex={selectedActionIndex}
+      isInActionMode={isInActionMode}
+    />
+  );
 }
 
 export async function renderTUI(repoRoot: string): Promise<void> {
@@ -69,15 +206,6 @@ export async function renderTUI(repoRoot: string): Promise<void> {
   dispatcherEvents.setState(initialState);
 
   const { waitUntilExit } = render(<TUIRunner repoRoot={repoRoot} />);
-
-  // Handle 'q' to quit
-  process.stdin.setRawMode?.(true);
-  process.stdin.resume();
-  process.stdin.on("data", (data) => {
-    if (data.toString() === "q" || data.toString() === "\x03") {
-      process.exit(0);
-    }
-  });
 
   await waitUntilExit();
 }

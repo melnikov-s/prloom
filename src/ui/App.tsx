@@ -1,6 +1,9 @@
-import React from "react";
-import { Box, Text } from "ink";
+import React, { useState, useEffect } from "react";
+import { Box, Text, useInput } from "ink";
+import { existsSync, readFileSync } from "fs";
+import { join } from "path";
 import type { DispatcherUIState, DispatcherEvent } from "../lib/events.js";
+import type { PlanState } from "../lib/state.js";
 
 interface HeaderProps {
   startedAt: Date;
@@ -31,8 +34,8 @@ export function Header({ startedAt }: HeaderProps): React.ReactElement {
       </Box>
       <Box>
         <Text dimColor>Running: {formatUptime(startedAt)}</Text>
-        <Text dimColor> │ </Text>
-        <Text dimColor>(q to quit)</Text>
+        <Text dimColor> | </Text>
+        <Text dimColor>(arrows to navigate, space to expand, q to quit)</Text>
       </Box>
     </Box>
   );
@@ -112,7 +115,11 @@ const COL_BRANCH = 28;
 const COL_STATUS = 12;
 const COL_PROGRESS = 14;
 
-function PlanRow({
+interface SelectablePlanRowProps extends PlanRowProps {
+  isSelected: boolean;
+}
+
+function SelectablePlanRow({
   id,
   branch,
   status,
@@ -121,18 +128,28 @@ function PlanRow({
   todosDone,
   todosTotal,
   error,
-}: PlanRowProps): React.ReactElement {
+  isSelected,
+}: SelectablePlanRowProps): React.ReactElement {
   const statusColor = getStatusColor(status);
   const statusEmoji = getStatusEmoji(status);
   const prUrl = pr && repoUrl ? `${repoUrl}/pull/${pr}` : pr ? `#${pr}` : "—";
 
   return (
     <Box>
+      <Box width={3}>
+        <Text color={isSelected ? "cyan" : undefined}>
+          {isSelected ? "▸ " : "  "}
+        </Text>
+      </Box>
       <Box width={COL_ID}>
-        <Text>{id.slice(0, COL_ID - 2)}</Text>
+        <Text color={isSelected ? "cyan" : undefined} bold={isSelected}>
+          {id.slice(0, COL_ID - 2)}
+        </Text>
       </Box>
       <Box width={COL_BRANCH}>
-        <Text dimColor>{branch.slice(0, COL_BRANCH - 2)}</Text>
+        <Text dimColor={!isSelected} color={isSelected ? "cyan" : undefined}>
+          {branch.slice(0, COL_BRANCH - 2)}
+        </Text>
       </Box>
       <Box width={COL_STATUS}>
         <Text>
@@ -144,7 +161,7 @@ function PlanRow({
         <ProgressBar done={todosDone} total={todosTotal} />
       </Box>
       <Box>
-        <Text dimColor>{prUrl}</Text>
+        <Text dimColor={!isSelected}>{prUrl}</Text>
       </Box>
       {error && (
         <Box marginLeft={1}>
@@ -158,6 +175,9 @@ function PlanRow({
 function PlanHeader(): React.ReactElement {
   return (
     <Box>
+      <Box width={3}>
+        <Text> </Text>
+      </Box>
       <Box width={COL_ID}>
         <Text bold dimColor>
           ID
@@ -187,15 +207,189 @@ function PlanHeader(): React.ReactElement {
   );
 }
 
-interface PlanPanelProps {
-  uiState: DispatcherUIState;
-  planTodos: Map<string, { done: number; total: number }>;
+// Action button definitions
+interface ActionDef {
+  label: string;
+  key: string;
+  ipcType?: "stop" | "unpause" | "poll" | "launch_poll";
+  command?: string;
+  showFor?: (status: string) => boolean;
 }
 
-export function PlanPanel({
+const ACTIONS: ActionDef[] = [
+  {
+    label: "Block",
+    key: "block",
+    ipcType: "stop",
+    showFor: (status) => status !== "blocked" && status !== "done",
+  },
+  {
+    label: "Unblock",
+    key: "unblock",
+    ipcType: "unpause",
+    showFor: (status) => status === "blocked",
+  },
+  {
+    label: "Poll",
+    key: "poll",
+    ipcType: "poll",
+    showFor: () => true,
+  },
+  {
+    label: "Watch",
+    key: "watch",
+    command: "watch",
+    showFor: (status) => status === "active",
+  },
+  {
+    label: "Logs",
+    key: "logs",
+    command: "logs",
+    showFor: () => true,
+  },
+];
+
+interface ActionButtonProps {
+  label: string;
+  isSelected: boolean;
+}
+
+function ActionButton({
+  label,
+  isSelected,
+}: ActionButtonProps): React.ReactElement {
+  return (
+    <Box marginRight={1}>
+      <Text
+        color={isSelected ? "black" : "white"}
+        backgroundColor={isSelected ? "cyan" : undefined}
+        bold={isSelected}
+      >
+        {isSelected ? ` ${label} ` : `[${label}]`}
+      </Text>
+    </Box>
+  );
+}
+
+interface LogStreamProps {
+  planId: string;
+  maxLines?: number;
+}
+
+function LogStream({
+  planId,
+  maxLines = 10,
+}: LogStreamProps): React.ReactElement {
+  const [lines, setLines] = useState<string[]>([]);
+
+  useEffect(() => {
+    const logPath = join("/tmp", `prloom-${planId}`, "worker.log");
+
+    const readLogs = () => {
+      if (existsSync(logPath)) {
+        try {
+          const content = readFileSync(logPath, "utf-8");
+          const allLines = content.trim().split("\n");
+          setLines(allLines.slice(-maxLines));
+        } catch {
+          setLines(["(error reading log file)"]);
+        }
+      } else {
+        setLines(["(no log file yet)"]);
+      }
+    };
+
+    readLogs();
+    const interval = setInterval(readLogs, 1000);
+    return () => clearInterval(interval);
+  }, [planId, maxLines]);
+
+  return (
+    <Box flexDirection="column" paddingX={1}>
+      <Text bold dimColor>
+        LOG (last {maxLines} lines):
+      </Text>
+      <Box
+        flexDirection="column"
+        borderStyle="round"
+        borderColor="gray"
+        paddingX={1}
+        marginTop={1}
+      >
+        {lines.length === 0 ? (
+          <Text dimColor>(empty)</Text>
+        ) : (
+          lines.map((line, idx) => (
+            <Text key={idx} dimColor wrap="truncate">
+              {line.slice(0, 100)}
+            </Text>
+          ))
+        )}
+      </Box>
+    </Box>
+  );
+}
+
+interface ExpandedPlanViewProps {
+  planId: string;
+  status: string;
+  selectedActionIndex: number;
+  availableActions: ActionDef[];
+}
+
+function ExpandedPlanView({
+  planId,
+  status,
+  selectedActionIndex,
+  availableActions,
+}: ExpandedPlanViewProps): React.ReactElement {
+  return (
+    <Box
+      flexDirection="column"
+      borderStyle="single"
+      borderColor="cyan"
+      marginLeft={3}
+      marginY={1}
+    >
+      <LogStream planId={planId} />
+      <Box paddingX={1} marginTop={1}>
+        <Text bold dimColor>
+          ACTIONS:{" "}
+        </Text>
+        {availableActions.map((action, idx) => (
+          <ActionButton
+            key={action.key}
+            label={action.label}
+            isSelected={idx === selectedActionIndex}
+          />
+        ))}
+      </Box>
+      <Box paddingX={1} marginTop={1}>
+        <Text dimColor>
+          (space to execute, up to select plan, left/right for actions)
+        </Text>
+      </Box>
+    </Box>
+  );
+}
+
+interface InteractivePlanPanelProps {
+  uiState: DispatcherUIState;
+  planTodos: Map<string, { done: number; total: number }>;
+  selectedPlanIndex: number;
+  expandedPlanId: string | null;
+  selectedActionIndex: number;
+  isInActionMode: boolean;
+}
+
+export function InteractivePlanPanel({
   uiState,
   planTodos,
-}: PlanPanelProps): React.ReactElement {
+  selectedPlanIndex,
+  expandedPlanId,
+  selectedActionIndex,
+  isInActionMode,
+}: InteractivePlanPanelProps): React.ReactElement {
   const planIds = Object.keys(uiState.state.plans);
   const planCount = planIds.length;
 
@@ -216,18 +410,37 @@ export function PlanPanel({
             {planIds.map((planId, idx) => {
               const ps = uiState.state.plans[planId]!;
               const todos = planTodos.get(planId) ?? { done: 0, total: 0 };
+              const isSelected = idx === selectedPlanIndex && !isInActionMode;
+              const isExpanded = planId === expandedPlanId;
+              const status = ps.status ?? "active";
+
+              // Get available actions for this plan's status
+              const availableActions = ACTIONS.filter(
+                (a) => !a.showFor || a.showFor(status)
+              );
+
               return (
-                <PlanRow
-                  key={planId}
-                  id={planId}
-                  branch={ps.branch}
-                  status={ps.status ?? "active"}
-                  pr={ps.pr}
-                  repoUrl={uiState.repoUrl}
-                  todosDone={todos.done}
-                  todosTotal={todos.total}
-                  error={ps.lastError}
-                />
+                <React.Fragment key={planId}>
+                  <SelectablePlanRow
+                    id={planId}
+                    branch={ps.branch}
+                    status={status}
+                    pr={ps.pr}
+                    repoUrl={uiState.repoUrl}
+                    todosDone={todos.done}
+                    todosTotal={todos.total}
+                    error={ps.lastError}
+                    isSelected={isSelected || isExpanded}
+                  />
+                  {isExpanded && (
+                    <ExpandedPlanView
+                      planId={planId}
+                      status={status}
+                      selectedActionIndex={selectedActionIndex}
+                      availableActions={availableActions}
+                    />
+                  )}
+                </React.Fragment>
               );
             })}
           </>
@@ -270,7 +483,7 @@ function getEventColor(type: DispatcherEvent["type"]): string {
 
 export function ActivityPanel({
   events,
-  maxLines = 15,
+  maxLines = 10,
 }: ActivityPanelProps): React.ReactElement {
   // Take last N events and show newest at bottom
   const displayEvents = [...events.slice(0, maxLines)].reverse();
@@ -278,7 +491,6 @@ export function ActivityPanel({
   return (
     <Box
       flexDirection="column"
-      flexGrow={1}
       borderStyle="single"
       borderColor="gray"
       paddingX={1}
@@ -312,55 +524,44 @@ export function ActivityPanel({
   );
 }
 
-interface ErrorPanelProps {
-  planId: string;
-  error: string;
-}
+// Export the action definitions and helper to get available actions
+export { ACTIONS };
+export type { ActionDef };
 
-function ErrorPanel({ planId, error }: ErrorPanelProps): React.ReactElement {
-  const logPath = `/tmp/prloom-${planId}/worker.log`;
-
-  return (
-    <Box
-      flexDirection="column"
-      borderStyle="single"
-      borderColor="red"
-      paddingX={1}
-      marginTop={0}
-    >
-      <Text bold color="red">
-        ⚠ ERROR: {planId}
-      </Text>
-      <Box marginTop={1}>
-        <Text wrap="wrap">{error}</Text>
-      </Box>
-      <Box marginTop={1}>
-        <Text dimColor>Log: {logPath}</Text>
-      </Box>
-    </Box>
-  );
+export function getAvailableActions(status: string): ActionDef[] {
+  return ACTIONS.filter((a) => !a.showFor || a.showFor(status));
 }
 
 interface AppProps {
   uiState: DispatcherUIState;
   planTodos: Map<string, { done: number; total: number }>;
+  selectedPlanIndex: number;
+  expandedPlanId: string | null;
+  selectedActionIndex: number;
+  isInActionMode: boolean;
 }
 
-export function App({ uiState, planTodos }: AppProps): React.ReactElement {
-  // Find plans with errors to display
-  const plansWithErrors = Object.entries(uiState.state.plans)
-    .filter(([, ps]) => ps.lastError)
-    .slice(0, 1); // Show first error only for now
-
+export function App({
+  uiState,
+  planTodos,
+  selectedPlanIndex,
+  expandedPlanId,
+  selectedActionIndex,
+  isInActionMode,
+}: AppProps): React.ReactElement {
   return (
     <Box flexDirection="column">
       <Box flexDirection="column">
         <ActivityPanel events={uiState.events} />
-        <PlanPanel uiState={uiState} planTodos={planTodos} />
+        <InteractivePlanPanel
+          uiState={uiState}
+          planTodos={planTodos}
+          selectedPlanIndex={selectedPlanIndex}
+          expandedPlanId={expandedPlanId}
+          selectedActionIndex={selectedActionIndex}
+          isInActionMode={isInActionMode}
+        />
       </Box>
-      {plansWithErrors.map(([planId, ps]) => (
-        <ErrorPanel key={planId} planId={planId} error={ps.lastError!} />
-      ))}
       <Header startedAt={uiState.startedAt} />
     </Box>
   );
