@@ -1,9 +1,9 @@
-import { join, dirname } from "path";
-import { existsSync, writeFileSync, renameSync } from "fs";
+import { join } from "path";
+import { existsSync, writeFileSync } from "fs";
 import { loadConfig, getAgentConfig } from "../lib/config.js";
 import { getAdapter, type AgentName } from "../lib/adapters/index.js";
 import { nanoid } from "nanoid";
-import { generatePlanSkeleton, parsePlan } from "../lib/plan.js";
+import { generatePlanSkeleton } from "../lib/plan.js";
 import { renderDesignerNewPrompt } from "../lib/template.js";
 import { ensureInboxDir, getInboxPath, setInboxStatus } from "../lib/state.js";
 import { getCurrentBranch, ensureRemoteBranchExists } from "../lib/git.js";
@@ -93,23 +93,6 @@ export async function runNew(
 
   console.log("");
   console.log("Designer session ended.");
-
-  // Auto-rename based on descriptive branch name if set
-  let currentPlanPath = planPath;
-  try {
-    const plan = parsePlan(planPath);
-    if (plan.frontmatter.branch && plan.frontmatter.branch.trim() !== "") {
-      const descriptiveName = `${plan.frontmatter.branch.trim()}-${id}.md`;
-      const newPath = join(dirname(planPath), descriptiveName);
-      if (planPath !== newPath) {
-        renameSync(planPath, newPath);
-        currentPlanPath = newPath;
-        console.log(`Renamed plan to: ${descriptiveName}`);
-      }
-    }
-  } catch (error) {
-    console.warn("Failed to rename plan based on branch name:", String(error));
-  }
 
   // Prompt to queue the plan
   const shouldQueue = await confirm("Queue this plan for the dispatcher?");

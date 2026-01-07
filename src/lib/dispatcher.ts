@@ -159,6 +159,16 @@ export async function runDispatcher(
 
   while (true) {
     try {
+      // Reload state from disk to pick up external changes (e.g., UI setting inbox status)
+      // Merge: keep in-memory plans (with session tracking), but reload inbox from disk
+      const diskState = loadState(repoRoot);
+      state.inbox = diskState.inbox;
+      // Merge control_cursor (take the max to not re-process commands)
+      state.control_cursor = Math.max(
+        state.control_cursor,
+        diskState.control_cursor
+      );
+
       // 1. Consume IPC commands
       const { commands, newCursor } = consume(repoRoot, state.control_cursor);
       state.control_cursor = newCursor;
