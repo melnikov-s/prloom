@@ -38,15 +38,16 @@ export async function runStatus(repoRoot: string): Promise<void> {
       const ps = state.plans[planId]!;
       const planPath = join(ps.worktree, ps.planRelpath);
 
-      let status = "unknown";
+      // Status comes from dispatcher state (authoritative)
+      const status = ps.status;
       let agent = "—";
+
       if (existsSync(planPath)) {
         try {
           const plan = parsePlan(planPath);
-          status = plan.frontmatter.status;
           agent = plan.frontmatter.agent ?? "default";
         } catch {
-          status = "error";
+          // Plan file exists but couldn't be parsed
         }
       }
 

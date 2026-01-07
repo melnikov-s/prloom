@@ -38,7 +38,7 @@ export async function runPoll(repoRoot: string, planId: string): Promise<void> {
   const plan = parsePlan(planPath);
 
   console.log(`PR FEEDBACK: ${planId}`);
-  console.log(`PR #${ps.pr} | Status: ${plan.frontmatter.status}`);
+  console.log(`PR #${ps.pr} | Status: ${ps.status}`);
   console.log("─".repeat(60));
 
   // Get authenticated user to filter bot comments
