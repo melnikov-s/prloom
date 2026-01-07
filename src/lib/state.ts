@@ -13,7 +13,6 @@ import type { AgentName } from "./adapters/index.js";
 export interface PlanState {
   /** Agent to use for this plan */
   agent?: AgentName;
-  sessionId?: string;
   worktree: string;
   branch: string;
   pr?: number;

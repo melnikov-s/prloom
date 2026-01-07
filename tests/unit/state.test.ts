@@ -31,10 +31,8 @@ test("saveState and loadState round-trip", () => {
     control_cursor: 100,
     plans: {
       "test-plan": {
-        sessionId: "abc123",
         worktree: "/path/to/worktree",
         branch: "test-plan-xyz",
-
         planRelpath: "plans/test-plan.md",
         baseBranch: "develop",
         status: "active",
@@ -47,7 +45,7 @@ test("saveState and loadState round-trip", () => {
   const loaded = loadState(TEST_DIR);
 
   expect(loaded.control_cursor).toBe(100);
-  expect(loaded.plans["test-plan"]?.sessionId).toBe("abc123");
+  expect(loaded.plans["test-plan"]?.worktree).toBe("/path/to/worktree");
   expect(loaded.plans["test-plan"]?.planRelpath).toBe("plans/test-plan.md");
 });
 
