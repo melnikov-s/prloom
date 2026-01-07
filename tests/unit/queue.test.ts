@@ -1,11 +1,22 @@
 import { test, expect, beforeEach, afterEach } from "bun:test";
-import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from "fs";
+import {
+  mkdtempSync,
+  rmSync,
+  mkdirSync,
+  writeFileSync,
+  readFileSync,
+} from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
 import { runQueue } from "../../src/cli/queue.js";
 import { runStatus } from "../../src/cli/status.js";
-import { getInboxPath } from "../../src/lib/state.js";
-import { parsePlan, generatePlanSkeleton } from "../../src/lib/plan.js";
+import {
+  getInboxPath,
+  loadState,
+  getInboxMeta,
+  setInboxStatus,
+} from "../../src/lib/state.js";
+import { generatePlanSkeleton } from "../../src/lib/plan.js";
 
 let repoRoot: string;
 
@@ -18,30 +29,37 @@ afterEach(() => {
   rmSync(repoRoot, { recursive: true });
 });
 
-test("runQueue transitions draft to queued", async () => {
-  const id = "draft-plan";
+test("runQueue transitions draft to queued (via state.inbox)", async () => {
+  // Use simple ID without hyphens to avoid resolver extracting suffix
+  const id = "abc123";
   const inboxPath = getInboxPath(repoRoot, id);
   const skeleton = generatePlanSkeleton(id);
   writeFileSync(inboxPath, skeleton);
 
-  // Starts as draft
-  expect(parsePlan(inboxPath).frontmatter.status).toBe("draft");
+  // Set initial status to draft in state.inbox
+  setInboxStatus(repoRoot, id, "draft");
+
+  // Verify starts as draft
+  expect(getInboxMeta(repoRoot, id).status).toBe("draft");
 
   await runQueue(repoRoot, id);
 
-  // Now queued
-  expect(parsePlan(inboxPath).frontmatter.status).toBe("queued");
+  // Now queued in state.inbox
+  expect(getInboxMeta(repoRoot, id).status).toBe("queued");
 });
 
-test("runStatus shows draft/queued labels", async () => {
-  const id1 = "plan-1";
-  const id2 = "plan-2";
+test("runStatus shows draft/queued labels from state.inbox", async () => {
+  const id1 = "plan1";
+  const id2 = "plan2";
   const path1 = getInboxPath(repoRoot, id1);
   const path2 = getInboxPath(repoRoot, id2);
 
-  writeFileSync(path1, generatePlanSkeleton(id1)); // draft
-  const skeleton2 = generatePlanSkeleton(id2);
-  writeFileSync(path2, skeleton2.replace("status: draft", "status: queued"));
+  writeFileSync(path1, generatePlanSkeleton(id1));
+  writeFileSync(path2, generatePlanSkeleton(id2));
+
+  // Set status in state.inbox
+  setInboxStatus(repoRoot, id1, "draft");
+  setInboxStatus(repoRoot, id2, "queued");
 
   // Capture console.log
   const logs: string[] = [];
@@ -55,16 +73,19 @@ test("runStatus shows draft/queued labels", async () => {
   }
 
   const logStr = logs.join("\n");
-  expect(logStr).toContain("plan-1 [draft]");
-  expect(logStr).toContain("plan-2 [queued]");
+  expect(logStr).toContain("plan1 [draft]");
+  expect(logStr).toContain("plan2 [queued]");
 });
 
 test("runQueue is idempotent (already queued)", async () => {
-  const id = "already-queued";
+  // Use simple ID without hyphens
+  const id = "xyz789";
   const inboxPath = getInboxPath(repoRoot, id);
   const skeleton = generatePlanSkeleton(id);
-  // Set to queued manually
-  writeFileSync(inboxPath, skeleton.replace("status: draft", "status: queued"));
+  writeFileSync(inboxPath, skeleton);
+
+  // Set to queued in state.inbox
+  setInboxStatus(repoRoot, id, "queued");
 
   const logs: string[] = [];
   const originalLog = console.log;
@@ -77,26 +98,15 @@ test("runQueue is idempotent (already queued)", async () => {
   }
 
   expect(logs.join("\n")).toContain("already queued");
-  expect(parsePlan(inboxPath).frontmatter.status).toBe("queued");
+  expect(getInboxMeta(repoRoot, id).status).toBe("queued");
 });
 
-test("runQueue warns on unexpected status but still queues", async () => {
-  const id = "unexpected-status";
+test("getInboxMeta defaults to draft when no meta exists", () => {
+  const id = "nometa";
   const inboxPath = getInboxPath(repoRoot, id);
-  const skeleton = generatePlanSkeleton(id);
-  // Set to something weird
-  writeFileSync(inboxPath, skeleton.replace("status: draft", "status: active"));
+  writeFileSync(inboxPath, generatePlanSkeleton(id));
 
-  const warnings: string[] = [];
-  const originalWarn = console.warn;
-  console.warn = (msg: string) => warnings.push(msg);
-
-  try {
-    await runQueue(repoRoot, id);
-  } finally {
-    console.warn = originalWarn;
-  }
-
-  expect(warnings.join("\n")).toContain("unexpected status: active");
-  expect(parsePlan(inboxPath).frontmatter.status).toBe("queued");
+  // Don't call setInboxStatus - should default to draft
+  const meta = getInboxMeta(repoRoot, id);
+  expect(meta.status).toBe("draft");
 });

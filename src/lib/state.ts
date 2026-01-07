@@ -47,9 +47,15 @@ export interface PlanState {
   todoRetryCount?: number;
 }
 
+export interface InboxMeta {
+  status: "draft" | "queued";
+  agent?: AgentName;
+}
+
 export interface State {
   control_cursor: number;
   plans: Record<string, PlanState>;
+  inbox: Record<string, InboxMeta>;
 }
 
 const SWARM_DIR = "prloom/.local";
@@ -121,14 +127,14 @@ export function loadState(repoRoot: string): State {
   const statePath = join(getSwarmDir(repoRoot), STATE_FILE);
 
   if (!existsSync(statePath)) {
-    return { control_cursor: 0, plans: {} };
+    return { control_cursor: 0, plans: {}, inbox: {} };
   }
 
   try {
     const raw = readFileSync(statePath, "utf-8");
-    return JSON.parse(raw);
+    return JSON.parse(raw) as State;
   } catch {
-    return { control_cursor: 0, plans: {} };
+    return { control_cursor: 0, plans: {}, inbox: {} };
   }
 }
 
@@ -219,44 +225,34 @@ export function deleteInboxPlan(repoRoot: string, planId: string): void {
   if (existsSync(inboxPath)) {
     unlinkSync(inboxPath);
   }
-  // Also delete metadata file if it exists
+  // Also delete legacy metadata file if it exists
   const metaPath = inboxPath.replace(/\.md$/, ".json");
   if (existsSync(metaPath)) {
     unlinkSync(metaPath);
   }
 }
 
-// Inbox metadata
+// Inbox metadata helpers (stored in state.inbox, not sidecar files)
 
-export interface InboxMeta {
-  agent?: AgentName;
+export function getInboxMeta(repoRoot: string, planId: string): InboxMeta {
+  const state = loadState(repoRoot);
+  return state.inbox[planId] ?? { status: "draft" };
 }
 
-export function saveInboxMeta(
+export function setInboxStatus(
   repoRoot: string,
   planId: string,
-  meta: InboxMeta
+  status: "draft" | "queued",
+  agent?: AgentName
 ): void {
-  const inboxPath = getInboxPath(repoRoot, planId);
-  const metaPath = inboxPath.replace(/\.md$/, ".json");
-  writeFileSync(metaPath, JSON.stringify(meta, null, 2));
+  const state = loadState(repoRoot);
+  const existing = state.inbox[planId] ?? { status: "draft" };
+  state.inbox[planId] = { ...existing, status, agent: agent ?? existing.agent };
+  saveState(repoRoot, state);
 }
 
-export function loadInboxMeta(
-  repoRoot: string,
-  planId: string
-): InboxMeta | null {
-  const inboxPath = getInboxPath(repoRoot, planId);
-  const metaPath = inboxPath.replace(/\.md$/, ".json");
-
-  if (!existsSync(metaPath)) {
-    return null;
-  }
-
-  try {
-    const raw = readFileSync(metaPath, "utf-8");
-    return JSON.parse(raw);
-  } catch {
-    return null;
-  }
+export function deleteInboxMeta(repoRoot: string, planId: string): void {
+  const state = loadState(repoRoot);
+  delete state.inbox[planId];
+  saveState(repoRoot, state);
 }

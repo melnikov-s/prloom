@@ -58,6 +58,8 @@ function getStatusColor(status: string): string {
       return "green";
     case "queued":
       return "yellow";
+    case "draft":
+      return "yellowBright";
     case "blocked":
       return "red";
     case "review":
@@ -77,6 +79,8 @@ function getStatusEmoji(status: string): string {
       return "🟢";
     case "queued":
       return "🟡";
+    case "draft":
+      return "📝";
     case "blocked":
       return "🔴";
     case "review":
@@ -215,17 +219,28 @@ function PlanHeader(): React.ReactElement {
 interface ActionDef {
   label: string;
   key: string;
-  ipcType?: "stop" | "unpause" | "poll" | "launch_poll" | "review";
+  ipcType?: "stop" | "unpause" | "poll" | "launch_poll" | "review" | "activate";
   command?: string;
   showFor?: (status: string) => boolean;
 }
 
 const ACTIONS: ActionDef[] = [
   {
+    label: "Activate",
+    key: "activate",
+    ipcType: "activate",
+    showFor: (status) => status === "draft",
+  },
+  {
     label: "Block",
     key: "block",
     ipcType: "stop",
-    showFor: (status) => status !== "blocked" && status !== "done" && status !== "reviewing",
+    showFor: (status) =>
+      status !== "blocked" &&
+      status !== "done" &&
+      status !== "reviewing" &&
+      status !== "draft" &&
+      status !== "queued",
   },
   {
     label: "Unblock",
@@ -243,7 +258,8 @@ const ACTIONS: ActionDef[] = [
     label: "Poll",
     key: "poll",
     ipcType: "poll",
-    showFor: (status) => status !== "reviewing",
+    showFor: (status) =>
+      status !== "reviewing" && status !== "draft" && status !== "queued",
   },
   {
     label: "Watch",
@@ -255,7 +271,7 @@ const ACTIONS: ActionDef[] = [
     label: "Logs",
     key: "logs",
     command: "logs",
-    showFor: () => true,
+    showFor: (status) => status !== "draft" && status !== "queued",
   },
 ];
 
@@ -400,8 +416,28 @@ export function InteractivePlanPanel({
   selectedActionIndex,
   isInActionMode,
 }: InteractivePlanPanelProps): React.ReactElement {
-  const planIds = Object.keys(uiState.state.plans);
-  const planCount = planIds.length;
+  // Combine inbox and active plans
+  const inboxEntries = Object.entries(uiState.state.inbox).map(
+    ([id, meta]) => ({
+      id,
+      type: "inbox" as const,
+      status: meta.status,
+      branch: id,
+      pr: undefined as number | undefined,
+    })
+  );
+
+  const activeEntries = Object.entries(uiState.state.plans).map(([id, ps]) => ({
+    id,
+    type: "active" as const,
+    status: ps.status,
+    branch: ps.branch,
+    pr: ps.pr,
+    ps,
+  }));
+
+  const allPlans = [...inboxEntries, ...activeEntries];
+  const planCount = allPlans.length;
 
   return (
     <Box flexDirection="column" flexGrow={1} borderStyle="single" paddingX={1}>
@@ -410,19 +446,22 @@ export function InteractivePlanPanel({
         <Text dimColor> [{planCount}]</Text>
       </Box>
       <Box marginTop={1} flexDirection="column">
-        {planIds.length === 0 ? (
-          <Text dimColor>(no active plans)</Text>
+        {allPlans.length === 0 ? (
+          <Text dimColor>(no plans)</Text>
         ) : (
           <>
             <Box marginBottom={1}>
               <PlanHeader />
             </Box>
-            {planIds.map((planId, idx) => {
-              const ps = uiState.state.plans[planId]!;
-              const todos = planTodos.get(planId) ?? { done: 0, total: 0 };
+            {allPlans.map((plan, idx) => {
+              const todos = planTodos.get(plan.id) ?? { done: 0, total: 0 };
               const isSelected = idx === selectedPlanIndex && !isInActionMode;
-              const isExpanded = planId === expandedPlanId;
-              const status = ps.status ?? "active";
+              const isExpanded = plan.id === expandedPlanId;
+              const status = plan.status;
+              const ps =
+                plan.type === "active"
+                  ? uiState.state.plans[plan.id]
+                  : undefined;
 
               // Get available actions for this plan's status
               const availableActions = ACTIONS.filter(
@@ -430,21 +469,21 @@ export function InteractivePlanPanel({
               );
 
               return (
-                <React.Fragment key={planId}>
+                <React.Fragment key={plan.id}>
                   <SelectablePlanRow
-                    id={planId}
-                    branch={ps.branch}
+                    id={plan.id}
+                    branch={plan.branch}
                     status={status}
-                    pr={ps.pr}
+                    pr={plan.pr}
                     repoUrl={uiState.repoUrl}
                     todosDone={todos.done}
                     todosTotal={todos.total}
-                    error={ps.lastError}
+                    error={ps?.lastError}
                     isSelected={isSelected || isExpanded}
                   />
                   {isExpanded && (
                     <ExpandedPlanView
-                      planId={planId}
+                      planId={plan.id}
                       status={status}
                       selectedActionIndex={selectedActionIndex}
                       availableActions={availableActions}

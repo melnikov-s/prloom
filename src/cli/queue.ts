@@ -1,7 +1,10 @@
-import { join } from "path";
 import { existsSync } from "fs";
-import { listInboxPlanIds, getInboxPath } from "../lib/state.js";
-import { parsePlan, setStatus } from "../lib/plan.js";
+import {
+  listInboxPlanIds,
+  getInboxPath,
+  getInboxMeta,
+  setInboxStatus,
+} from "../lib/state.js";
 import { resolvePlanId } from "../lib/resolver.js";
 import { promptSelection } from "../ui/Selection.js";
 
@@ -18,13 +21,12 @@ export async function runQueue(
     const inboxIds = listInboxPlanIds(repoRoot);
     const options = inboxIds
       .map((id) => {
-        const path = getInboxPath(repoRoot, id);
-        const plan = parsePlan(path);
+        const meta = getInboxMeta(repoRoot, id);
         return {
           id,
           label: id,
-          metadata: plan.frontmatter.status ?? "draft",
-          color: plan.frontmatter.status === "draft" ? "yellow" : "gray",
+          metadata: meta.status,
+          color: meta.status === "draft" ? "yellow" : "gray",
         };
       })
       .filter((opt) => opt.metadata === "draft");
@@ -45,19 +47,13 @@ export async function runQueue(
     process.exit(1);
   }
 
-  const plan = parsePlan(inboxPath);
+  const meta = getInboxMeta(repoRoot, planId);
 
-  if (plan.frontmatter.status === "queued") {
+  if (meta.status === "queued") {
     console.log(`Plan ${planId} is already queued.`);
     return;
   }
 
-  if (plan.frontmatter.status !== "draft") {
-    console.warn(
-      `Plan ${planId} has unexpected status: ${plan.frontmatter.status}`
-    );
-  }
-
-  setStatus(inboxPath, "queued");
+  setInboxStatus(repoRoot, planId, "queued");
   console.log(`✅ Queued ${planId} for dispatch.`);
 }

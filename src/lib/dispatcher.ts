@@ -1,6 +1,11 @@
 import { join } from "path";
 import { existsSync, statSync, readFileSync } from "fs";
-import { loadConfig, resolveWorktreesDir, getAgentConfig, type Config } from "./config.js";
+import {
+  loadConfig,
+  resolveWorktreesDir,
+  getAgentConfig,
+  type Config,
+} from "./config.js";
 import {
   loadState,
   saveState,
@@ -9,7 +14,8 @@ import {
   listInboxPlanIds,
   getInboxPath,
   deleteInboxPlan,
-  loadInboxMeta,
+  getInboxMeta,
+  deleteInboxMeta,
   type State,
   type PlanState,
 } from "./state.js";
@@ -206,13 +212,14 @@ export async function ingestInboxPlans(
 
     try {
       const plan = parsePlan(inboxPath);
-      const inboxMeta = loadInboxMeta(repoRoot, planId);
+      const inboxMeta = getInboxMeta(repoRoot, planId);
 
       // Trust the frontmatter ID for tracking
       const actualId = plan.frontmatter.id;
 
       // Skip drafts - designer is still working on them
-      if (plan.frontmatter.status === "draft") {
+      // Status is now tracked in state.inbox, not frontmatter
+      if (inboxMeta.status !== "queued") {
         continue;
       }
 
@@ -262,7 +269,10 @@ export async function ingestInboxPlans(
       const planForPR = parsePlan(worktreePlanPath);
       const prTitle = planForPR.title || actualId;
       log.info(`   Creating initial commit: [prloom] ${actualId}`);
-      await commitEmpty(worktreePath, `[prloom] ${actualId}\n\n${extractBody(planForPR)}`);
+      await commitEmpty(
+        worktreePath,
+        `[prloom] ${actualId}\n\n${extractBody(planForPR)}`
+      );
       log.info(`   Pushing branch to origin: ${branch}`);
       await push(worktreePath, branch);
 
@@ -293,9 +303,10 @@ export async function ingestInboxPlans(
         dispatcherEvents.setState(state);
       }
 
-      // Delete inbox plan (not archive)
+      // Delete inbox plan file and state entry
       log.info(`   Removing plan from inbox`);
       deleteInboxPlan(repoRoot, planId);
+      delete state.inbox[planId];
 
       log.success(`✅ Ingested ${actualId} → PR #${pr}`);
     } catch (error) {
@@ -532,7 +543,7 @@ export async function processActivePlans(
           const adapter = getAdapter(agentName);
 
           // Build tmux config if available and not explicitly disabled
-          const useTmux = (options.tmux !== false) && await hasTmux();
+          const useTmux = options.tmux !== false && (await hasTmux());
           const tmuxConfig = useTmux
             ? { sessionName: `prloom-${planId}` }
             : undefined;
@@ -748,7 +759,7 @@ async function runTriage(
   log.info(`   Using agent: ${triageConfig.agent}`, plan.frontmatter.id);
 
   // Build tmux config if available and not explicitly disabled
-  const useTmux = (options.tmux !== false) && await hasTmux();
+  const useTmux = options.tmux !== false && (await hasTmux());
   const tmuxConfig = useTmux
     ? { sessionName: `prloom-triage-${plan.frontmatter.id}` }
     : undefined;
@@ -760,7 +771,12 @@ async function runTriage(
     );
   }
 
-  await adapter.execute({ cwd: ps.worktree, prompt, tmux: tmuxConfig, model: triageConfig.model });
+  await adapter.execute({
+    cwd: ps.worktree,
+    prompt,
+    tmux: tmuxConfig,
+    model: triageConfig.model,
+  });
   log.info(`   Triage agent completed`, plan.frontmatter.id);
 
   // Read and process triage result
@@ -893,7 +909,10 @@ async function runReviewAgent(
   log: Logger
 ): Promise<void> {
   if (!ps.pr) {
-    log.error(`   Cannot review: no PR associated with plan`, plan.frontmatter.id);
+    log.error(
+      `   Cannot review: no PR associated with plan`,
+      plan.frontmatter.id
+    );
     return;
   }
 
@@ -920,7 +939,7 @@ async function runReviewAgent(
   log.info(`   Using agent: ${reviewerConfig.agent}`, plan.frontmatter.id);
 
   // Build tmux config if available and not explicitly disabled
-  const useTmux = (options.tmux !== false) && await hasTmux();
+  const useTmux = options.tmux !== false && (await hasTmux());
   const tmuxConfig = useTmux
     ? { sessionName: `prloom-review-${plan.frontmatter.id}` }
     : undefined;

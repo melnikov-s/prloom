@@ -5,9 +5,14 @@ import { existsSync } from "fs";
 import { execa } from "execa";
 import { App, getAvailableActions, type ActionDef } from "./App.js";
 import { dispatcherEvents, type DispatcherUIState } from "../lib/events.js";
-import { loadState } from "../lib/state.js";
+import {
+  loadState,
+  setInboxStatus,
+  listInboxPlanIds,
+  getInboxPath,
+} from "../lib/state.js";
 import { parsePlan } from "../lib/plan.js";
-import { enqueue } from "../lib/ipc.js";
+import { enqueue, type IpcCommand } from "../lib/ipc.js";
 
 interface TUIRunnerProps {
   repoRoot: string;
@@ -29,24 +34,39 @@ function TUIRunner({ repoRoot }: TUIRunnerProps): React.ReactElement {
   const [selectedActionIndex, setSelectedActionIndex] = useState(0);
   const [isInActionMode, setIsInActionMode] = useState(false);
 
-  // Get plan IDs for navigation
-  const planIds = Object.keys(uiState.state.plans);
-  const planCount = planIds.length;
+  // Get plan IDs for navigation (inbox + active)
+  const inboxIds = Object.keys(uiState.state.inbox);
+  const activeIds = Object.keys(uiState.state.plans);
+  const allPlanIds = [...inboxIds, ...activeIds];
+  const planCount = allPlanIds.length;
 
   // Get current plan info
-  const currentPlanId = planIds[selectedPlanIndex];
-  const currentPlan = currentPlanId
-    ? uiState.state.plans[currentPlanId]
-    : undefined;
-  const currentStatus = currentPlan?.status ?? "active";
+  const currentPlanId = allPlanIds[selectedPlanIndex];
+  const isCurrentInbox = currentPlanId
+    ? inboxIds.includes(currentPlanId)
+    : false;
+  const currentStatus = currentPlanId
+    ? isCurrentInbox
+      ? uiState.state.inbox[currentPlanId]?.status ?? "draft"
+      : uiState.state.plans[currentPlanId]?.status ?? "active"
+    : "active";
   const availableActions = getAvailableActions(currentStatus);
 
   // Execute an action for a plan
   const executeAction = useCallback(
     async (action: ActionDef, planId: string) => {
-      if (action.ipcType) {
-        // Send IPC command
-        enqueue(repoRoot, { type: action.ipcType, plan_id: planId });
+      if (action.key === "activate") {
+        // Handle activate action directly - set inbox status to queued
+        setInboxStatus(repoRoot, planId, "queued");
+        // Refresh state to update TUI
+        const newState = loadState(repoRoot);
+        dispatcherEvents.setState(newState);
+      } else if (action.ipcType) {
+        // Send IPC command (exclude activate since it's handled above)
+        enqueue(repoRoot, {
+          type: action.ipcType as IpcCommand["type"],
+          plan_id: planId,
+        });
       } else if (action.command) {
         // For watch/logs, we need to spawn a new process
         // Since we're in the TUI, we'll exit and run the command
@@ -97,18 +117,14 @@ function TUIRunner({ repoRoot }: TUIRunnerProps): React.ReactElement {
     } else {
       // In plan selection mode
       if (key.upArrow) {
-        setSelectedPlanIndex((prev) =>
-          prev > 0 ? prev - 1 : planCount - 1
-        );
+        setSelectedPlanIndex((prev) => (prev > 0 ? prev - 1 : planCount - 1));
         // If moving to a different plan while one is expanded, collapse it
         if (expandedPlanId) {
           setExpandedPlanId(null);
           setSelectedActionIndex(0);
         }
       } else if (key.downArrow) {
-        setSelectedPlanIndex((prev) =>
-          prev < planCount - 1 ? prev + 1 : 0
-        );
+        setSelectedPlanIndex((prev) => (prev < planCount - 1 ? prev + 1 : 0));
         // If moving to a different plan while one is expanded, collapse it
         if (expandedPlanId) {
           setExpandedPlanId(null);
@@ -116,7 +132,7 @@ function TUIRunner({ repoRoot }: TUIRunnerProps): React.ReactElement {
         }
       } else if (input === " ") {
         // Space - toggle expand/collapse
-        const planId = planIds[selectedPlanIndex];
+        const planId = allPlanIds[selectedPlanIndex];
         if (planId) {
           if (expandedPlanId === planId) {
             // Already expanded - collapse
@@ -168,12 +184,12 @@ function TUIRunner({ repoRoot }: TUIRunnerProps): React.ReactElement {
       setSelectedPlanIndex(planCount - 1);
     }
     // If expanded plan no longer exists, collapse
-    if (expandedPlanId && !planIds.includes(expandedPlanId)) {
+    if (expandedPlanId && !allPlanIds.includes(expandedPlanId)) {
       setExpandedPlanId(null);
       setIsInActionMode(false);
       setSelectedActionIndex(0);
     }
-  }, [planIds, planCount, selectedPlanIndex, expandedPlanId]);
+  }, [allPlanIds, planCount, selectedPlanIndex, expandedPlanId]);
 
   // Periodic refresh to update uptime (forces re-render for timer)
   useEffect(() => {

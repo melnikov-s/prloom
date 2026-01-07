@@ -1,6 +1,10 @@
 import { join } from "path";
-import { loadState, listInboxPlanIds, getInboxPath } from "../lib/state.js";
-import { parsePlan } from "../lib/plan.js";
+import {
+  loadState,
+  listInboxPlanIds,
+  getInboxPath,
+  getInboxMeta,
+} from "../lib/state.js";
 
 export async function runStatus(repoRoot: string): Promise<void> {
   const state = loadState(repoRoot);
@@ -15,9 +19,8 @@ export async function runStatus(repoRoot: string): Promise<void> {
   } else {
     for (const id of inboxPlanIds) {
       const inboxPath = getInboxPath(repoRoot, id);
-      const plan = parsePlan(inboxPath);
-      const status = plan.frontmatter.status;
-      console.log(`  ${id} [${status}]`);
+      const meta = getInboxMeta(repoRoot, id);
+      console.log(`  ${id} [${meta.status}]`);
       console.log(`    Path: ${inboxPath}`);
     }
   }

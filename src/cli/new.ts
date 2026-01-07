@@ -3,9 +3,9 @@ import { existsSync, writeFileSync, renameSync } from "fs";
 import { loadConfig, getAgentConfig } from "../lib/config.js";
 import { getAdapter, type AgentName } from "../lib/adapters/index.js";
 import { nanoid } from "nanoid";
-import { generatePlanSkeleton, setStatus, parsePlan } from "../lib/plan.js";
+import { generatePlanSkeleton, parsePlan } from "../lib/plan.js";
 import { renderDesignerNewPrompt } from "../lib/template.js";
-import { ensureInboxDir, getInboxPath } from "../lib/state.js";
+import { ensureInboxDir, getInboxPath, setInboxStatus } from "../lib/state.js";
 import { getCurrentBranch, ensureRemoteBranchExists } from "../lib/git.js";
 import { confirm } from "./prompt.js";
 
@@ -55,13 +55,28 @@ export async function runNew(
     process.exit(1);
   }
 
-  // Create plan skeleton with deterministic frontmatter (status: draft)
+  // Create plan skeleton with deterministic frontmatter
   const skeleton = generatePlanSkeleton(id, baseBranch);
   writeFileSync(planPath, skeleton);
+
+  // Save inbox status as draft in state
+  setInboxStatus(repoRoot, id, "draft");
 
   console.log(`Created plan in inbox: ${planPath}`);
   console.log(`Base branch: ${baseBranch}`);
   console.log(`Worker agent: ${workerAgent}`);
+
+  // Verify placement prompt
+  console.log("");
+  console.log("📍 Verify plan placement:");
+  console.log(`   Plan: ${planPath}`);
+  const placementOk = await confirm("Is this location correct?");
+  if (!placementOk) {
+    console.log(
+      "Exiting. Please move the plan file and use 'prloom edit' to continue."
+    );
+    process.exit(0);
+  }
 
   // Skip designer session if --no-designer flag is used
   if (noDesigner) {
@@ -82,7 +97,11 @@ export async function runNew(
     baseBranch,
     workerAgent
   );
-  await adapter.interactive({ cwd: repoRoot, prompt, model: model ?? designerConfig.model });
+  await adapter.interactive({
+    cwd: repoRoot,
+    prompt,
+    model: model ?? designerConfig.model,
+  });
 
   console.log("");
   console.log("Designer session ended.");
@@ -107,7 +126,7 @@ export async function runNew(
   // Prompt to queue the plan
   const shouldQueue = await confirm("Queue this plan for the dispatcher?");
   if (shouldQueue) {
-    setStatus(currentPlanPath, "queued");
+    setInboxStatus(repoRoot, id, "queued");
     console.log("Plan queued. Run 'prloom start' to dispatch.");
   } else {
     console.log("Plan left as draft. Use 'prloom edit' to continue later.");

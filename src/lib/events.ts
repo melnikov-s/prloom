@@ -20,7 +20,7 @@ class DispatcherEvents extends EventEmitter {
   private events: DispatcherEvent[] = [];
   private maxEvents = 100;
   private startedAt: Date = new Date();
-  private currentState: State = { control_cursor: 0, plans: {} };
+  private currentState: State = { control_cursor: 0, plans: {}, inbox: {} };
   private repoUrl?: string;
 
   start(): void {

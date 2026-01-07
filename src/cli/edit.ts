@@ -3,8 +3,14 @@ import { existsSync, readFileSync } from "fs";
 import { loadConfig } from "../lib/config.js";
 import { getAdapter, type AgentName } from "../lib/adapters/index.js";
 import { renderDesignerEditPrompt } from "../lib/template.js";
-import { listInboxPlanIds, loadState, getInboxPath } from "../lib/state.js";
-import { parsePlan, setStatus } from "../lib/plan.js";
+import {
+  listInboxPlanIds,
+  loadState,
+  getInboxPath,
+  getInboxMeta,
+  setInboxStatus,
+} from "../lib/state.js";
+import { parsePlan } from "../lib/plan.js";
 import { resolvePlanId } from "../lib/resolver.js";
 import { promptSelection } from "../ui/Selection.js";
 import { confirm } from "./prompt.js";
@@ -25,13 +31,12 @@ export async function runEdit(
     const state = loadState(repoRoot);
 
     const inboxOptions = inboxIds.map((id) => {
-      const path = getInboxPath(repoRoot, id);
-      const plan = parsePlan(path);
+      const meta = getInboxMeta(repoRoot, id);
       return {
         id,
         label: id,
-        metadata: `inbox [${plan.frontmatter.status ?? "draft"}]`,
-        color: plan.frontmatter.status === "draft" ? "yellow" : "gray",
+        metadata: `inbox [${meta.status}]`,
+        color: meta.status === "draft" ? "yellow" : "gray",
       };
     });
 
@@ -114,11 +119,11 @@ export async function runEdit(
 
   // For inbox plans: check if still draft and prompt to queue
   if (isInbox) {
-    const plan = parsePlan(planPath);
-    if (plan.frontmatter.status === "draft") {
+    const meta = getInboxMeta(repoRoot, planId);
+    if (meta.status === "draft") {
       const shouldQueue = await confirm("Queue this plan for the dispatcher?");
       if (shouldQueue) {
-        setStatus(planPath, "queued");
+        setInboxStatus(repoRoot, planId, "queued");
         console.log("Plan queued. Run 'prloom start' to dispatch.");
       } else {
         console.log("Plan left as draft.");
