@@ -10,15 +10,10 @@ export const manualAdapter: AgentAdapter = {
   name: "manual",
 
   async execute({ cwd, prompt, tmux }): Promise<ExecutionResult> {
-    console.log(
-      "⚠️  Manual agent: execute() called but should be skipped by dispatcher."
-    );
-    console.log("   This plan is intended for IDE-driven execution.");
     return { exitCode: 0 };
   },
 
   async interactive({ cwd, prompt, model }): Promise<void> {
-    console.log("ℹ️  Manual agent mode: No interactive session to launch.");
-    console.log("   Use your IDE (Cursor, Anti-Gravity) to work on this plan.");
+    // No-op
   },
 };

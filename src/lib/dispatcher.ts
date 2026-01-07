@@ -145,7 +145,7 @@ export async function runDispatcher(
       state.control_cursor = newCursor;
 
       for (const cmd of commands) {
-        await handleCommand(state, cmd);
+        handleCommand(state, cmd, log);
       }
 
       // 2. Ingest inbox plans
@@ -196,17 +196,17 @@ export async function ingestInboxPlans(
 
       // Skip ingestion if no TODOs found - prevents immediate completion loop
       if (plan.todos.length === 0) {
-        console.error(
+        log.error(
           `⚠️ Plan ${actualId} has zero TODO items, skipping ingestion. Please add at least one task.`
         );
         continue;
       }
 
-      console.log(`📥 Ingesting inbox plan: ${actualId} (from ${planId}.md)`);
+      log.info(`📥 Ingesting inbox plan: ${actualId} (from ${planId}.md)`);
 
       // Determine base branch for this plan
       const baseBranch = plan.frontmatter.base_branch ?? config.base_branch;
-      console.log(`   Base branch: ${baseBranch}`);
+      log.info(`   Base branch: ${baseBranch}`);
 
       // Create branch and worktree
       const branchBase =
@@ -215,29 +215,29 @@ export async function ingestInboxPlans(
           : actualId;
 
       const branch = await createBranchName(branchBase);
-      console.log(`   Creating branch: ${branch}`);
+      log.info(`   Creating branch: ${branch}`);
       const worktreePath = await createWorktree(
         repoRoot,
         worktreesDir,
         branch,
         baseBranch
       );
-      console.log(`   Created worktree: ${worktreePath}`);
+      log.info(`   Created worktree: ${worktreePath}`);
       const planRelpath = `prloom/plans/${actualId}.md`;
 
       // Copy plan to worktree
-      console.log(`   Copying plan to worktree: ${planRelpath}`);
+      log.info(`   Copying plan to worktree: ${planRelpath}`);
       copyFileToWorktree(inboxPath, worktreePath, planRelpath);
 
       // Commit and push
       const worktreePlanPath = join(worktreePath, planRelpath);
-      console.log(`   Committing: [prloom] ${actualId}: initial plan`);
+      log.info(`   Committing: [prloom] ${actualId}: initial plan`);
       await commitAll(worktreePath, `[prloom] ${actualId}: initial plan`);
-      console.log(`   Pushing branch to origin: ${branch}`);
+      log.info(`   Pushing branch to origin: ${branch}`);
       await push(worktreePath, branch);
 
       // Create draft PR
-      console.log(`   Creating draft PR...`);
+      log.info(`   Creating draft PR...`);
       const updatedPlan = parsePlan(worktreePlanPath);
       const prTitle = updatedPlan.title || actualId;
       const pr = await createDraftPR(
@@ -247,7 +247,7 @@ export async function ingestInboxPlans(
         prTitle,
         extractBody(updatedPlan)
       );
-      console.log(`   Created draft PR #${pr}`);
+      log.info(`   Created draft PR #${pr}`);
 
       // Store in state with active status
       state.plans[actualId] = {
@@ -260,14 +260,15 @@ export async function ingestInboxPlans(
       };
 
       // Delete inbox plan (not archive)
-      console.log(`   Removing plan from inbox`);
+      log.info(`   Removing plan from inbox`);
       deleteInboxPlan(repoRoot, planId);
 
-      console.log(`✅ Ingested ${actualId} → PR #${pr}`);
+      log.success(`✅ Ingested ${actualId} → PR #${pr}`);
     } catch (error) {
-      console.error(
-        `❌ Failed to ingest plan ${planId}:`,
-        error instanceof Error ? error.message : error
+      log.error(
+        `❌ Failed to ingest plan ${planId}: ${
+          error instanceof Error ? error.message : error
+        }`
       );
     }
   }
@@ -311,7 +312,7 @@ export async function processActivePlans(
       const planPath = join(ps.worktree, ps.planRelpath);
 
       if (!existsSync(planPath)) {
-        console.warn(`Plan file not found: ${planPath}`);
+        log.warn(`Plan file not found: ${planPath}`, planId);
         continue;
       }
 
@@ -319,8 +320,9 @@ export async function processActivePlans(
       if (ps.pr) {
         const prState = await getPRState(repoRoot, ps.pr);
         if (prState === "merged" || prState === "closed") {
-          console.log(
-            `PR #${ps.pr} ${prState}, removing ${planId} from active`
+          log.info(
+            `PR #${ps.pr} ${prState}, removing ${planId} from active`,
+            planId
           );
           delete state.plans[planId];
           continue;
@@ -353,11 +355,22 @@ export async function processActivePlans(
           const newFeedback = await pollNewFeedback(repoRoot, ps, botLogin);
 
           if (newFeedback.length > 0) {
-            console.log(`💬 ${newFeedback.length} new feedback for ${planId}`);
+            log.info(
+              `💬 ${newFeedback.length} new feedback for ${planId}`,
+              planId
+            );
 
             // Skip automated triage for manual agent plans
             if (!isManualAgent) {
-              await runTriage(repoRoot, config, ps, plan, newFeedback, options);
+              await runTriage(
+                repoRoot,
+                config,
+                ps,
+                plan,
+                newFeedback,
+                options,
+                log
+              );
             }
 
             // Re-parse plan after triage may have modified it
@@ -386,7 +399,10 @@ export async function processActivePlans(
 
       // If we find unchecked TODOs but status is review/done, flip back to active
       if (nextTodo && (ps.status === "review" || ps.status === "done")) {
-        console.log(`🔄 New TODOs found, flipping ${planId} back to active`);
+        log.info(
+          `🔄 New TODOs found, flipping ${planId} back to active`,
+          planId
+        );
         ps.status = "active";
       }
 
@@ -396,10 +412,11 @@ export async function processActivePlans(
         if (todo) {
           // If the task is explicitly marked as blocked, stop here
           if (todo.blocked) {
-            console.error(
+            log.error(
               `❌ Plan ${planId} is blocked by task #${todo.index + 1}: ${
                 todo.text
-              }`
+              }`,
+              planId
             );
             ps.status = "blocked";
             ps.lastError = `Blocked by task #${todo.index + 1}: ${todo.text}`;
@@ -410,17 +427,19 @@ export async function processActivePlans(
           const MAX_TODO_RETRIES = 3;
           if (ps.lastTodoIndex === todo.index) {
             ps.todoRetryCount = (ps.todoRetryCount ?? 0) + 1;
-            console.log(
+            log.info(
               `   [retry ${ps.todoRetryCount}/${MAX_TODO_RETRIES} for TODO #${
                 todo.index + 1
-              }]`
+              }]`,
+              planId
             );
 
             if (ps.todoRetryCount >= MAX_TODO_RETRIES) {
-              console.error(
+              log.error(
                 `❌ TODO #${
                   todo.index + 1
-                } failed ${MAX_TODO_RETRIES} times, blocking plan`
+                } failed ${MAX_TODO_RETRIES} times, blocking plan`,
+                planId
               );
 
               // Show the worker log from previous attempts
@@ -430,18 +449,21 @@ export async function processActivePlans(
                 "worker.log"
               );
               if (existsSync(workerLogPath)) {
-                console.error(`   Log file: ${workerLogPath}`);
-                const log = readFileSync(workerLogPath, "utf-8");
-                const lines = log.trim().split("\n").slice(-30);
-                console.error(`   Last 30 lines of worker log:`);
+                log.error(`   Log file: ${workerLogPath}`, planId);
+                const workerLogContent = readFileSync(workerLogPath, "utf-8");
+                const lines = workerLogContent.trim().split("\n").slice(-30);
+                log.error(`   Last 30 lines of worker log:`, planId);
                 for (const line of lines) {
-                  console.error(`     ${line}`);
+                  log.error(`     ${line}`, planId);
                 }
               } else {
-                console.error(`   No worker log found at: ${workerLogPath}`);
+                log.error(
+                  `   No worker log found at: ${workerLogPath}`,
+                  planId
+                );
               }
 
-              console.log(`   Setting plan status to: blocked`);
+              log.info(`   Setting plan status to: blocked`, planId);
               ps.status = "blocked";
               ps.lastError = `TODO #${
                 todo.index + 1
@@ -455,8 +477,9 @@ export async function processActivePlans(
             ps.todoRetryCount = 0;
           }
 
-          console.log(
-            `🔧 Running TODO #${todo.index + 1} for ${planId}: ${todo.text}`
+          log.info(
+            `🔧 Running TODO #${todo.index + 1} for ${planId}: ${todo.text}`,
+            planId
           );
 
           const prompt = renderWorkerPrompt(repoRoot, plan, todo);
@@ -477,12 +500,16 @@ export async function processActivePlans(
           // Store session identifiers for tracking
           if (execResult.tmuxSession) {
             ps.tmuxSession = execResult.tmuxSession;
-            console.log(
-              `   [spawned in tmux session: ${execResult.tmuxSession}]`
+            log.info(
+              `   [spawned in tmux session: ${execResult.tmuxSession}]`,
+              planId
             );
           } else if (execResult.pid) {
             ps.pid = execResult.pid;
-            console.log(`   [spawned detached process: ${execResult.pid}]`);
+            log.info(
+              `   [spawned detached process: ${execResult.pid}]`,
+              planId
+            );
           }
 
           // Poll for completion
@@ -490,20 +517,22 @@ export async function processActivePlans(
             await waitForTmuxSession(execResult.tmuxSession);
             const tmuxResult = readExecutionResult(execResult.tmuxSession);
             if (tmuxResult.exitCode !== 0) {
-              console.warn(
-                `   ⚠️ Worker exited with code ${tmuxResult.exitCode}`
+              log.warn(
+                `   ⚠️ Worker exited with code ${tmuxResult.exitCode}`,
+                planId
               );
             }
           } else if (execResult.pid) {
             await waitForProcess(execResult.pid);
-            console.log(`   Process ${execResult.pid} completed`);
+            log.info(`   Process ${execResult.pid} completed`, planId);
           } else if (
             execResult.exitCode !== undefined &&
             execResult.exitCode !== 0
           ) {
             // Synchronous execution with error (e.g., failed to spawn)
-            console.warn(
-              `   ⚠️ Worker exited with code ${execResult.exitCode}`
+            log.warn(
+              `   ⚠️ Worker exited with code ${execResult.exitCode}`,
+              planId
             );
           }
 
@@ -516,23 +545,24 @@ export async function processActivePlans(
           const updatedTodo = updatedPlan.todos[todo.index];
 
           if (!updatedTodo?.done) {
-            console.warn(
-              `   ⚠️ TODO #${todo.index + 1} was NOT marked complete by worker`
+            log.warn(
+              `   ⚠️ TODO #${todo.index + 1} was NOT marked complete by worker`,
+              planId
             );
-            console.warn(`   Exit code: ${execResult.exitCode}`);
+            log.warn(`   Exit code: ${execResult.exitCode}`, planId);
 
             // Show log file location and content
             const logPath = join("/tmp", `prloom-${planId}`, "worker.log");
             if (existsSync(logPath)) {
-              console.warn(`   Log file: ${logPath}`);
-              const log = readFileSync(logPath, "utf-8");
-              const lines = log.trim().split("\n").slice(-30);
-              console.warn(`   Last 30 lines of worker log:`);
+              log.warn(`   Log file: ${logPath}`, planId);
+              const workerLogContent = readFileSync(logPath, "utf-8");
+              const lines = workerLogContent.trim().split("\n").slice(-30);
+              log.warn(`   Last 30 lines of worker log:`, planId);
               for (const line of lines) {
-                console.warn(`     ${line}`);
+                log.warn(`     ${line}`, planId);
               }
             } else {
-              console.warn(`   No worker log found at: ${logPath}`);
+              log.warn(`   No worker log found at: ${logPath}`, planId);
             }
 
             // Don't commit/push, let retry logic handle it on next iteration
@@ -542,27 +572,27 @@ export async function processActivePlans(
           // TODO was completed - reset retry tracking
           ps.lastTodoIndex = undefined;
           ps.todoRetryCount = undefined;
-          console.log(`   ✓ TODO #${todo.index + 1} marked complete`);
+          log.success(`   ✓ TODO #${todo.index + 1} marked complete`, planId);
 
           // Commit and push
-          console.log(`   Committing: ${todo.text}`);
+          log.info(`   Committing: ${todo.text}`, planId);
           const committed = await commitAll(ps.worktree, todo.text);
           if (committed) {
-            console.log(`   Pushing to origin: ${ps.branch}`);
+            log.info(`   Pushing to origin: ${ps.branch}`, planId);
             await push(ps.worktree, ps.branch);
           } else {
-            console.log(`   No changes to commit`);
+            log.info(`   No changes to commit`, planId);
           }
 
           // Re-parse and check status
           const updated = parsePlan(planPath);
           if (ps.pr) {
-            console.log(`   Updating PR #${ps.pr} body`);
+            log.info(`   Updating PR #${ps.pr} body`, planId);
             await updatePRBody(repoRoot, ps.pr, extractBody(updated));
           }
 
           if (updated.frontmatter.status === "blocked") {
-            console.log(`⚠️ Plan ${planId} is blocked`);
+            log.warn(`⚠️ Plan ${planId} is blocked`, planId);
             ps.lastError = "Worker set status to blocked";
           }
 
@@ -570,46 +600,48 @@ export async function processActivePlans(
           const remainingTodo = findNextUnchecked(updated);
           if (!remainingTodo) {
             if (updated.todos.length === 0) {
-              console.error(
-                `❌ Plan ${planId} has zero TODO items, blocking it.`
+              log.error(
+                `❌ Plan ${planId} has zero TODO items, blocking it.`,
+                planId
               );
               ps.status = "blocked";
               ps.lastError = "Plan has zero TODO items. Please add tasks.";
               continue;
             }
 
-            console.log(`🎉 All TODOs complete for ${planId}`);
-            console.log(`   Setting plan status to: review`);
+            log.success(`🎉 All TODOs complete for ${planId}`, planId);
+            log.info(`   Setting plan status to: review`, planId);
             ps.status = "review";
             if (ps.pr) {
-              console.log(`   Marking PR #${ps.pr} as ready for review`);
+              log.info(`   Marking PR #${ps.pr} as ready for review`, planId);
               await markPRReady(repoRoot, ps.pr);
             }
-            console.log(`✅ Plan ${planId} complete, PR marked ready`);
+            log.success(`✅ Plan ${planId} complete, PR marked ready`, planId);
           }
         } else {
           // All TODOs done
           if (plan.todos.length === 0) {
-            console.error(
-              `❌ Plan ${planId} has zero TODO items, blocking it.`
+            log.error(
+              `❌ Plan ${planId} has zero TODO items, blocking it.`,
+              planId
             );
             ps.status = "blocked";
             ps.lastError = "Plan has zero TODO items. Please add tasks.";
             continue;
           }
 
-          console.log(`🎉 All TODOs complete for ${planId}`);
-          console.log(`   Setting plan status to: review`);
+          log.success(`🎉 All TODOs complete for ${planId}`, planId);
+          log.info(`   Setting plan status to: review`, planId);
           ps.status = "review";
           if (ps.pr) {
-            console.log(`   Marking PR #${ps.pr} as ready for review`);
+            log.info(`   Marking PR #${ps.pr} as ready for review`, planId);
             await markPRReady(repoRoot, ps.pr);
           }
-          console.log(`✅ Plan ${planId} complete, PR marked ready`);
+          log.success(`✅ Plan ${planId} complete, PR marked ready`, planId);
         }
       }
     } catch (error) {
-      console.error(`Error processing ${planId}:`, error);
+      log.error(`Error processing ${planId}: ${error}`, planId);
       ps.lastError = String(error);
     }
   }
@@ -644,7 +676,8 @@ async function runTriage(
   ps: PlanState,
   plan: ReturnType<typeof parsePlan>,
   feedback: PRFeedback[],
-  options: DispatcherOptions = {}
+  options: DispatcherOptions = {},
+  log: Logger
 ): Promise<void> {
   // Ensure .prloom directory exists in worktree
   ensureWorktreePrloomDir(ps.worktree);
@@ -653,8 +686,11 @@ async function runTriage(
   const adapter = getAdapter(triageAgent);
   const prompt = renderTriagePrompt(repoRoot, plan, feedback);
 
-  console.log(`🔍 Running triage for ${plan.frontmatter.id}...`);
-  console.log(`   Using agent: ${triageAgent}`);
+  log.info(
+    `🔍 Running triage for ${plan.frontmatter.id}...`,
+    plan.frontmatter.id
+  );
+  log.info(`   Using agent: ${triageAgent}`, plan.frontmatter.id);
 
   // Build tmux config if enabled
   const tmuxConfig = options.tmux
@@ -662,11 +698,14 @@ async function runTriage(
     : undefined;
 
   if (tmuxConfig) {
-    console.log(`   Spawning in tmux session: ${tmuxConfig.sessionName}`);
+    log.info(
+      `   Spawning in tmux session: ${tmuxConfig.sessionName}`,
+      plan.frontmatter.id
+    );
   }
 
   await adapter.execute({ cwd: ps.worktree, prompt, tmux: tmuxConfig });
-  console.log(`   Triage agent completed`);
+  log.info(`   Triage agent completed`, plan.frontmatter.id);
 
   // Read and process triage result
   try {
@@ -674,18 +713,27 @@ async function runTriage(
 
     // Handle rebase request
     if (result.rebase_requested) {
-      console.log(`  Rebase requested, rebasing on ${ps.baseBranch}...`);
+      log.info(
+        `  Rebase requested, rebasing on ${ps.baseBranch}...`,
+        plan.frontmatter.id
+      );
       const rebaseResult = await rebaseOnBaseBranch(ps.worktree, ps.baseBranch);
 
       if (rebaseResult.hasConflicts) {
-        console.log(`   Rebase conflict detected, blocking plan`);
-        console.log(`   Setting plan status to: blocked`);
+        log.warn(
+          `   Rebase conflict detected, blocking plan`,
+          plan.frontmatter.id
+        );
+        log.info(`   Setting plan status to: blocked`, plan.frontmatter.id);
         ps.status = "blocked";
         ps.lastError = `Rebase conflict: ${rebaseResult.conflictFiles?.join(
           ", "
         )}`;
 
-        console.log(`   Posting rebase conflict comment to PR #${ps.pr}`);
+        log.info(
+          `   Posting rebase conflict comment to PR #${ps.pr}`,
+          plan.frontmatter.id
+        );
         await postPRComment(
           repoRoot,
           ps.pr!,
@@ -728,36 +776,45 @@ ${rebaseResult.conflictFiles?.join("\n")}
 The plan is now **blocked** until conflicts are resolved.`
         );
       } else if (rebaseResult.success) {
-        console.log(`   Force pushing rebased branch: ${ps.branch}`);
+        log.info(
+          `   Force pushing rebased branch: ${ps.branch}`,
+          plan.frontmatter.id
+        );
         await forcePush(ps.worktree, ps.branch);
-        console.log(`   Rebased and force-pushed`);
+        log.success(`   Rebased and force-pushed`, plan.frontmatter.id);
       }
     }
 
     // Post triage reply
-    console.log(`   Posting triage reply to PR #${ps.pr}`);
+    log.info(`   Posting triage reply to PR #${ps.pr}`, plan.frontmatter.id);
     await postPRComment(repoRoot, ps.pr!, result.reply_markdown);
-    console.log(`   Posted triage reply`);
+    log.success(`   Posted triage reply`, plan.frontmatter.id);
 
     // Commit any changes from triage
-    console.log(`   Committing: [prloom] ${plan.frontmatter.id}: triage`);
+    log.info(
+      `   Committing: [prloom] ${plan.frontmatter.id}: triage`,
+      plan.frontmatter.id
+    );
     const committed = await commitAll(
       ps.worktree,
       `[prloom] ${plan.frontmatter.id}: triage`
     );
     if (committed) {
-      console.log(`   Pushing to origin: ${ps.branch}`);
+      log.info(`   Pushing to origin: ${ps.branch}`, plan.frontmatter.id);
       await push(ps.worktree, ps.branch);
     } else {
-      console.log(`   No changes to commit from triage`);
+      log.info(`   No changes to commit from triage`, plan.frontmatter.id);
     }
   } catch (error) {
-    console.error(`   Triage failed:`, error);
-    console.log(`   Setting plan status to: blocked`);
+    log.error(`   Triage failed: ${error}`, plan.frontmatter.id);
+    log.info(`   Setting plan status to: blocked`, plan.frontmatter.id);
     ps.status = "blocked";
     ps.lastError = `Triage failed: ${error}`;
 
-    console.log(`   Posting triage error comment to PR #${ps.pr}`);
+    log.info(
+      `   Posting triage error comment to PR #${ps.pr}`,
+      plan.frontmatter.id
+    );
     await postPRComment(
       repoRoot,
       ps.pr!,
@@ -766,34 +823,35 @@ The plan is now **blocked** until conflicts are resolved.`
   }
 }
 
-function handleCommand(state: State, cmd: IpcCommand): void {
+function handleCommand(state: State, cmd: IpcCommand, log: Logger): void {
   const ps = state.plans[cmd.plan_id];
   if (!ps) return;
 
   if (cmd.type === "stop") {
     // Block the plan
-    console.log(`⏹️ Stopping ${cmd.plan_id}`);
-    console.log(`   Setting plan status to: blocked`);
+    log.info(`⏹️ Stopping ${cmd.plan_id}`, cmd.plan_id);
+    log.info(`   Setting plan status to: blocked`, cmd.plan_id);
     ps.status = "blocked";
-    console.log(`   Plan blocked`);
+    log.success(`   Plan blocked`, cmd.plan_id);
   } else if (cmd.type === "unpause") {
     // Unblock the plan
-    console.log(`▶️ Unpausing ${cmd.plan_id}`);
-    console.log(`   Setting plan status to: active`);
+    log.info(`▶️ Unpausing ${cmd.plan_id}`, cmd.plan_id);
+    log.info(`   Setting plan status to: active`, cmd.plan_id);
     ps.status = "active";
     // Reset retry counter when unblocking
     ps.lastTodoIndex = undefined;
     ps.todoRetryCount = undefined;
-    console.log(`   Plan unblocked, retry counter reset`);
+    log.success(`   Plan unblocked, retry counter reset`, cmd.plan_id);
   } else if (cmd.type === "poll") {
     // Force a single immediate feedback poll without shifting schedule
     ps.pollOnce = true;
-    console.log(`🔄 Poll once scheduled for ${cmd.plan_id}`);
+    log.info(`🔄 Poll once scheduled for ${cmd.plan_id}`, cmd.plan_id);
   } else if (cmd.type === "launch_poll") {
     // Force immediate feedback poll AND reset schedule (poll timestamp)
     ps.lastPolledAt = undefined;
-    console.log(
-      `🔄 Launching immediate poll (reset schedule) for ${cmd.plan_id}`
+    log.info(
+      `🔄 Launching immediate poll (reset schedule) for ${cmd.plan_id}`,
+      cmd.plan_id
     );
   }
 }

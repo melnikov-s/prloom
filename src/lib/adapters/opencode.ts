@@ -23,10 +23,8 @@ export const opencodeAdapter: AgentAdapter = {
       );
 
       if (!existsSync(promptFile)) {
-        console.error(`   ❌ Failed to write prompt file: ${promptFile}`);
         return { exitCode: 1 };
       }
-      console.log(`   📝 Prompt file: ${promptFile}`);
 
       const wrappedCmd = `opencode run "$(cat '${promptFile}')" 2>&1 | tee "${logFile}"; echo $? > "${exitCodeFile}"`;
 
@@ -47,7 +45,6 @@ export const opencodeAdapter: AgentAdapter = {
       );
 
       if (tmuxResult.exitCode !== 0) {
-        console.error(`   ❌ tmux failed to start: ${tmuxResult.stderr}`);
         return { exitCode: tmuxResult.exitCode ?? 1 };
       }
 

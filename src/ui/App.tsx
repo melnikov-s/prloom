@@ -225,14 +225,15 @@ function getEventColor(type: DispatcherEvent["type"]): string {
 
 export function ActivityPanel({
   events,
-  maxLines = 20,
+  maxLines = 15,
 }: ActivityPanelProps): React.ReactElement {
-  const displayEvents = events.slice(0, maxLines);
+  // Take last N events and show newest at bottom
+  const displayEvents = [...events.slice(0, maxLines)].reverse();
 
   return (
     <Box
       flexDirection="column"
-      width={40}
+      flexGrow={1}
       borderStyle="single"
       borderColor="gray"
       paddingX={1}
@@ -252,12 +253,12 @@ export function ActivityPanel({
             const color = getEventColor(event.type);
 
             return (
-              <Text key={idx} wrap="truncate">
+              <Box key={idx}>
                 <Text dimColor>{time}</Text>
                 <Text> </Text>
                 <Text color={color}>{prefix}</Text>
-                <Text> {event.message.slice(0, 25)}</Text>
-              </Text>
+                <Text> {event.message}</Text>
+              </Box>
             );
           })
         )}
@@ -311,13 +312,13 @@ export function App({ uiState, planTodos }: AppProps): React.ReactElement {
   return (
     <Box flexDirection="column">
       <Header startedAt={uiState.startedAt} />
-      <Box>
+      <Box flexDirection="column">
+        <ActivityPanel events={uiState.events} />
         <PlanPanel
           uiState={uiState}
           selectedIndex={selectedIndex}
           planTodos={planTodos}
         />
-        <ActivityPanel events={uiState.events} />
       </Box>
       {plansWithErrors.map(([planId, ps]) => (
         <ErrorPanel key={planId} planId={planId} error={ps.lastError!} />
