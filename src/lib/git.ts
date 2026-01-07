@@ -39,20 +39,6 @@ export async function getGitHubRepoUrl(
   }
 }
 
-export async function branchExists(
-  repoRoot: string,
-  planId: string
-): Promise<boolean> {
-  try {
-    const { stdout } = await execa("git", ["branch", "--list", `${planId}-*`], {
-      cwd: repoRoot,
-    });
-    return stdout.trim().length > 0;
-  } catch {
-    return false;
-  }
-}
-
 export async function createBranchName(baseName: string): Promise<string> {
   // Ensure the baseName is branch-safe (very basic slugify)
   const safeName = baseName
