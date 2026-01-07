@@ -255,23 +255,11 @@ const ACTIONS: ActionDef[] = [
     showFor: (status) => status === "review",
   },
   {
-    label: "Poll",
+    label: "Refresh PR",
     key: "poll",
     ipcType: "poll",
     showFor: (status) =>
       status !== "reviewing" && status !== "draft" && status !== "queued",
-  },
-  {
-    label: "Watch",
-    key: "watch",
-    command: "watch",
-    showFor: (status) => status === "active" || status === "reviewing",
-  },
-  {
-    label: "Logs",
-    key: "logs",
-    command: "logs",
-    showFor: (status) => status !== "draft" && status !== "queued",
   },
 ];
 
