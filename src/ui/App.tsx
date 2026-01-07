@@ -489,7 +489,6 @@ export function InteractivePlanPanel({
 
 interface ActivityPanelProps {
   events: DispatcherEvent[];
-  maxLines?: number;
 }
 
 function getEventPrefix(type: DispatcherEvent["type"]): string {
@@ -520,10 +519,9 @@ function getEventColor(type: DispatcherEvent["type"]): string {
 
 export function ActivityPanel({
   events,
-  maxLines = 10,
 }: ActivityPanelProps): React.ReactElement {
-  // Take last N events and show newest at bottom
-  const displayEvents = [...events.slice(0, maxLines)].reverse();
+  // Show all events with newest at bottom
+  const displayEvents = [...events].reverse();
 
   return (
     <Box
