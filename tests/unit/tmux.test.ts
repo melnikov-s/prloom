@@ -1,10 +1,11 @@
 import { test, expect, beforeEach, afterEach } from "bun:test";
-import { mkdirSync, rmSync, existsSync, readFileSync } from "fs";
+import { mkdirSync, rmSync, existsSync, readFileSync, writeFileSync } from "fs";
 import { join } from "path";
 import {
   prepareLogFiles,
   getWorkerLogPaths,
   readExecutionResult,
+  waitForExitCodeFile,
 } from "../../src/lib/adapters/tmux.js";
 
 const TEST_SESSION = "prloom-test-plan-123";
@@ -70,4 +71,37 @@ test("readExecutionResult reads exit code from file", () => {
 
   const result = readExecutionResult(TEST_SESSION);
   expect(result.exitCode).toBe(42);
+});
+
+test("waitForExitCodeFile resolves when exit code file exists", async () => {
+  const { localDir, exitCodeFile } = getWorkerLogPaths(TEST_SESSION);
+  mkdirSync(localDir, { recursive: true });
+
+  // Create exit code file immediately
+  writeFileSync(exitCodeFile, "0");
+
+  // Should resolve immediately
+  const start = Date.now();
+  await waitForExitCodeFile(TEST_SESSION);
+  const elapsed = Date.now() - start;
+
+  expect(elapsed).toBeLessThan(100); // Should be nearly instant
+});
+
+test("waitForExitCodeFile waits for exit code file to appear", async () => {
+  const { localDir, exitCodeFile } = getWorkerLogPaths(TEST_SESSION);
+  mkdirSync(localDir, { recursive: true });
+
+  // Create file after a delay
+  setTimeout(() => {
+    writeFileSync(exitCodeFile, "0");
+  }, 500);
+
+  const start = Date.now();
+  await waitForExitCodeFile(TEST_SESSION);
+  const elapsed = Date.now() - start;
+
+  // Should wait at least 500ms but not much longer than 1.5s (1s poll interval + buffer)
+  expect(elapsed).toBeGreaterThanOrEqual(400);
+  expect(elapsed).toBeLessThan(2000);
 });

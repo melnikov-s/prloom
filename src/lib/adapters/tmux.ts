@@ -107,3 +107,44 @@ export async function waitForTmuxSession(sessionName: string): Promise<void> {
     await new Promise((resolve) => setTimeout(resolve, 1000));
   }
 }
+
+/**
+ * Wait for exit code file to appear (command completed).
+ * Polls every second until the file exists.
+ */
+export async function waitForExitCodeFile(sessionName: string): Promise<void> {
+  const { exitCodeFile } = getWorkerLogPaths(sessionName);
+  while (true) {
+    if (existsSync(exitCodeFile)) {
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+  }
+}
+
+/**
+ * Check if a tmux session exists.
+ */
+export async function hasSession(sessionName: string): Promise<boolean> {
+  const { exitCode } = await execa(
+    "tmux",
+    ["has-session", "-t", sessionName],
+    { reject: false }
+  );
+  return exitCode === 0;
+}
+
+/**
+ * Send keys to an existing tmux session.
+ */
+export async function sendKeys(
+  sessionName: string,
+  command: string
+): Promise<boolean> {
+  const { exitCode } = await execa(
+    "tmux",
+    ["send-keys", "-t", sessionName, command, "Enter"],
+    { reject: false }
+  );
+  return exitCode === 0;
+}

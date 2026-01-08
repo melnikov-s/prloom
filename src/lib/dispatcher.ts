@@ -54,7 +54,7 @@ import {
   waitForProcess,
 } from "./adapters/process.js";
 import {
-  waitForTmuxSession,
+  waitForExitCodeFile,
   readExecutionResult,
   hasTmux,
 } from "./adapters/tmux.js";
@@ -635,7 +635,7 @@ export async function processActivePlans(
 
           // Poll for completion
           if (execResult.tmuxSession) {
-            await waitForTmuxSession(execResult.tmuxSession);
+            await waitForExitCodeFile(execResult.tmuxSession);
             const tmuxResult = readExecutionResult(execResult.tmuxSession);
             if (tmuxResult.exitCode !== 0) {
               log.warn(
