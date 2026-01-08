@@ -836,12 +836,20 @@ async function runTriage(
     );
   }
 
-  await adapter.execute({
+  const execResult = await adapter.execute({
     cwd: ps.worktree,
     prompt,
     tmux: tmuxConfig,
     model: triageConfig.model,
   });
+
+  // Wait for tmux session or detached process to complete
+  if (execResult.tmuxSession) {
+    await waitForExitCodeFile(execResult.tmuxSession);
+  } else if (execResult.pid) {
+    await waitForProcess(execResult.pid);
+  }
+
   log.info(`   Triage agent completed`, plan.frontmatter.id);
 
   // Read and process triage result
@@ -1024,12 +1032,20 @@ async function runReviewAgent(
   }
 
   try {
-    await adapter.execute({
+    const execResult = await adapter.execute({
       cwd: ps.worktree,
       prompt,
       tmux: tmuxConfig,
       model: reviewerConfig.model,
     });
+
+    // Wait for tmux session or detached process to complete
+    if (execResult.tmuxSession) {
+      await waitForExitCodeFile(execResult.tmuxSession);
+    } else if (execResult.pid) {
+      await waitForProcess(execResult.pid);
+    }
+
     log.info(`   Review agent completed`, plan.frontmatter.id);
 
     // Read and process review result
