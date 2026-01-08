@@ -4,7 +4,6 @@ import {
   readFileSync,
   writeFileSync,
   mkdirSync,
-  renameSync,
   unlinkSync,
   readdirSync,
 } from "fs";
