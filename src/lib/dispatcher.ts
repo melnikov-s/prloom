@@ -90,7 +90,7 @@ export type ActivatedPlanState = PlanState & {
   branch: string;
   planRelpath: string;
   baseBranch: string;
-  status: "active" | "blocked" | "review" | "reviewing" | "done";
+  status: "active" | "blocked" | "review" | "reviewing" | "triaging" | "done";
 };
 
 // Logger that routes to TUI events or console
@@ -427,9 +427,9 @@ export async function processActivePlans(
         }
       }
 
-      // Skip if plan status is blocked or reviewing
+      // Skip if plan status is blocked, reviewing, or triaging
       let plan = parsePlan(planPath);
-      if (ps.status === "blocked" || ps.status === "reviewing") {
+      if (ps.status === "blocked" || ps.status === "reviewing" || ps.status === "triaging") {
         continue;
       }
 
@@ -803,6 +803,12 @@ async function runTriage(
   options: DispatcherOptions = {},
   log: Logger
 ): Promise<void> {
+  // Store previous status to restore later
+  const previousStatus = ps.status;
+  
+  // Set status to triaging
+  ps.status = "triaging";
+  
   // Ensure .prloom directory exists in worktree
   ensureWorktreePrloomDir(ps.worktree);
 
@@ -934,6 +940,13 @@ The plan is now **blocked** until conflicts are resolved.`
       await push(ps.worktree, ps.branch);
     } else {
       log.info(`   No changes to commit from triage`, plan.frontmatter.id);
+    }
+    
+    // Restore status to active after successful triage (unless blocked by rebase conflict)
+    // The next dispatch loop will check for new TODOs and continue processing
+    if (ps.status === "triaging") {
+      log.info(`   Setting plan status back to: active`, plan.frontmatter.id);
+      ps.status = "active";
     }
   } catch (error) {
     log.error(`   Triage failed: ${error}`, plan.frontmatter.id);

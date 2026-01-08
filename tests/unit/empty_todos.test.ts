@@ -139,7 +139,6 @@ id: ${id}
         status: "active",
       },
     },
-    inbox: {},
   };
 
   // processActivePlans expects botLogin

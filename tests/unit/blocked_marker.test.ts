@@ -54,7 +54,6 @@ id: ${id}
         status: "active",
       },
     },
-    inbox: {},
   };
 
   await processActivePlans(repoRoot, config, state, "bot-user", {}, noopLogger);

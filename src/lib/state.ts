@@ -29,6 +29,7 @@ export interface PlanState {
     | "blocked"
     | "review"
     | "reviewing"
+    | "triaging"
     | "done";
 
   /** Active tmux session name when running with --tmux */
