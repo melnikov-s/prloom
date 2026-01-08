@@ -13,6 +13,8 @@ export interface TodoItem {
   text: string;
   done: boolean;
   blocked: boolean;
+  /** Indented lines following the TODO that provide additional context */
+  context?: string;
 }
 
 export interface Plan {
@@ -81,15 +83,31 @@ function parseTodos(section: string): TodoItem[] {
   const todos: TodoItem[] = [];
   let index = 0;
 
-  for (const line of lines) {
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]!;
     const checkboxMatch = line.match(/^- \[([\s\S])\] (.+)$/);
     if (checkboxMatch && checkboxMatch[1] && checkboxMatch[2]) {
       const marker = checkboxMatch[1].toLowerCase();
+
+      // Collect any indented context lines that follow
+      const contextLines: string[] = [];
+      while (i + 1 < lines.length) {
+        const nextLine = lines[i + 1]!;
+        // Context lines must be indented (start with spaces/tabs) and not be another checkbox
+        if (nextLine.match(/^[\t ]+/) && !nextLine.match(/^\s*- \[/)) {
+          contextLines.push(nextLine);
+          i++;
+        } else {
+          break;
+        }
+      }
+
       todos.push({
         index,
         text: checkboxMatch[2].trim(),
         done: marker === "x",
         blocked: marker === "b",
+        context: contextLines.length > 0 ? contextLines.join("\n") : undefined,
       });
       index++;
     }

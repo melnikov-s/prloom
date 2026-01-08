@@ -127,6 +127,93 @@ Test objective
   rmSync(tmpDir, { recursive: true });
 });
 
+test("parsePlan captures indented context lines for TODOs", () => {
+  const tmpDir = mkdtempSync(join(tmpdir(), "prloom-test-"));
+  const planPath = join(tmpDir, "test-plan.md");
+
+  const planContent = `---
+id: context-todo-plan
+---
+
+## TODO
+
+- [ ] Remove debug flag
+  File: src/foo.ts:42
+  Comment by @reviewer: "remove this"
+  Code: \`const debug = true;\`
+- [ ] Second task without context
+- [x] Third task with context
+  Some context here
+  More context
+
+## Progress Log
+`;
+  writeFileSync(planPath, planContent);
+
+  const plan = parsePlan(planPath);
+  expect(plan.todos).toHaveLength(3);
+
+  // First TODO has multi-line context
+  expect(plan.todos[0]?.text).toBe("Remove debug flag");
+  expect(plan.todos[0]?.done).toBe(false);
+  expect(plan.todos[0]?.context).toContain("File: src/foo.ts:42");
+  expect(plan.todos[0]?.context).toContain("Comment by @reviewer");
+  expect(plan.todos[0]?.context).toContain("const debug = true");
+
+  // Second TODO has no context
+  expect(plan.todos[1]?.text).toBe("Second task without context");
+  expect(plan.todos[1]?.context).toBeUndefined();
+
+  // Third TODO is done but still has context
+  expect(plan.todos[2]?.text).toBe("Third task with context");
+  expect(plan.todos[2]?.done).toBe(true);
+  expect(plan.todos[2]?.context).toContain("Some context here");
+  expect(plan.todos[2]?.context).toContain("More context");
+
+  rmSync(tmpDir, { recursive: true });
+});
+
+test("parsePlan handles mixed TODOs with and without context", () => {
+  const tmpDir = mkdtempSync(join(tmpdir(), "prloom-test-"));
+  const planPath = join(tmpDir, "test-plan.md");
+
+  const planContent = `---
+id: mixed-plan
+---
+
+## TODO
+
+- [ ] Task A
+- [ ] Task B with context
+  Context for B
+- [ ] Task C
+- [x] Task D with context
+  Context for D
+
+## Progress Log
+`;
+  writeFileSync(planPath, planContent);
+
+  const plan = parsePlan(planPath);
+  expect(plan.todos).toHaveLength(4);
+
+  expect(plan.todos[0]?.text).toBe("Task A");
+  expect(plan.todos[0]?.context).toBeUndefined();
+
+  expect(plan.todos[1]?.text).toBe("Task B with context");
+  expect(plan.todos[1]?.context).toBe("  Context for B");
+
+  expect(plan.todos[2]?.text).toBe("Task C");
+  expect(plan.todos[2]?.context).toBeUndefined();
+
+  expect(plan.todos[3]?.text).toBe("Task D with context");
+  expect(plan.todos[3]?.done).toBe(true);
+  expect(plan.todos[3]?.context).toBe("  Context for D");
+
+  rmSync(tmpDir, { recursive: true });
+});
+
+
 test("generatePlanSkeleton includes base_branch when provided", () => {
   const skeleton = generatePlanSkeleton("test-plan", "release/1.2");
 

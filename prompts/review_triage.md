@@ -50,10 +50,25 @@ For explicit requests to modify code:
 - Add them at the end of the ## TODO section
 - Use the format: `- [ ] Specific actionable task`
 - Do NOT create vague tasks like "Address review comments"
-- Create SPECIFIC tasks like:
-  - "Update function X to handle null input"
-  - "Add test for Y edge case"
-  - "Rename Z for clarity"
+- **CRITICAL: Include full context using indented lines** - the worker agent cannot see the original comment
+- For inline code comments, use this format:
+  ```
+  - [ ] Brief description of what to do
+    File: path/to/file.ts:42
+    Comment by @reviewer: "the original comment text"
+    Code:
+    ```diff
+    @@ -40,5 +40,5 @@
+     const foo = 1;
+    -const debug = true;  // <- this line
+    +const bar = 2;
+    ```
+  ```
+- The indented context lines will be passed to the worker, so include:
+  - The file path and line number
+  - The reviewer's original comment
+  - The diff hunk showing the relevant code
+- Create SPECIFIC tasks - the task title should describe the action, context goes below
 - Group related requests into single tasks when logical
 - If the plan status is `done` and you add TODOs, change status to `active`
 

@@ -47,13 +47,19 @@ export function renderWorkerPrompt(
 
   const planTodos = formatPlanTodos(plan.todos);
 
+  // Format current todo with context if available
+  let currentTodo = `TODO #${todo.index + 1}: ${todo.text}`;
+  if (todo.context) {
+    currentTodo += `\n\n**Context:**\n${todo.context}`;
+  }
+
   let prompt = compiled({
     plan_title: plan.title || plan.frontmatter.id,
     plan_objective: plan.objective,
     plan_context: plan.context,
     plan_todos: planTodos,
     plan_progress_log: plan.progressLog,
-    current_todo: `TODO #${todo.index + 1}: ${todo.text}`,
+    current_todo: currentTodo,
     plan: plan.raw,
   });
 
@@ -127,6 +133,7 @@ export function renderTriagePrompt(
     .map((f) => {
       let entry = `### ${f.type} by @${f.author}\n\n${f.body}`;
       if (f.path) entry += `\n\n*File: ${f.path}${f.line ? `:${f.line}` : ""}*`;
+      if (f.diffHunk) entry += `\n\n**Code context:**\n\`\`\`diff\n${f.diffHunk}\n\`\`\``;
       if (f.reviewState) entry += `\n\n*Review: ${f.reviewState}*`;
       if (f.inReplyToId) entry += `\n\n*In reply to comment #${f.inReplyToId}*`;
       return entry;

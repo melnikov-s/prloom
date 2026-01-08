@@ -81,6 +81,8 @@ export interface PRFeedback {
   body: string;
   path?: string;
   line?: number;
+  /** For review_comment: the diff hunk showing code context around the comment */
+  diffHunk?: string;
   reviewState?: string;
   createdAt: string;
   /** For review_comment: ID of the parent comment if this is a reply */
@@ -193,7 +195,7 @@ export async function getPRReviewComments(
       "api",
       `repos/{owner}/{repo}/pulls/${prNumber}/comments`,
       "--jq",
-      ".[] | {id: .id, author: .user.login, body: .body, path: .path, line: .line, createdAt: .created_at, inReplyToId: .in_reply_to_id}",
+      ".[] | {id: .id, author: .user.login, body: .body, path: .path, line: .line, diffHunk: .diff_hunk, createdAt: .created_at, inReplyToId: .in_reply_to_id}",
     ],
     { cwd: repoRoot }
   );
@@ -212,6 +214,7 @@ export async function getPRReviewComments(
         body: obj.body,
         path: obj.path,
         line: obj.line,
+        diffHunk: obj.diffHunk || undefined,
         createdAt: obj.createdAt,
         inReplyToId: obj.inReplyToId || undefined,
       };
