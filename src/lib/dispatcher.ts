@@ -467,6 +467,7 @@ export async function processActivePlans(
           if (decision.clearPollOnce) {
             ps.pollOnce = undefined;
           }
+          log.info(`🔄 Polling for new comments on ${planId}`, planId);
           const newFeedback = await pollNewFeedback(repoRoot, ps, botLogin);
 
           if (newFeedback.length > 0) {
@@ -498,6 +499,8 @@ export async function processActivePlans(
             if (maxIds.lastReviewId) ps.lastReviewId = maxIds.lastReviewId;
             if (maxIds.lastReviewCommentId)
               ps.lastReviewCommentId = maxIds.lastReviewCommentId;
+          } else {
+            log.info(`✓ No new comments found for ${planId}`, planId);
           }
 
           // Only update the polling schedule timestamp on normal polling cycles.
@@ -1082,7 +1085,6 @@ function handleCommand(state: State, cmd: IpcCommand, log: Logger): void {
   } else if (cmd.type === "poll") {
     // Force a single immediate feedback poll without shifting schedule
     ps.pollOnce = true;
-    log.info(`🔄 Poll once scheduled for ${cmd.plan_id}`, cmd.plan_id);
   } else if (cmd.type === "launch_poll") {
     // Force immediate feedback poll AND reset schedule (poll timestamp)
     ps.lastPolledAt = undefined;
