@@ -36,7 +36,6 @@ test("PlanState allows all valid status values including 'triaging'", () => {
     "draft",
     "queued",
     "active",
-    "blocked",
     "review",
     "reviewing",
     "triaging",
@@ -48,4 +47,19 @@ test("PlanState allows all valid status values including 'triaging'", () => {
     const planState: PlanState = { status };
     expect(planState.status).toBe(status);
   });
+});
+
+test("PlanState blocked property is independent of status", () => {
+  // A plan can be blocked while in any status
+  const blockedActivePlan: PlanState = { status: "active", blocked: true };
+  const blockedReviewPlan: PlanState = { status: "review", blocked: true };
+  const unblockedPlan: PlanState = { status: "active", blocked: false };
+  const neverBlockedPlan: PlanState = { status: "active" }; // blocked undefined
+
+  expect(blockedActivePlan.blocked).toBe(true);
+  expect(blockedActivePlan.status).toBe("active");
+  expect(blockedReviewPlan.blocked).toBe(true);
+  expect(blockedReviewPlan.status).toBe("review");
+  expect(unblockedPlan.blocked).toBe(false);
+  expect(neverBlockedPlan.blocked).toBeUndefined();
 });

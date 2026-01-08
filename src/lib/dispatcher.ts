@@ -90,7 +90,7 @@ export type ActivatedPlanState = PlanState & {
   branch: string;
   planRelpath: string;
   baseBranch: string;
-  status: "active" | "blocked" | "review" | "reviewing" | "triaging" | "done";
+  status: "active" | "review" | "reviewing" | "triaging" | "done";
 };
 
 // Logger that routes to TUI events or console
@@ -427,9 +427,9 @@ export async function processActivePlans(
         }
       }
 
-      // Skip if plan status is blocked, reviewing, or triaging
+      // Skip if plan is blocked, reviewing, or triaging
       let plan = parsePlan(planPath);
-      if (ps.status === "blocked" || ps.status === "reviewing" || ps.status === "triaging") {
+      if (ps.blocked || ps.status === "reviewing" || ps.status === "triaging") {
         continue;
       }
 
@@ -536,7 +536,7 @@ export async function processActivePlans(
               }`,
               planId
             );
-            ps.status = "blocked";
+            ps.blocked = true;
             ps.lastError = `Blocked by task #${todo.index + 1}: ${todo.text}`;
             continue;
           }
@@ -581,8 +581,8 @@ export async function processActivePlans(
                 );
               }
 
-              log.info(`   Setting plan status to: blocked`, planId);
-              ps.status = "blocked";
+              log.info(`   Blocking plan`, planId);
+              ps.blocked = true;
               ps.lastError = `TODO #${
                 todo.index + 1
               } failed after ${MAX_TODO_RETRIES} retries - worker did not mark it complete`;
@@ -721,7 +721,7 @@ export async function processActivePlans(
                 `❌ Plan ${planId} has zero TODO items, blocking it.`,
                 planId
               );
-              ps.status = "blocked";
+              ps.blocked = true;
               ps.lastError = "Plan has zero TODO items. Please add tasks.";
               continue;
             }
@@ -746,7 +746,7 @@ export async function processActivePlans(
               `❌ Plan ${planId} has zero TODO items, blocking it.`,
               planId
             );
-            ps.status = "blocked";
+            ps.blocked = true;
             ps.lastError = "Plan has zero TODO items. Please add tasks.";
             continue;
           }
@@ -869,8 +869,8 @@ async function runTriage(
           `   Rebase conflict detected, blocking plan`,
           plan.frontmatter.id
         );
-        log.info(`   Setting plan status to: blocked`, plan.frontmatter.id);
-        ps.status = "blocked";
+        log.info(`   Blocking plan`, plan.frontmatter.id);
+        ps.blocked = true;
         ps.lastError = `Rebase conflict: ${rebaseResult.conflictFiles?.join(
           ", "
         )}`;
@@ -959,8 +959,8 @@ The plan is now **blocked** until conflicts are resolved.`
     }
   } catch (error) {
     log.error(`   Triage failed: ${error}`, plan.frontmatter.id);
-    log.info(`   Setting plan status to: blocked`, plan.frontmatter.id);
-    ps.status = "blocked";
+    log.info(`   Blocking plan`, plan.frontmatter.id);
+    ps.blocked = true;
     ps.lastError = `Triage failed: ${error}`;
 
     log.info(
@@ -1077,8 +1077,8 @@ async function runReviewAgent(
     );
   } catch (error) {
     log.error(`   Review failed: ${error}`, plan.frontmatter.id);
-    log.info(`   Setting plan status to: blocked`, plan.frontmatter.id);
-    ps.status = "blocked";
+    log.info(`   Blocking plan`, plan.frontmatter.id);
+    ps.blocked = true;
     ps.lastError = `Review failed: ${error}`;
 
     log.info(
@@ -1100,14 +1100,14 @@ function handleCommand(state: State, cmd: IpcCommand, log: Logger): void {
   if (cmd.type === "stop") {
     // Block the plan
     log.info(`⏹️ Stopping ${cmd.plan_id}`, cmd.plan_id);
-    log.info(`   Setting plan status to: blocked`, cmd.plan_id);
-    ps.status = "blocked";
+    log.info(`   Blocking plan`, cmd.plan_id);
+    ps.blocked = true;
     log.success(`   Plan blocked`, cmd.plan_id);
   } else if (cmd.type === "unpause") {
     // Unblock the plan
     log.info(`▶️ Unpausing ${cmd.plan_id}`, cmd.plan_id);
-    log.info(`   Setting plan status to: active`, cmd.plan_id);
-    ps.status = "active";
+    log.info(`   Unblocking plan`, cmd.plan_id);
+    ps.blocked = false;
     // Reset retry counter when unblocking
     ps.lastTodoIndex = undefined;
     ps.todoRetryCount = undefined;

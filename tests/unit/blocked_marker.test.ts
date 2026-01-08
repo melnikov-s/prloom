@@ -58,6 +58,46 @@ id: ${id}
 
   await processActivePlans(repoRoot, config, state, "bot-user", {}, noopLogger);
 
-  // Verify status is now blocked in state
-  expect(state.plans[id]!.status).toBe("blocked");
+  // Verify plan is now blocked (blocked flag, status unchanged)
+  expect(state.plans[id]!.blocked).toBe(true);
+  expect(state.plans[id]!.status).toBe("active"); // Status preserved
+});
+
+test("processActivePlans: blocked plan preserves its status when unblocked", async () => {
+  const id = "blocked-review-plan";
+  const worktreePath = mkdtempSync(join(tmpdir(), "worktree-"));
+  const planRelpath = `prloom/plans/${id}.md`;
+  mkdirSync(join(worktreePath, "prloom", "plans"), { recursive: true });
+
+  // Create a plan that was in review status when blocked
+  const planPath = join(worktreePath, planRelpath);
+  const content = `---
+id: ${id}
+---
+## TODO
+- [x] Done task
+`;
+  writeFileSync(planPath, content);
+
+  const config = loadConfig(repoRoot);
+  const state: State = {
+    control_cursor: 0,
+    plans: {
+      [id]: {
+        worktree: worktreePath,
+        branch: "feat-blocked",
+        planRelpath,
+        baseBranch: "main",
+        status: "review",
+        blocked: true,
+      },
+    },
+  };
+
+  // Unblock the plan
+  state.plans[id]!.blocked = false;
+
+  // Verify status is preserved as review
+  expect(state.plans[id]!.status).toBe("review");
+  expect(state.plans[id]!.blocked).toBe(false);
 });

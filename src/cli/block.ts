@@ -18,8 +18,8 @@ export async function runBlock(
       .map(([id, ps]) => ({
         id,
         label: id,
-        metadata: ps.status ?? "unknown",
-        color: ps.status === "blocked" ? "red" : "green",
+        metadata: ps.blocked ? "blocked" : (ps.status ?? "unknown"),
+        color: ps.blocked ? "red" : "green",
       }))
       .filter((opt) => opt.metadata !== "blocked" && opt.metadata !== "done");
 
@@ -38,7 +38,7 @@ export async function runBlock(
     process.exit(1);
   }
 
-  ps.status = "blocked";
+  ps.blocked = true;
   saveState(repoRoot, state);
   console.log(`⏹️ Blocked ${planId}`);
 }

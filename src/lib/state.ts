@@ -26,11 +26,13 @@ export interface PlanState {
     | "draft"
     | "queued"
     | "active"
-    | "blocked"
     | "review"
     | "reviewing"
     | "triaging"
     | "done";
+
+  /** Whether the plan is blocked (can happen at any status) */
+  blocked?: boolean;
 
   /** Active tmux session name when running with --tmux */
   tmuxSession?: string;

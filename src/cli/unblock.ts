@@ -18,8 +18,8 @@ export async function runUnblock(
       .map(([id, ps]) => ({
         id,
         label: id,
-        metadata: ps.status ?? "unknown",
-        color: ps.status === "blocked" ? "red" : "green",
+        metadata: ps.blocked ? "blocked" : (ps.status ?? "unknown"),
+        color: ps.blocked ? "red" : "green",
       }))
       .filter((opt) => opt.metadata === "blocked");
 
@@ -38,7 +38,7 @@ export async function runUnblock(
     process.exit(1);
   }
 
-  ps.status = "active";
+  ps.blocked = false;
 
   // Reset retry counter
   ps.lastTodoIndex = undefined;

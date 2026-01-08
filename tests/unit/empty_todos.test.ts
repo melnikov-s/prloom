@@ -145,6 +145,6 @@ id: ${id}
   await processActivePlans(repoRoot, config, state, "bot-user", {}, noopLogger);
 
   // Verify it was blocked
-  expect(state.plans[id]!.status).toBe("blocked");
+  expect(state.plans[id]!.blocked).toBe(true);
   expect(state.plans[id]!.lastError).toContain("zero TODO items");
 });

@@ -52,7 +52,8 @@ interface PlanRowProps {
   error?: string;
 }
 
-function getStatusColor(status: string): string {
+function getStatusColor(status: string, blocked?: boolean): string {
+  if (blocked) return "red";
   switch (status) {
     case "active":
       return "green";
@@ -60,8 +61,6 @@ function getStatusColor(status: string): string {
       return "yellow";
     case "draft":
       return "yellowBright";
-    case "blocked":
-      return "red";
     case "review":
       return "cyan";
     case "reviewing":
@@ -73,7 +72,8 @@ function getStatusColor(status: string): string {
   }
 }
 
-function getStatusEmoji(status: string): string {
+function getStatusEmoji(status: string, blocked?: boolean): string {
+  if (blocked) return "🔴";
   switch (status) {
     case "active":
       return "🟢";
@@ -81,8 +81,6 @@ function getStatusEmoji(status: string): string {
       return "🟡";
     case "draft":
       return "📝";
-    case "blocked":
-      return "🔴";
     case "review":
       return "👀";
     case "reviewing":
@@ -125,6 +123,7 @@ const COL_PROGRESS = 14;
 
 interface SelectablePlanRowProps extends PlanRowProps {
   isSelected: boolean;
+  blocked?: boolean;
 }
 
 function SelectablePlanRow({
@@ -137,14 +136,16 @@ function SelectablePlanRow({
   todosTotal,
   error,
   isSelected,
+  blocked,
 }: SelectablePlanRowProps): React.ReactElement {
   // Defensive: ensure all string values are defined
   const safeId = id ?? "";
   const safeBranch = branch ?? "";
   const safeStatus = status ?? "unknown";
+  const displayStatus = blocked ? "blocked" : safeStatus;
 
-  const statusColor = getStatusColor(safeStatus);
-  const statusEmoji = getStatusEmoji(safeStatus);
+  const statusColor = getStatusColor(safeStatus, blocked);
+  const statusEmoji = getStatusEmoji(safeStatus, blocked);
   const prUrl = pr && repoUrl ? `${repoUrl}/pull/${pr}` : pr ? `#${pr}` : "—";
 
   return (
@@ -167,7 +168,7 @@ function SelectablePlanRow({
       <Box width={COL_STATUS}>
         <Text>
           {statusEmoji}{" "}
-          <Text color={statusColor}>{safeStatus.slice(0, 7).padEnd(7)}</Text>
+          <Text color={statusColor}>{displayStatus.slice(0, 7).padEnd(7)}</Text>
         </Text>
       </Box>
       <Box width={COL_PROGRESS}>
@@ -226,7 +227,7 @@ interface ActionDef {
   key: string;
   ipcType?: "stop" | "unpause" | "poll" | "launch_poll" | "review" | "activate";
   command?: string;
-  showFor?: (status: string) => boolean;
+  showFor?: (status: string, blocked?: boolean) => boolean;
 }
 
 const ACTIONS: ActionDef[] = [
@@ -234,14 +235,14 @@ const ACTIONS: ActionDef[] = [
     label: "Activate",
     key: "activate",
     ipcType: "activate",
-    showFor: (status) => status === "draft",
+    showFor: (status, blocked) => status === "draft" && !blocked,
   },
   {
     label: "Block",
     key: "block",
     ipcType: "stop",
-    showFor: (status) =>
-      status !== "blocked" &&
+    showFor: (status, blocked) =>
+      !blocked &&
       status !== "done" &&
       status !== "reviewing" &&
       status !== "draft" &&
@@ -251,19 +252,19 @@ const ACTIONS: ActionDef[] = [
     label: "Unblock",
     key: "unblock",
     ipcType: "unpause",
-    showFor: (status) => status === "blocked",
+    showFor: (status, blocked) => blocked === true,
   },
   {
     label: "Review",
     key: "review",
     ipcType: "review",
-    showFor: (status) => status === "review",
+    showFor: (status, blocked) => status === "review" && !blocked,
   },
   {
     label: "Refresh PR",
     key: "poll",
     ipcType: "poll",
-    showFor: (status) =>
+    showFor: (status, blocked) =>
       status !== "reviewing" && status !== "draft" && status !== "queued",
   },
 ];
@@ -415,6 +416,7 @@ export function InteractivePlanPanel({
     .map(([id, ps]) => ({
       id,
       status: ps.status ?? "draft",
+      blocked: ps.blocked,
       branch: ps.branch ?? id,
       pr: ps.pr,
       ps,
@@ -441,11 +443,12 @@ export function InteractivePlanPanel({
               const isSelected = idx === selectedPlanIndex && !isInActionMode;
               const isExpanded = plan.id === expandedPlanId;
               const status = plan.status;
+              const blocked = plan.blocked;
               const ps = plan.ps;
 
-              // Get available actions for this plan's status
+              // Get available actions for this plan's status and blocked state
               const availableActions = ACTIONS.filter(
-                (a) => !a.showFor || a.showFor(status)
+                (a) => !a.showFor || a.showFor(status, blocked)
               );
 
               return (
@@ -460,6 +463,7 @@ export function InteractivePlanPanel({
                     todosTotal={todos.total}
                     error={ps?.lastError}
                     isSelected={isSelected || isExpanded}
+                    blocked={blocked}
                   />
                   {isExpanded && (
                     <ExpandedPlanView
@@ -555,8 +559,8 @@ export function ActivityPanel({
 export { ACTIONS };
 export type { ActionDef };
 
-export function getAvailableActions(status: string): ActionDef[] {
-  return ACTIONS.filter((a) => !a.showFor || a.showFor(status));
+export function getAvailableActions(status: string, blocked?: boolean): ActionDef[] {
+  return ACTIONS.filter((a) => !a.showFor || a.showFor(status, blocked));
 }
 
 interface AppProps {

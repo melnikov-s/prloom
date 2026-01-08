@@ -92,3 +92,76 @@ test("loadState returns empty state when file missing", () => {
 
   rmSync(emptyDir, { recursive: true, force: true });
 });
+
+test("saveState persists blocked property", () => {
+  const state: State = {
+    control_cursor: 0,
+    plans: {
+      "test-plan": {
+        worktree: "/path/to/worktree",
+        branch: "test-branch",
+        planRelpath: "prloom/plans/test-plan.md",
+        baseBranch: "main",
+        status: "active",
+        blocked: true,
+      },
+    },
+  };
+
+  saveState(TEST_DIR, state);
+  const loaded = loadState(TEST_DIR);
+
+  expect(loaded.plans["test-plan"]?.blocked).toBe(true);
+  expect(loaded.plans["test-plan"]?.status).toBe("active"); // Status preserved
+});
+
+test("blocked property is independent of status", () => {
+  // A plan can be blocked while in review status
+  const state: State = {
+    control_cursor: 0,
+    plans: {
+      "test-plan": {
+        worktree: "/path/to/worktree",
+        branch: "test-branch",
+        planRelpath: "prloom/plans/test-plan.md",
+        baseBranch: "main",
+        status: "review",
+        blocked: true,
+      },
+    },
+  };
+
+  saveState(TEST_DIR, state);
+  const loaded = loadState(TEST_DIR);
+
+  expect(loaded.plans["test-plan"]?.blocked).toBe(true);
+  expect(loaded.plans["test-plan"]?.status).toBe("review");
+});
+
+test("unblocking preserves original status", () => {
+  // Start with a blocked plan in review status
+  const state: State = {
+    control_cursor: 0,
+    plans: {
+      "test-plan": {
+        worktree: "/path/to/worktree",
+        branch: "test-branch",
+        planRelpath: "prloom/plans/test-plan.md",
+        baseBranch: "main",
+        status: "review",
+        blocked: true,
+      },
+    },
+  };
+
+  saveState(TEST_DIR, state);
+  
+  // Unblock the plan
+  const loaded = loadState(TEST_DIR);
+  loaded.plans["test-plan"]!.blocked = false;
+  saveState(TEST_DIR, loaded);
+
+  const final = loadState(TEST_DIR);
+  expect(final.plans["test-plan"]?.blocked).toBe(false);
+  expect(final.plans["test-plan"]?.status).toBe("review"); // Status preserved
+});

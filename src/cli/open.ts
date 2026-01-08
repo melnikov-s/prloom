@@ -39,8 +39,8 @@ export async function runOpen(
       .map(([id, ps]) => ({
         id,
         label: id,
-        metadata: ps.status ?? "unknown",
-        color: ps.status === "blocked" ? "red" : "green",
+        metadata: ps.blocked ? "blocked" : (ps.status ?? "unknown"),
+        color: ps.blocked ? "red" : "green",
       }))
       .filter((opt) => opt.metadata === "blocked");
 

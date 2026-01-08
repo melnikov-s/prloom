@@ -17,8 +17,8 @@ export async function runLogs(
     const options = Object.entries(state.plans).map(([id, ps]) => ({
       id,
       label: id,
-      metadata: ps.status ?? "unknown",
-      color: ps.status === "blocked" ? "red" : "green",
+      metadata: ps.blocked ? "blocked" : (ps.status ?? "unknown"),
+      color: ps.blocked ? "red" : "green",
     }));
 
     if (options.length === 0) {

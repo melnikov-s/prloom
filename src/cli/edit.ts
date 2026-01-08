@@ -45,7 +45,7 @@ export async function runEdit(
         color:
           ps.status === "draft"
             ? "yellow"
-            : ps.status === "blocked"
+            : ps.blocked
             ? "red"
             : "green",
       };
