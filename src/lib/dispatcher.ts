@@ -81,6 +81,18 @@ export type Logger = {
   error: (msg: string, planId?: string) => void;
 };
 
+/**
+ * PlanState with required activation fields.
+ * Used for functions that only work on plans that have been activated (not draft/queued).
+ */
+export type ActivatedPlanState = PlanState & {
+  worktree: string;
+  branch: string;
+  planRelpath: string;
+  baseBranch: string;
+  status: "active" | "blocked" | "review" | "reviewing" | "done";
+};
+
 // Logger that routes to TUI events or console
 function createLogger(useTUI: boolean) {
   return {
@@ -158,10 +170,21 @@ export async function runDispatcher(
 
   while (true) {
     try {
-      // Reload state from disk to pick up external changes (e.g., UI setting inbox status)
-      // Merge: keep in-memory plans (with session tracking), but reload inbox from disk
+      // Reload state from disk to pick up external changes (e.g., UI changing plan status)
       const diskState = loadState(repoRoot);
-      state.inbox = diskState.inbox;
+      // Merge: keep in-memory plans with session tracking, but reload status changes from disk
+      for (const [id, diskPs] of Object.entries(diskState.plans)) {
+        if (!state.plans[id]) {
+          // New plan from disk (e.g., external queue command)
+          state.plans[id] = diskPs;
+        } else if (
+          diskPs.status === "queued" &&
+          state.plans[id].status === "draft"
+        ) {
+          // Plan was queued externally
+          state.plans[id].status = "queued";
+        }
+      }
       // Merge control_cursor (take the max to not re-process commands)
       state.control_cursor = Math.max(
         state.control_cursor,
@@ -225,12 +248,16 @@ export async function ingestInboxPlans(
       // Trust the frontmatter ID for tracking (and inbox metadata lookup)
       const actualId = plan.frontmatter.id;
 
-      // Use frontmatter ID to look up inbox status (matches how setInboxStatus stores it)
-      const inboxMeta = state.inbox[actualId] ?? { status: "draft" as const };
+      // Auto-discovery: Ensure plan exists in state.plans
+      if (!state.plans[actualId]) {
+        state.plans[actualId] = { status: "draft" };
+      }
+
+      const planMeta = state.plans[actualId]!;
 
       // Skip drafts - designer is still working on them
-      // Status is now tracked in state.inbox, not frontmatter
-      if (inboxMeta.status !== "queued") {
+      // Status is now tracked in state.plans
+      if (planMeta.status !== "queued") {
         continue;
       }
 
@@ -298,9 +325,10 @@ export async function ingestInboxPlans(
       );
       log.info(`   Created draft PR #${pr}`);
 
-      // Store in state with active status
+      // Update plan state with active status and activation fields
       state.plans[actualId] = {
-        agent: inboxMeta?.agent,
+        ...state.plans[actualId],
+        agent: planMeta?.agent ?? state.plans[actualId]?.agent,
         worktree: worktreePath,
         branch,
         pr,
@@ -314,10 +342,9 @@ export async function ingestInboxPlans(
         dispatcherEvents.setState(state);
       }
 
-      // Delete inbox plan file and state entry
+      // Delete inbox plan file (plan is now in state.plans with full metadata)
       log.info(`   Removing plan from inbox`);
       deleteInboxPlan(repoRoot, planId);
-      delete state.inbox[actualId];
 
       log.success(`✅ Ingested ${actualId} → PR #${pr}`);
     } catch (error) {
@@ -342,7 +369,8 @@ export function getFeedbackPollDecision(opts: {
   lastPolledAt?: string;
   pollOnce?: boolean;
 }): FeedbackPollDecision {
-  const lastPolledRaw = opts.lastPolledAt ? Date.parse(opts.lastPolledAt) : 0;
+  const lastPolledAt = opts.lastPolledAt;
+  const lastPolledRaw = lastPolledAt ? Date.parse(lastPolledAt) : 0;
   const lastPolled = Number.isFinite(lastPolledRaw) ? lastPolledRaw : 0;
 
   const pollOnce = opts.pollOnce === true;
@@ -365,6 +393,20 @@ export async function processActivePlans(
 ): Promise<void> {
   for (const [planId, ps] of Object.entries(state.plans)) {
     try {
+      // Skip draft/queued plans - they haven't been activated yet (no worktree)
+      if (ps.status === "draft" || ps.status === "queued") {
+        continue;
+      }
+
+      // Activated plans must have worktree and planRelpath
+      if (!ps.worktree || !ps.planRelpath) {
+        log.warn(
+          `Plan ${planId} missing worktree or planRelpath, skipping`,
+          planId
+        );
+        continue;
+      }
+
       const planPath = join(ps.worktree, ps.planRelpath);
 
       if (!existsSync(planPath)) {
@@ -397,7 +439,14 @@ export async function processActivePlans(
       // Handle pending review request (only valid when status is "review")
       if (ps.pendingReview && ps.status === "review") {
         ps.pendingReview = undefined;
-        await runReviewAgent(repoRoot, config, ps, plan, options, log);
+        await runReviewAgent(
+          repoRoot,
+          config,
+          ps as ActivatedPlanState,
+          plan,
+          options,
+          log
+        );
         // Re-parse plan in case review agent modified it
         plan = parsePlan(planPath);
         // Skip the rest of processing for this iteration
@@ -431,7 +480,7 @@ export async function processActivePlans(
               await runTriage(
                 repoRoot,
                 config,
-                ps,
+                ps as ActivatedPlanState,
                 plan,
                 newFeedback,
                 options,
@@ -745,7 +794,7 @@ async function pollNewFeedback(
 async function runTriage(
   repoRoot: string,
   config: Config,
-  ps: PlanState,
+  ps: ActivatedPlanState,
   plan: ReturnType<typeof parsePlan>,
   feedback: PRFeedback[],
   options: DispatcherOptions = {},
@@ -909,7 +958,7 @@ The plan is now **blocked** until conflicts are resolved.`
 async function runReviewAgent(
   repoRoot: string,
   config: Config,
-  ps: PlanState,
+  ps: ActivatedPlanState,
   plan: ReturnType<typeof parsePlan>,
   options: DispatcherOptions = {},
   log: Logger

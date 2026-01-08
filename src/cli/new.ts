@@ -5,7 +5,7 @@ import { getAdapter, type AgentName } from "../lib/adapters/index.js";
 import { nanoid } from "nanoid";
 import { generatePlanSkeleton } from "../lib/plan.js";
 import { renderDesignerNewPrompt } from "../lib/template.js";
-import { ensureInboxDir, getInboxPath, setInboxStatus } from "../lib/state.js";
+import { ensureInboxDir, getInboxPath, setPlanStatus } from "../lib/state.js";
 import { getCurrentBranch, ensureRemoteBranchExists } from "../lib/git.js";
 import { confirm } from "./prompt.js";
 
@@ -59,8 +59,8 @@ export async function runNew(
   const skeleton = generatePlanSkeleton(id, baseBranch);
   writeFileSync(planPath, skeleton);
 
-  // Save inbox status as draft in state
-  setInboxStatus(repoRoot, id, "draft");
+  // Save status as draft in state
+  setPlanStatus(repoRoot, id, "draft");
 
   console.log(`Created plan in inbox: ${planPath}`);
   console.log(`Base branch: ${baseBranch}`);
@@ -97,7 +97,7 @@ export async function runNew(
   // Prompt to queue the plan
   const shouldQueue = await confirm("Queue this plan for the dispatcher?");
   if (shouldQueue) {
-    setInboxStatus(repoRoot, id, "queued");
+    setPlanStatus(repoRoot, id, "queued");
     console.log("Plan queued. Run 'prloom start' to dispatch.");
   } else {
     console.log("Plan left as draft. Use 'prloom edit' to continue later.");

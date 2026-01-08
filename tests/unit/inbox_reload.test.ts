@@ -7,8 +7,8 @@ import {
   saveState,
   loadState,
   getInboxPath,
-  setInboxStatus,
-  getInboxMeta,
+  setPlanStatus,
+  getPlanMeta,
   type State,
 } from "../../src/lib/state.js";
 import { loadConfig } from "../../src/lib/config.js";
@@ -32,7 +32,7 @@ afterEach(() => {
   rmSync(repoRoot, { recursive: true });
 });
 
-test("setInboxStatus persists status to disk and can be read back", () => {
+test("setPlanStatus persists status to disk and can be read back", () => {
   const id = "test-plan";
   const inboxPath = getInboxPath(repoRoot, id);
   writeFileSync(
@@ -46,20 +46,20 @@ id: ${id}
   );
 
   // Initially no meta should default to draft
-  expect(getInboxMeta(repoRoot, id).status).toBe("draft");
+  expect(getPlanMeta(repoRoot, id).status).toBe("draft");
 
   // Set to queued
-  setInboxStatus(repoRoot, id, "queued");
+  setPlanStatus(repoRoot, id, "queued");
 
   // Fresh read should show queued
-  expect(getInboxMeta(repoRoot, id).status).toBe("queued");
+  expect(getPlanMeta(repoRoot, id).status).toBe("queued");
 
   // Loading state from disk should also show queued
   const diskState = loadState(repoRoot);
-  expect(diskState.inbox[id]?.status).toBe("queued");
+  expect(diskState.plans[id]?.status).toBe("queued");
 });
 
-test("dispatcher sees inbox status changes made externally (simulates UI → dispatcher flow)", async () => {
+test("dispatcher sees plan status changes made externally (simulates UI → dispatcher flow)", async () => {
   const id = "external-change-plan";
   const inboxPath = getInboxPath(repoRoot, id);
   writeFileSync(
@@ -75,25 +75,33 @@ id: ${id}
   // Simulate dispatcher having an in-memory state with plan as draft
   const dispatcherState: State = {
     control_cursor: 0,
-    plans: {},
-    inbox: {
+    plans: {
       [id]: { status: "draft" },
     },
   };
   saveState(repoRoot, dispatcherState);
 
-  // Simulate external change (like UI calling setInboxStatus)
-  setInboxStatus(repoRoot, id, "queued");
+  // Simulate external change (like UI calling setPlanStatus)
+  setPlanStatus(repoRoot, id, "queued");
 
   // Verify disk now shows queued
   const diskState = loadState(repoRoot);
-  expect(diskState.inbox[id]?.status).toBe("queued");
+  expect(diskState.plans[id]?.status).toBe("queued");
 
-  // Simulate dispatcher reloading inbox from disk (as per the fix)
-  dispatcherState.inbox = diskState.inbox;
+  // Simulate dispatcher reloading plans from disk (as per the fix)
+  for (const [pid, diskPs] of Object.entries(diskState.plans)) {
+    if (!dispatcherState.plans[pid]) {
+      dispatcherState.plans[pid] = diskPs;
+    } else if (
+      diskPs.status === "queued" &&
+      dispatcherState.plans[pid].status === "draft"
+    ) {
+      dispatcherState.plans[pid].status = "queued";
+    }
+  }
 
   // Now dispatcher's in-memory state should see the queued status
-  expect(dispatcherState.inbox[id]?.status).toBe("queued");
+  expect(dispatcherState.plans[id]?.status).toBe("queued");
 });
 
 test("ingestInboxPlans picks up plans queued by external process", async () => {
@@ -110,24 +118,33 @@ id: ${id}
   );
 
   // Start with draft in state
-  setInboxStatus(repoRoot, id, "draft");
+  setPlanStatus(repoRoot, id, "draft");
 
   // Load initial state (simulating dispatcher startup)
   let state = loadState(repoRoot);
-  expect(state.inbox[id]?.status).toBe("draft");
+  expect(state.plans[id]?.status).toBe("draft");
 
   // Externally set to queued (simulating UI action)
-  setInboxStatus(repoRoot, id, "queued");
+  setPlanStatus(repoRoot, id, "queued");
 
-  // Reload inbox from disk (simulating dispatcher's loop start)
+  // Reload from disk (simulating dispatcher's loop start)
   const diskState = loadState(repoRoot);
-  state.inbox = diskState.inbox;
+  for (const [pid, diskPs] of Object.entries(diskState.plans)) {
+    if (!state.plans[pid]) {
+      state.plans[pid] = diskPs;
+    } else if (
+      diskPs.status === "queued" &&
+      state.plans[pid].status === "draft"
+    ) {
+      state.plans[pid].status = "queued";
+    }
+  }
 
   // Now state should see queued
-  expect(state.inbox[id]?.status).toBe("queued");
+  expect(state.plans[id]?.status).toBe("queued");
 });
 
-test("inbox status survives state reload with other plans present", () => {
+test("plan status survives state reload with other plans present", () => {
   const id1 = "plan-one";
   const id2 = "plan-two";
 
@@ -142,13 +159,13 @@ test("inbox status survives state reload with other plans present", () => {
   );
 
   // Set different statuses
-  setInboxStatus(repoRoot, id1, "draft");
-  setInboxStatus(repoRoot, id2, "queued");
+  setPlanStatus(repoRoot, id1, "draft");
+  setPlanStatus(repoRoot, id2, "queued");
 
   // Reload and verify both statuses persisted
   const state = loadState(repoRoot);
-  expect(state.inbox[id1]?.status).toBe("draft");
-  expect(state.inbox[id2]?.status).toBe("queued");
+  expect(state.plans[id1]?.status).toBe("draft");
+  expect(state.plans[id2]?.status).toBe("queued");
 });
 
 test("ingestInboxPlans uses frontmatter ID for metadata lookup (filename has branch prefix)", async () => {
@@ -168,20 +185,20 @@ id: ${frontmatterId}
 `
   );
 
-  // Set inbox status using the frontmatter ID (as setInboxStatus does)
-  setInboxStatus(repoRoot, frontmatterId, "queued");
+  // Set status using the frontmatter ID (as setPlanStatus does)
+  setPlanStatus(repoRoot, frontmatterId, "queued");
 
   // Verify it's stored under the frontmatter ID
   const state = loadState(repoRoot);
-  expect(state.inbox[frontmatterId]?.status).toBe("queued");
-  expect(state.inbox[filename]).toBeUndefined(); // NOT stored under filename
+  expect(state.plans[frontmatterId]?.status).toBe("queued");
+  expect(state.plans[filename]).toBeUndefined(); // NOT stored under filename
 
   // ingestInboxPlans should find the queued status by reading the frontmatter ID
   // (We can't fully test ingestion without mocking git, but we can verify the lookup works)
   const config = loadConfig(repoRoot);
 
-  // The state passed to ingestInboxPlans should have the inbox metadata
+  // The state passed to ingestInboxPlans should have the plans metadata
   // accessible via the frontmatter ID
-  const inboxMeta = state.inbox[frontmatterId] ?? { status: "draft" as const };
-  expect(inboxMeta.status).toBe("queued");
+  const planMeta = state.plans[frontmatterId] ?? { status: "draft" as const };
+  expect(planMeta.status).toBe("queued");
 });

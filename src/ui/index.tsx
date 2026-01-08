@@ -34,21 +34,14 @@ function TUIRunner({ repoRoot }: TUIRunnerProps): React.ReactElement {
   const [selectedActionIndex, setSelectedActionIndex] = useState(0);
   const [isInActionMode, setIsInActionMode] = useState(false);
 
-  // Get plan IDs for navigation (inbox + active)
-  const inboxIds = Object.keys(uiState.state.inbox);
-  const activeIds = Object.keys(uiState.state.plans);
-  const allPlanIds = [...inboxIds, ...activeIds];
+  // Get plan IDs for navigation
+  const allPlanIds = Object.keys(uiState.state.plans);
   const planCount = allPlanIds.length;
 
   // Get current plan info
   const currentPlanId = allPlanIds[selectedPlanIndex];
-  const isCurrentInbox = currentPlanId
-    ? inboxIds.includes(currentPlanId)
-    : false;
   const currentStatus = currentPlanId
-    ? isCurrentInbox
-      ? uiState.state.inbox[currentPlanId]?.status ?? "draft"
-      : uiState.state.plans[currentPlanId]?.status ?? "active"
+    ? uiState.state.plans[currentPlanId]?.status ?? "draft"
     : "active";
   const availableActions = getAvailableActions(currentStatus);
 
@@ -158,6 +151,11 @@ function TUIRunner({ repoRoot }: TUIRunnerProps): React.ReactElement {
       // Calculate TODO progress for each plan
       const newPlanTodos = new Map<string, { done: number; total: number }>();
       for (const [planId, ps] of Object.entries(newState.state.plans)) {
+        // Defensive: skip plans with missing worktree or planRelpath
+        if (!ps || !ps.worktree || !ps.planRelpath) {
+          newPlanTodos.set(planId, { done: 0, total: 0 });
+          continue;
+        }
         const planPath = join(ps.worktree, ps.planRelpath);
         if (existsSync(planPath)) {
           try {

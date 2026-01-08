@@ -28,12 +28,17 @@ export async function resolvePlanId(
   const exactInboxMatch = inboxIds.find(
     (id) => id === input || id.endsWith(`-${input}`)
   );
-  if (exactInboxMatch || state.plans[input]) {
-    matches.add(
-      exactInboxMatch
-        ? exactInboxMatch.split("-").pop() || exactInboxMatch
-        : input
-    );
+  if (exactInboxMatch) {
+    if (exactInboxMatch === input) {
+      matches.add(input);
+    } else if (exactInboxMatch.endsWith(`-${input}`)) {
+      matches.add(input);
+    } else {
+      // Fallback for cases like branch-id where match was found by ID extraction
+      matches.add(exactInboxMatch.split("-").pop() || exactInboxMatch);
+    }
+  } else if (state.plans[input]) {
+    matches.add(input);
   }
 
   // 2. Check for Exact Branch match in active state
@@ -58,15 +63,17 @@ export async function resolvePlanId(
   // 4. Check for Descriptive Branch match in Active plans
   // We check the plan file in the worktree to be accurate
   for (const [id, ps] of Object.entries(state.plans)) {
-    const planPath = join(ps.worktree, ps.planRelpath);
-    if (existsSync(planPath)) {
-      try {
-        const plan = parsePlan(planPath);
-        if (plan.frontmatter.branch === input) {
-          matches.add(id);
+    if (ps.worktree && ps.planRelpath) {
+      const planPath = join(ps.worktree, ps.planRelpath);
+      if (existsSync(planPath)) {
+        try {
+          const plan = parsePlan(planPath);
+          if (plan.frontmatter.branch === input) {
+            matches.add(id);
+          }
+        } catch {
+          // Ignore
         }
-      } catch {
-        // Ignore
       }
     }
   }

@@ -39,7 +39,6 @@ test("resolvePlanId: exact ID match (state)", async () => {
         status: "active",
       },
     },
-    inbox: {},
   });
 
   const resolved = await resolvePlanId(repoRoot, id);
@@ -79,7 +78,6 @@ test("resolvePlanId: fully qualified branch match (state)", async () => {
         status: "active",
       },
     },
-    inbox: {},
   });
 
   const resolved = await resolvePlanId(repoRoot, fullBranch);

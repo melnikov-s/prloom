@@ -13,14 +13,23 @@ import type { AgentName } from "./adapters/index.js";
 export interface PlanState {
   /** Agent to use for this plan */
   agent?: AgentName;
-  worktree: string;
-  branch: string;
-  pr?: number;
-  planRelpath: string; // e.g. "prloom/.local/plan.md" (gitignored)
-  baseBranch: string; // e.g. "main" for rebase
 
-  /** Plan execution status - owned by dispatcher, not frontmatter */
-  status: "active" | "blocked" | "review" | "reviewing" | "done";
+  // Activation fields - only populated after plan is activated by dispatcher
+  worktree?: string;
+  branch?: string;
+  pr?: number;
+  planRelpath?: string; // e.g. "prloom/.local/plan.md" (gitignored)
+  baseBranch?: string; // e.g. "main" for rebase
+
+  /** Plan execution status - covers full lifecycle from draft to done */
+  status:
+    | "draft"
+    | "queued"
+    | "active"
+    | "blocked"
+    | "review"
+    | "reviewing"
+    | "done";
 
   /** Active tmux session name when running with --tmux */
   tmuxSession?: string;
@@ -46,15 +55,9 @@ export interface PlanState {
   todoRetryCount?: number;
 }
 
-export interface InboxMeta {
-  status: "draft" | "queued";
-  agent?: AgentName;
-}
-
 export interface State {
   control_cursor: number;
   plans: Record<string, PlanState>;
-  inbox: Record<string, InboxMeta>;
 }
 
 const SWARM_DIR = "prloom/.local";
@@ -121,14 +124,24 @@ export function loadState(repoRoot: string): State {
   const statePath = join(getSwarmDir(repoRoot), STATE_FILE);
 
   if (!existsSync(statePath)) {
-    return { control_cursor: 0, plans: {}, inbox: {} };
+    return { control_cursor: 0, plans: {} };
   }
 
   try {
     const raw = readFileSync(statePath, "utf-8");
-    return JSON.parse(raw) as State;
+    const parsed = JSON.parse(raw);
+    // Migration: merge legacy inbox into plans if present
+    if (parsed.inbox && typeof parsed.inbox === "object") {
+      for (const [id, meta] of Object.entries(parsed.inbox)) {
+        if (!parsed.plans[id] && meta && typeof meta === "object") {
+          parsed.plans[id] = meta as PlanState;
+        }
+      }
+      delete parsed.inbox;
+    }
+    return parsed as State;
   } catch {
-    return { control_cursor: 0, plans: {}, inbox: {} };
+    return { control_cursor: 0, plans: {} };
   }
 }
 
@@ -141,7 +154,7 @@ export function saveState(repoRoot: string, state: State): void {
   renameSync(tempPath, statePath);
 }
 
-// Inbox
+// Inbox (file storage - plans waiting to be activated)
 
 const INBOX_DIR = "inbox";
 
@@ -196,27 +209,47 @@ export function deleteInboxPlan(repoRoot: string, planId: string): void {
   }
 }
 
-// Inbox metadata helpers (stored in state.inbox, not sidecar files)
+// Plan metadata helpers (stored in state.plans)
 
-export function getInboxMeta(repoRoot: string, planId: string): InboxMeta {
+export function getPlanMeta(repoRoot: string, planId: string): PlanState {
   const state = loadState(repoRoot);
-  return state.inbox[planId] ?? { status: "draft" };
+  return state.plans[planId] ?? { status: "draft" };
 }
 
+/** @deprecated Use getPlanMeta instead */
+export function getInboxMeta(repoRoot: string, planId: string): PlanState {
+  return getPlanMeta(repoRoot, planId);
+}
+
+export function setPlanStatus(
+  repoRoot: string,
+  planId: string,
+  status: PlanState["status"],
+  agent?: AgentName
+): void {
+  const state = loadState(repoRoot);
+  const existing = state.plans[planId] ?? { status: "draft" };
+  state.plans[planId] = { ...existing, status, agent: agent ?? existing.agent };
+  saveState(repoRoot, state);
+}
+
+/** @deprecated Use setPlanStatus instead */
 export function setInboxStatus(
   repoRoot: string,
   planId: string,
   status: "draft" | "queued",
   agent?: AgentName
 ): void {
+  setPlanStatus(repoRoot, planId, status, agent);
+}
+
+export function deletePlanMeta(repoRoot: string, planId: string): void {
   const state = loadState(repoRoot);
-  const existing = state.inbox[planId] ?? { status: "draft" };
-  state.inbox[planId] = { ...existing, status, agent: agent ?? existing.agent };
+  delete state.plans[planId];
   saveState(repoRoot, state);
 }
 
+/** @deprecated Use deletePlanMeta instead */
 export function deleteInboxMeta(repoRoot: string, planId: string): void {
-  const state = loadState(repoRoot);
-  delete state.inbox[planId];
-  saveState(repoRoot, state);
+  deletePlanMeta(repoRoot, planId);
 }

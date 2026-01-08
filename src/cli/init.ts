@@ -50,14 +50,8 @@ export async function runInit(
   // Ensure prloom/.local runtime directories exist
   const localDir = join(prloomDir, ".local");
   const inboxDir = join(localDir, "inbox");
-  const plansStateDir = join(localDir, "plans");
 
   mkdirSync(inboxDir, { recursive: true });
-  mkdirSync(plansStateDir, { recursive: true });
-
-  // Ensure prloom/plans exists for committed plans
-  const plansDir = join(prloomDir, "plans");
-  mkdirSync(plansDir, { recursive: true });
 
   // Ensure gitignore
   await ensureGitignoreEntry(repoRoot, "prloom/.local/");

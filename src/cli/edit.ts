@@ -7,8 +7,8 @@ import {
   listInboxPlanIds,
   loadState,
   getInboxPath,
-  getInboxMeta,
-  setInboxStatus,
+  getPlanMeta,
+  setPlanStatus,
 } from "../lib/state.js";
 import { parsePlan } from "../lib/plan.js";
 import { resolvePlanId } from "../lib/resolver.js";
@@ -26,28 +26,30 @@ export async function runEdit(
   if (planIdInput) {
     planId = await resolvePlanId(repoRoot, planIdInput);
   } else {
-    // Collect options from inbox and state
-    const inboxIds = listInboxPlanIds(repoRoot);
+    // Collect options from state and disk
     const state = loadState(repoRoot);
+    const diskIds = listInboxPlanIds(repoRoot);
+    const allIds = Array.from(
+      new Set([...Object.keys(state.plans), ...diskIds])
+    );
 
-    const inboxOptions = inboxIds.map((id) => {
-      const meta = getInboxMeta(repoRoot, id);
+    const options = allIds.map((id) => {
+      const ps = state.plans[id] ?? { status: "draft" as const };
+      const isDraftOrQueued = ps.status === "draft" || ps.status === "queued";
       return {
         id,
         label: id,
-        metadata: `inbox [${meta.status}]`,
-        color: meta.status === "draft" ? "yellow" : "gray",
+        metadata: isDraftOrQueued
+          ? `inbox [${ps.status}]`
+          : `active [${ps.status}]`,
+        color:
+          ps.status === "draft"
+            ? "yellow"
+            : ps.status === "blocked"
+            ? "red"
+            : "green",
       };
     });
-
-    const activeOptions = Object.entries(state.plans).map(([id, ps]) => ({
-      id,
-      label: id,
-      metadata: `active [${ps.status ?? "unknown"}]`,
-      color: ps.status === "blocked" ? "red" : "green",
-    }));
-
-    const options = [...inboxOptions, ...activeOptions];
 
     if (options.length === 0) {
       console.log("No plans found to edit.");
@@ -74,13 +76,18 @@ export async function runEdit(
   } else {
     // Check if ingested (in state)
     const ps = state.plans[planId];
-    if (ps) {
+    if (ps && ps.worktree && ps.planRelpath) {
       planPath = join(ps.worktree, ps.planRelpath);
       cwd = ps.worktree;
       console.log(`Editing ingested plan in worktree: ${planId}`);
     } else {
       console.error(`Plan not found: ${planId}`);
-      console.error("Check inbox or active plans with 'prloom status'.");
+      console.error("Check inbox or active plans with 'prloom status'. ");
+      if (ps && !ps.worktree) {
+        console.error(
+          "Note: This plan is in state but not yet activated (no worktree)."
+        );
+      }
       process.exit(1);
     }
   }
@@ -119,11 +126,11 @@ export async function runEdit(
 
   // For inbox plans: check if still draft and prompt to queue
   if (isInbox) {
-    const meta = getInboxMeta(repoRoot, planId);
-    if (meta.status === "draft") {
+    const ps = getPlanMeta(repoRoot, planId);
+    if (ps.status === "draft") {
       const shouldQueue = await confirm("Queue this plan for the dispatcher?");
       if (shouldQueue) {
-        setInboxStatus(repoRoot, planId, "queued");
+        setPlanStatus(repoRoot, planId, "queued");
         console.log("Plan queued. Run 'prloom start' to dispatch.");
       } else {
         console.log("Plan left as draft.");

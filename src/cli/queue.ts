@@ -2,8 +2,9 @@ import { existsSync } from "fs";
 import {
   listInboxPlanIds,
   getInboxPath,
-  getInboxMeta,
-  setInboxStatus,
+  getPlanMeta,
+  setPlanStatus,
+  loadState,
 } from "../lib/state.js";
 import { resolvePlanId } from "../lib/resolver.js";
 import { promptSelection } from "../ui/Selection.js";
@@ -18,15 +19,20 @@ export async function runQueue(
     planId = await resolvePlanId(repoRoot, planIdInput);
   } else {
     // Show picker for draft plans
-    const inboxIds = listInboxPlanIds(repoRoot);
-    const options = inboxIds
+    const state = loadState(repoRoot);
+    const diskIds = listInboxPlanIds(repoRoot);
+    const allIds = Array.from(
+      new Set([...Object.keys(state.plans), ...diskIds])
+    );
+
+    const options = allIds
       .map((id) => {
-        const meta = getInboxMeta(repoRoot, id);
+        const ps = state.plans[id] ?? { status: "draft" as const };
         return {
           id,
           label: id,
-          metadata: meta.status,
-          color: meta.status === "draft" ? "yellow" : "gray",
+          metadata: ps.status,
+          color: ps.status === "draft" ? "yellow" : "gray",
         };
       })
       .filter((opt) => opt.metadata === "draft");
@@ -47,13 +53,13 @@ export async function runQueue(
     process.exit(1);
   }
 
-  const meta = getInboxMeta(repoRoot, planId);
+  const ps = getPlanMeta(repoRoot, planId);
 
-  if (meta.status === "queued") {
+  if (ps.status === "queued") {
     console.log(`Plan ${planId} is already queued.`);
     return;
   }
 
-  setInboxStatus(repoRoot, planId, "queued");
+  setPlanStatus(repoRoot, planId, "queued");
   console.log(`✅ Queued ${planId} for dispatch.`);
 }

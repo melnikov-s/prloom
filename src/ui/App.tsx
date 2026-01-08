@@ -138,8 +138,13 @@ function SelectablePlanRow({
   error,
   isSelected,
 }: SelectablePlanRowProps): React.ReactElement {
-  const statusColor = getStatusColor(status);
-  const statusEmoji = getStatusEmoji(status);
+  // Defensive: ensure all string values are defined
+  const safeId = id ?? "";
+  const safeBranch = branch ?? "";
+  const safeStatus = status ?? "unknown";
+
+  const statusColor = getStatusColor(safeStatus);
+  const statusEmoji = getStatusEmoji(safeStatus);
   const prUrl = pr && repoUrl ? `${repoUrl}/pull/${pr}` : pr ? `#${pr}` : "—";
 
   return (
@@ -151,18 +156,18 @@ function SelectablePlanRow({
       </Box>
       <Box width={COL_ID}>
         <Text color={isSelected ? "cyan" : undefined} bold={isSelected}>
-          {id.slice(0, COL_ID - 2)}
+          {safeId.slice(0, COL_ID - 2)}
         </Text>
       </Box>
       <Box width={COL_BRANCH}>
         <Text dimColor={!isSelected} color={isSelected ? "cyan" : undefined}>
-          {branch.slice(0, COL_BRANCH - 2)}
+          {safeBranch.slice(0, COL_BRANCH - 2)}
         </Text>
       </Box>
       <Box width={COL_STATUS}>
         <Text>
           {statusEmoji}{" "}
-          <Text color={statusColor}>{status.slice(0, 7).padEnd(7)}</Text>
+          <Text color={statusColor}>{safeStatus.slice(0, 7).padEnd(7)}</Text>
         </Text>
       </Box>
       <Box width={COL_PROGRESS}>
@@ -404,27 +409,17 @@ export function InteractivePlanPanel({
   selectedActionIndex,
   isInActionMode,
 }: InteractivePlanPanelProps): React.ReactElement {
-  // Combine inbox and active plans
-  const inboxEntries = Object.entries(uiState.state.inbox).map(
-    ([id, meta]) => ({
+  // All plans are now in a single object
+  const allPlans = Object.entries(uiState.state.plans)
+    .filter(([, ps]) => ps != null)
+    .map(([id, ps]) => ({
       id,
-      type: "inbox" as const,
-      status: meta.status,
-      branch: id,
-      pr: undefined as number | undefined,
-    })
-  );
+      status: ps.status ?? "draft",
+      branch: ps.branch ?? id,
+      pr: ps.pr,
+      ps,
+    }));
 
-  const activeEntries = Object.entries(uiState.state.plans).map(([id, ps]) => ({
-    id,
-    type: "active" as const,
-    status: ps.status,
-    branch: ps.branch,
-    pr: ps.pr,
-    ps,
-  }));
-
-  const allPlans = [...inboxEntries, ...activeEntries];
   const planCount = allPlans.length;
 
   return (
@@ -446,10 +441,7 @@ export function InteractivePlanPanel({
               const isSelected = idx === selectedPlanIndex && !isInActionMode;
               const isExpanded = plan.id === expandedPlanId;
               const status = plan.status;
-              const ps =
-                plan.type === "active"
-                  ? uiState.state.plans[plan.id]
-                  : undefined;
+              const ps = plan.ps;
 
               // Get available actions for this plan's status
               const availableActions = ACTIONS.filter(

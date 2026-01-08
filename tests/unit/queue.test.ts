@@ -13,8 +13,8 @@ import { runStatus } from "../../src/cli/status.js";
 import {
   getInboxPath,
   loadState,
-  getInboxMeta,
-  setInboxStatus,
+  getPlanMeta,
+  setPlanStatus,
 } from "../../src/lib/state.js";
 import { generatePlanSkeleton } from "../../src/lib/plan.js";
 
@@ -29,26 +29,26 @@ afterEach(() => {
   rmSync(repoRoot, { recursive: true });
 });
 
-test("runQueue transitions draft to queued (via state.inbox)", async () => {
+test("runQueue transitions draft to queued (via state.plans)", async () => {
   // Use simple ID without hyphens to avoid resolver extracting suffix
   const id = "abc123";
   const inboxPath = getInboxPath(repoRoot, id);
   const skeleton = generatePlanSkeleton(id);
   writeFileSync(inboxPath, skeleton);
 
-  // Set initial status to draft in state.inbox
-  setInboxStatus(repoRoot, id, "draft");
+  // Set initial status to draft in state.plans
+  setPlanStatus(repoRoot, id, "draft");
 
   // Verify starts as draft
-  expect(getInboxMeta(repoRoot, id).status).toBe("draft");
+  expect(getPlanMeta(repoRoot, id).status).toBe("draft");
 
   await runQueue(repoRoot, id);
 
-  // Now queued in state.inbox
-  expect(getInboxMeta(repoRoot, id).status).toBe("queued");
+  // Now queued in state.plans
+  expect(getPlanMeta(repoRoot, id).status).toBe("queued");
 });
 
-test("runStatus shows draft/queued labels from state.inbox", async () => {
+test("runStatus shows draft/queued labels from state.plans", async () => {
   const id1 = "plan1";
   const id2 = "plan2";
   const path1 = getInboxPath(repoRoot, id1);
@@ -57,9 +57,9 @@ test("runStatus shows draft/queued labels from state.inbox", async () => {
   writeFileSync(path1, generatePlanSkeleton(id1));
   writeFileSync(path2, generatePlanSkeleton(id2));
 
-  // Set status in state.inbox
-  setInboxStatus(repoRoot, id1, "draft");
-  setInboxStatus(repoRoot, id2, "queued");
+  // Set status in state.plans
+  setPlanStatus(repoRoot, id1, "draft");
+  setPlanStatus(repoRoot, id2, "queued");
 
   // Capture console.log
   const logs: string[] = [];
@@ -84,8 +84,8 @@ test("runQueue is idempotent (already queued)", async () => {
   const skeleton = generatePlanSkeleton(id);
   writeFileSync(inboxPath, skeleton);
 
-  // Set to queued in state.inbox
-  setInboxStatus(repoRoot, id, "queued");
+  // Set to queued in state.plans
+  setPlanStatus(repoRoot, id, "queued");
 
   const logs: string[] = [];
   const originalLog = console.log;
@@ -98,15 +98,15 @@ test("runQueue is idempotent (already queued)", async () => {
   }
 
   expect(logs.join("\n")).toContain("already queued");
-  expect(getInboxMeta(repoRoot, id).status).toBe("queued");
+  expect(getPlanMeta(repoRoot, id).status).toBe("queued");
 });
 
-test("getInboxMeta defaults to draft when no meta exists", () => {
+test("getPlanMeta defaults to draft when no meta exists", () => {
   const id = "nometa";
   const inboxPath = getInboxPath(repoRoot, id);
   writeFileSync(inboxPath, generatePlanSkeleton(id));
 
-  // Don't call setInboxStatus - should default to draft
-  const meta = getInboxMeta(repoRoot, id);
+  // Don't call setPlanStatus - should default to draft
+  const meta = getPlanMeta(repoRoot, id);
   expect(meta.status).toBe("draft");
 });
