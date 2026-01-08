@@ -72,6 +72,11 @@ yargs(hideBin(process.argv))
           type: "boolean",
           describe: "Create plan skeleton without launching designer session",
           default: false,
+        })
+        .option("branch", {
+          alias: "b",
+          type: "string",
+          describe: "Preferred branch name (defaults to plan ID)",
         }),
     async (argv) => {
       const { runNew } = await import("./new.js");
@@ -80,7 +85,8 @@ yargs(hideBin(process.argv))
         argv["plan-id"],
         argv.agent,
         argv["no-designer"],
-        argv.model
+        argv.model,
+        argv.branch
       );
     }
   )

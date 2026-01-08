@@ -22,7 +22,7 @@ test("getInboxPath: resolves prefixed filename", () => {
   const inboxDir = join(repoRoot, "prloom", ".local", "inbox");
   const planPath = join(inboxDir, prefixedName);
 
-  writeFileSync(planPath, generatePlanSkeleton(id));
+  writeFileSync(planPath, generatePlanSkeleton());
 
   const resolvedPath = getInboxPath(repoRoot, id);
   expect(resolvedPath).toBe(planPath);
@@ -35,15 +35,15 @@ test("listInboxPlanIds: extracts ID from prefixed filenames", () => {
 
   writeFileSync(
     join(inboxDir, `feat-one-${id1}.md`),
-    generatePlanSkeleton(id1)
+    generatePlanSkeleton()
   );
   writeFileSync(
     join(inboxDir, `feat-two-${id2}.md`),
-    generatePlanSkeleton(id2)
+    generatePlanSkeleton()
   );
   writeFileSync(
     join(inboxDir, `no-prefix.md`),
-    generatePlanSkeleton("no-prefix")
+    generatePlanSkeleton()
   );
 
   const ids = listInboxPlanIds(repoRoot);

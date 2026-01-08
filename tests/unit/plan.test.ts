@@ -11,9 +11,9 @@ import {
 
 const FIXTURE_PATH = join(import.meta.dir, "../fixtures/plans/sample.md");
 
-test("parsePlan extracts frontmatter id", () => {
+test("parsePlan extracts title section", () => {
   const plan = parsePlan(FIXTURE_PATH);
-  expect(plan.frontmatter.id).toBe("sample");
+  expect(plan.title).toBe("Sample plan fixture");
 });
 
 test("parsePlan extracts objective section", () => {
@@ -56,11 +56,12 @@ test("extractBody includes objective and progress log", () => {
   expect(body).toContain("✅ Completed: Second task");
 });
 
-test("generatePlanSkeleton creates valid frontmatter", () => {
-  const skeleton = generatePlanSkeleton("test-plan");
+test("generatePlanSkeleton creates valid markdown without frontmatter", () => {
+  const skeleton = generatePlanSkeleton();
 
-  expect(skeleton).toContain("id: test-plan");
-  expect(skeleton).not.toContain("status:");
+  expect(skeleton).not.toContain("---");
+  expect(skeleton).not.toContain("id:");
+  expect(skeleton).toContain("## Title");
   expect(skeleton).toContain("## Objective");
   expect(skeleton).toContain("## TODO");
 });
@@ -70,11 +71,7 @@ test("parsePlan strips HTML comments from title", () => {
   const planPath = join(tmpDir, "test-plan.md");
 
   // Plan with only HTML comment placeholder in title section
-  const planContent = `---
-id: test-plan
----
-
-## Title
+  const planContent = `## Title
 
 <!-- Short PR title (e.g., "Fix PDF viewer pagination") -->
 
@@ -101,11 +98,7 @@ test("parsePlan extracts actual title when provided", () => {
   const tmpDir = mkdtempSync(join(tmpdir(), "prloom-test-"));
   const planPath = join(tmpDir, "test-plan.md");
 
-  const planContent = `---
-id: test-plan
----
-
-## Title
+  const planContent = `## Title
 
 Add dark mode support for the dashboard
 
@@ -131,11 +124,7 @@ test("parsePlan captures indented context lines for TODOs", () => {
   const tmpDir = mkdtempSync(join(tmpdir(), "prloom-test-"));
   const planPath = join(tmpDir, "test-plan.md");
 
-  const planContent = `---
-id: context-todo-plan
----
-
-## TODO
+  const planContent = `## TODO
 
 - [ ] Remove debug flag
   File: src/foo.ts:42
@@ -177,11 +166,7 @@ test("parsePlan handles mixed TODOs with and without context", () => {
   const tmpDir = mkdtempSync(join(tmpdir(), "prloom-test-"));
   const planPath = join(tmpDir, "test-plan.md");
 
-  const planContent = `---
-id: mixed-plan
----
-
-## TODO
+  const planContent = `## TODO
 
 - [ ] Task A
 - [ ] Task B with context
@@ -214,30 +199,13 @@ id: mixed-plan
 });
 
 
-test("generatePlanSkeleton includes base_branch when provided", () => {
-  const skeleton = generatePlanSkeleton("test-plan", "release/1.2");
-
-  expect(skeleton).toContain("id: test-plan");
-  expect(skeleton).toContain("base_branch: release/1.2");
-});
-
-test("generatePlanSkeleton omits base_branch when not provided", () => {
-  const skeleton = generatePlanSkeleton("test-plan");
-
-  expect(skeleton).not.toContain("base_branch:");
-});
-
 // findNextUnchecked completion tests
 test("findNextUnchecked returns null when all TODOs are complete", () => {
   const tmpDir = mkdtempSync(join(tmpdir(), "prloom-test-"));
   const planPath = join(tmpDir, "test-plan.md");
 
   // Create a plan with all TODOs marked complete
-  const planContent = `---
-id: completed-plan
----
-
-## Objective
+  const planContent = `## Objective
 
 Test plan
 
@@ -267,11 +235,7 @@ test("findNextUnchecked returns null when TODO section is empty", () => {
   const tmpDir = mkdtempSync(join(tmpdir(), "prloom-test-"));
   const planPath = join(tmpDir, "test-plan.md");
 
-  const planContent = `---
-id: empty-plan
----
-
-## Objective
+  const planContent = `## Objective
 
 Test plan
 
@@ -294,11 +258,7 @@ test("parsePlan parses blocked marker [b]", () => {
   const tmpDir = mkdtempSync(join(tmpdir(), "prloom-test-"));
   const planPath = join(tmpDir, "test-plan.md");
 
-  const planContent = `---
-id: blocked-todo-plan
----
-
-## TODO
+  const planContent = `## TODO
 
 - [x] Done task
 - [b] Blocked task

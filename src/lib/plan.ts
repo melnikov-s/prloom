@@ -1,12 +1,4 @@
 import { readFileSync, writeFileSync } from "fs";
-import matter from "gray-matter";
-
-export interface PlanFrontmatter {
-  id: string;
-  branch?: string;
-  pr?: number;
-  base_branch?: string;
-}
 
 export interface TodoItem {
   index: number;
@@ -19,7 +11,6 @@ export interface TodoItem {
 
 export interface Plan {
   path: string;
-  frontmatter: PlanFrontmatter;
   title: string;
   objective: string;
   context: string;
@@ -30,31 +21,21 @@ export interface Plan {
 
 export function parsePlan(path: string): Plan {
   const raw = readFileSync(path, "utf-8");
-  const { data, content } = matter(raw);
 
-  const frontmatter: PlanFrontmatter = {
-    id: data.id ?? "",
-    branch: data.branch,
-    pr: data.pr,
-    base_branch:
-      typeof data.base_branch === "string" ? data.base_branch : undefined,
-  };
-
-  // Extract sections
+  // Extract sections (no frontmatter - just pure markdown)
   // Strip HTML comments from title so placeholder comments don't become PR titles
-  const rawTitle = extractSection(content, "Title") ?? "";
+  const rawTitle = extractSection(raw, "Title") ?? "";
   const title = stripHtmlComments(rawTitle);
-  const objective = extractSection(content, "Objective") ?? "";
-  const context = extractSection(content, "Context") ?? "";
-  const progressLog = extractSection(content, "Progress Log") ?? "";
+  const objective = extractSection(raw, "Objective") ?? "";
+  const context = extractSection(raw, "Context") ?? "";
+  const progressLog = extractSection(raw, "Progress Log") ?? "";
 
   // Parse TODOs
-  const todoSection = extractSection(content, "TODO") ?? "";
+  const todoSection = extractSection(raw, "TODO") ?? "";
   const todos = parseTodos(todoSection);
 
   return {
     path,
-    frontmatter,
     title,
     objective,
     context,
@@ -120,24 +101,6 @@ export function findNextUnchecked(plan: Plan): TodoItem | null {
   return plan.todos.find((t) => !t.done) ?? null;
 }
 
-export function setBranch(path: string, branch: string): void {
-  const raw = readFileSync(path, "utf-8");
-  const { data, content } = matter(raw);
-
-  data.branch = branch;
-  const updated = matter.stringify(content, data);
-  writeFileSync(path, updated);
-}
-
-export function setPR(path: string, pr: number): void {
-  const raw = readFileSync(path, "utf-8");
-  const { data, content } = matter(raw);
-
-  data.pr = pr;
-  const updated = matter.stringify(content, data);
-  writeFileSync(path, updated);
-}
-
 export function extractBody(plan: Plan): string {
   let body = `## Objective\n\n${plan.objective}`;
 
@@ -153,22 +116,12 @@ export function extractBody(plan: Plan): string {
 }
 
 /**
- * Generate a plan skeleton with deterministic frontmatter.
+ * Generate a plan skeleton (pure markdown, no frontmatter).
  * The designer agent will fill in the content sections.
- * Status is NOT in frontmatter - it's tracked in state.inbox.
+ * All metadata is tracked in state.json.
  */
-export function generatePlanSkeleton(id: string, baseBranch?: string): string {
-  const frontmatter: Record<string, string> = {
-    id,
-    branch: "", // Designer can specify a descriptive branch name here
-  };
-
-  if (baseBranch) {
-    frontmatter.base_branch = baseBranch;
-  }
-
-  const content = `
-## Title
+export function generatePlanSkeleton(): string {
+  return `## Title
 
 <!-- Short PR title (e.g., "Fix PDF viewer pagination") -->
 
@@ -188,8 +141,6 @@ export function generatePlanSkeleton(id: string, baseBranch?: string): string {
 
 <!-- Worker appends entries here -->
 `;
-
-  return matter.stringify(content.trim(), frontmatter);
 }
 
 /**
@@ -200,11 +151,10 @@ export function addTodos(path: string, todos: string[]): void {
   if (todos.length === 0) return;
 
   const raw = readFileSync(path, "utf-8");
-  const { data, content } = matter(raw);
 
   // Find the TODO section and append new items
   const todoPattern = /## TODO\s*\n([\s\S]*?)(?=\n## |$)/i;
-  const match = content.match(todoPattern);
+  const match = raw.match(todoPattern);
 
   if (!match) {
     throw new Error("No TODO section found in plan");
@@ -214,12 +164,8 @@ export function addTodos(path: string, todos: string[]): void {
   const newTodos = todos.map((t) => `- [ ] ${t}`).join("\n");
   const updatedTodoSection = todoSection.trimEnd() + "\n" + newTodos + "\n";
 
-  const updatedContent = content.replace(
-    todoPattern,
-    `## TODO\n${updatedTodoSection}`
-  );
+  const updated = raw.replace(todoPattern, `## TODO\n${updatedTodoSection}`);
 
-  const updated = matter.stringify(updatedContent, data);
   writeFileSync(path, updated);
 }
 
@@ -228,10 +174,9 @@ export function addTodos(path: string, todos: string[]): void {
  */
 export function appendProgressLog(path: string, entry: string): void {
   const raw = readFileSync(path, "utf-8");
-  const { data, content } = matter(raw);
 
   const logPattern = /## Progress Log\s*\n([\s\S]*)$/i;
-  const match = content.match(logPattern);
+  const match = raw.match(logPattern);
 
   if (!match) {
     throw new Error("No Progress Log section found in plan");
@@ -242,11 +187,7 @@ export function appendProgressLog(path: string, entry: string): void {
   const newEntry = `\n- ${timestamp}: ${entry}`;
   const updatedLogSection = logSection.trimEnd() + newEntry + "\n";
 
-  const updatedContent = content.replace(
-    logPattern,
-    `## Progress Log\n${updatedLogSection}`
-  );
+  const updated = raw.replace(logPattern, `## Progress Log\n${updatedLogSection}`);
 
-  const updated = matter.stringify(updatedContent, data);
   writeFileSync(path, updated);
 }

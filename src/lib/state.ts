@@ -14,12 +14,16 @@ export interface PlanState {
   /** Agent to use for this plan */
   agent?: AgentName;
 
+  // Plan creation fields - set when plan is created via `prloom new`
+  /** Base branch to create the worktree from (captured at plan creation) */
+  baseBranch?: string;
+
   // Activation fields - only populated after plan is activated by dispatcher
   worktree?: string;
+  /** Git branch name (user preference before activation, actual name after) */
   branch?: string;
   pr?: number;
   planRelpath?: string; // e.g. "prloom/.local/plan.md" (gitignored)
-  baseBranch?: string; // e.g. "main" for rebase
 
   /** Plan execution status - covers full lifecycle from draft to done */
   status:

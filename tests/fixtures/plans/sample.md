@@ -1,8 +1,3 @@
----
-id: sample
-base_branch: develop
----
-
 ## Title
 
 Sample plan fixture

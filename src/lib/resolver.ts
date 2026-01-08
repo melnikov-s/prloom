@@ -1,14 +1,13 @@
 import { join } from "path";
 import { existsSync } from "fs";
-import { loadState, listInboxPlanIds, getInboxPath } from "./state.js";
-import { parsePlan } from "./plan.js";
+import { loadState, listInboxPlanIds } from "./state.js";
 
 /**
  * Resolves a user-provided input string to a unique Plan ID.
  * Supports:
  * 1. Exact Plan ID (e.g. "k7r2p")
  * 2. Full Git Branch Name (e.g. "fix-bug-x9y8z")
- * 3. Descriptive Branch Name (e.g. "fix-bug")
+ * 3. Branch Preference (e.g. "fix-bug") from state.json
  *
  * If the input is ambiguous, it throws an error listing matches.
  */
@@ -41,40 +40,10 @@ export async function resolvePlanId(
     matches.add(input);
   }
 
-  // 2. Check for Exact Branch match in active state
+  // 2. Check for Branch match in state (works for both preference and actual)
   for (const [id, ps] of Object.entries(state.plans)) {
     if (ps.branch === input) {
       matches.add(id);
-    }
-  }
-
-  // 3. Check for Descriptive Branch match in Inbox plans frontmatter
-  for (const id of inboxIds) {
-    try {
-      const plan = parsePlan(getInboxPath(repoRoot, id));
-      if (plan.frontmatter.branch === input) {
-        matches.add(id);
-      }
-    } catch {
-      // Ignore parse errors for individual plans
-    }
-  }
-
-  // 4. Check for Descriptive Branch match in Active plans
-  // We check the plan file in the worktree to be accurate
-  for (const [id, ps] of Object.entries(state.plans)) {
-    if (ps.worktree && ps.planRelpath) {
-      const planPath = join(ps.worktree, ps.planRelpath);
-      if (existsSync(planPath)) {
-        try {
-          const plan = parsePlan(planPath);
-          if (plan.frontmatter.branch === input) {
-            matches.add(id);
-          }
-        } catch {
-          // Ignore
-        }
-      }
     }
   }
 

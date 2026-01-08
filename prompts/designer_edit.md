@@ -22,5 +22,3 @@ You are helping a software engineer **refine** an existing plan.
 1. Ask what needs to change
 2. Update Objective, Context, or TODOs per user's direction
 3. Keep TODOs small and sequential
-
-Leave the frontmatter alone, except for the `branch` field if the user requests a specific branch name.

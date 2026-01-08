@@ -245,8 +245,8 @@ export async function ingestInboxPlans(
     try {
       const plan = parsePlan(inboxPath);
 
-      // Trust the frontmatter ID for tracking (and inbox metadata lookup)
-      const actualId = plan.frontmatter.id;
+      // Plan ID is the filename (no frontmatter needed)
+      const actualId = planId;
 
       // Auto-discovery: Ensure plan exists in state.plans
       if (!state.plans[actualId]) {
@@ -271,14 +271,15 @@ export async function ingestInboxPlans(
 
       log.info(`📥 Ingesting inbox plan: ${actualId} (from ${planId}.md)`);
 
-      // Determine base branch for this plan
-      const baseBranch = plan.frontmatter.base_branch ?? config.base_branch;
+      // Determine base branch for this plan (from state, falls back to config)
+      const baseBranch = planMeta.baseBranch ?? config.base_branch;
       log.info(`   Base branch: ${baseBranch}`);
 
       // Create branch and worktree
+      // Use branch from state if set, otherwise use plan ID
       const branchBase =
-        plan.frontmatter.branch && plan.frontmatter.branch.trim() !== ""
-          ? plan.frontmatter.branch
+        planMeta.branch && planMeta.branch.trim() !== ""
+          ? planMeta.branch
           : actualId;
 
       const desiredBranch = await createBranchName(branchBase);
@@ -443,6 +444,7 @@ export async function processActivePlans(
           repoRoot,
           config,
           ps as ActivatedPlanState,
+          planId,
           plan,
           options,
           log
@@ -482,6 +484,7 @@ export async function processActivePlans(
                 repoRoot,
                 config,
                 ps as ActivatedPlanState,
+                planId,
                 plan,
                 newFeedback,
                 options,
@@ -799,6 +802,7 @@ async function runTriage(
   repoRoot: string,
   config: Config,
   ps: ActivatedPlanState,
+  planId: string,
   plan: ReturnType<typeof parsePlan>,
   feedback: PRFeedback[],
   options: DispatcherOptions = {},
@@ -818,21 +822,21 @@ async function runTriage(
   const prompt = renderTriagePrompt(repoRoot, ps.worktree, plan, feedback);
 
   log.info(
-    `🔍 Running triage for ${plan.frontmatter.id}...`,
-    plan.frontmatter.id
+    `🔍 Running triage for ${planId}...`,
+    planId
   );
-  log.info(`   Using agent: ${triageConfig.agent}`, plan.frontmatter.id);
+  log.info(`   Using agent: ${triageConfig.agent}`, planId);
 
   // Build tmux config if available and not explicitly disabled
   const useTmux = options.tmux !== false && (await hasTmux());
   const tmuxConfig = useTmux
-    ? { sessionName: `prloom-triage-${plan.frontmatter.id}` }
+    ? { sessionName: `prloom-triage-${planId}` }
     : undefined;
 
   if (tmuxConfig) {
     log.info(
       `   Spawning in tmux session: ${tmuxConfig.sessionName}`,
-      plan.frontmatter.id
+      planId
     );
   }
 
@@ -850,7 +854,7 @@ async function runTriage(
     await waitForProcess(execResult.pid);
   }
 
-  log.info(`   Triage agent completed`, plan.frontmatter.id);
+  log.info(`   Triage agent completed`, planId);
 
   // Read and process triage result
   try {
@@ -860,16 +864,16 @@ async function runTriage(
     if (result.rebase_requested) {
       log.info(
         `  Rebase requested, rebasing on ${ps.baseBranch}...`,
-        plan.frontmatter.id
+        planId
       );
       const rebaseResult = await rebaseOnBaseBranch(ps.worktree, ps.baseBranch);
 
       if (rebaseResult.hasConflicts) {
         log.warn(
           `   Rebase conflict detected, blocking plan`,
-          plan.frontmatter.id
+          planId
         );
-        log.info(`   Blocking plan`, plan.frontmatter.id);
+        log.info(`   Blocking plan`, planId);
         ps.blocked = true;
         ps.lastError = `Rebase conflict: ${rebaseResult.conflictFiles?.join(
           ", "
@@ -877,7 +881,7 @@ async function runTriage(
 
         log.info(
           `   Posting rebase conflict comment to PR #${ps.pr}`,
-          plan.frontmatter.id
+          planId
         );
         await postPRComment(
           repoRoot,
@@ -915,7 +919,7 @@ ${rebaseResult.conflictFiles?.join("\n")}
 
 5. Unblock the plan:
    \`\`\`
-   prloom unpause ${plan.frontmatter.id}
+   prloom unpause ${planId}
    \`\`\`
 
 The plan is now **blocked** until conflicts are resolved.`
@@ -923,49 +927,49 @@ The plan is now **blocked** until conflicts are resolved.`
       } else if (rebaseResult.success) {
         log.info(
           `   Force pushing rebased branch: ${ps.branch}`,
-          plan.frontmatter.id
+          planId
         );
         await forcePush(ps.worktree, ps.branch);
-        log.success(`   Rebased and force-pushed`, plan.frontmatter.id);
+        log.success(`   Rebased and force-pushed`, planId);
       }
     }
 
     // Post triage reply
-    log.info(`   Posting triage reply to PR #${ps.pr}`, plan.frontmatter.id);
+    log.info(`   Posting triage reply to PR #${ps.pr}`, planId);
     await postPRComment(repoRoot, ps.pr!, result.reply_markdown);
-    log.success(`   Posted triage reply`, plan.frontmatter.id);
+    log.success(`   Posted triage reply`, planId);
 
     // Commit any changes from triage
     log.info(
-      `   Committing: [prloom] ${plan.frontmatter.id}: triage`,
-      plan.frontmatter.id
+      `   Committing: [prloom] ${planId}: triage`,
+      planId
     );
     const committed = await commitAll(
       ps.worktree,
-      `[prloom] ${plan.frontmatter.id}: triage`
+      `[prloom] ${planId}: triage`
     );
     if (committed) {
-      log.info(`   Pushing to origin: ${ps.branch}`, plan.frontmatter.id);
+      log.info(`   Pushing to origin: ${ps.branch}`, planId);
       await push(ps.worktree, ps.branch);
     } else {
-      log.info(`   No changes to commit from triage`, plan.frontmatter.id);
+      log.info(`   No changes to commit from triage`, planId);
     }
     
     // Restore status to active after successful triage (unless blocked by rebase conflict)
     // The next dispatch loop will check for new TODOs and continue processing
     if (ps.status === "triaging") {
-      log.info(`   Setting plan status back to: active`, plan.frontmatter.id);
+      log.info(`   Setting plan status back to: active`, planId);
       ps.status = "active";
     }
   } catch (error) {
-    log.error(`   Triage failed: ${error}`, plan.frontmatter.id);
-    log.info(`   Blocking plan`, plan.frontmatter.id);
+    log.error(`   Triage failed: ${error}`, planId);
+    log.info(`   Blocking plan`, planId);
     ps.blocked = true;
     ps.lastError = `Triage failed: ${error}`;
 
     log.info(
       `   Posting triage error comment to PR #${ps.pr}`,
-      plan.frontmatter.id
+      planId
     );
     await postPRComment(
       repoRoot,
@@ -984,6 +988,7 @@ async function runReviewAgent(
   repoRoot: string,
   config: Config,
   ps: ActivatedPlanState,
+  planId: string,
   plan: ReturnType<typeof parsePlan>,
   options: DispatcherOptions = {},
   log: Logger
@@ -991,7 +996,7 @@ async function runReviewAgent(
   if (!ps.pr) {
     log.error(
       `   Cannot review: no PR associated with plan`,
-      plan.frontmatter.id
+      planId
     );
     return;
   }
@@ -1002,8 +1007,8 @@ async function runReviewAgent(
   // Set status to reviewing
   ps.status = "reviewing";
   log.info(
-    `🔍 Running review agent for ${plan.frontmatter.id}...`,
-    plan.frontmatter.id
+    `🔍 Running review agent for ${planId}...`,
+    planId
   );
 
   const reviewerConfig = getAgentConfig(config, "reviewer");
@@ -1016,18 +1021,18 @@ async function runReviewAgent(
     ps.baseBranch
   );
 
-  log.info(`   Using agent: ${reviewerConfig.agent}`, plan.frontmatter.id);
+  log.info(`   Using agent: ${reviewerConfig.agent}`, planId);
 
   // Build tmux config if available and not explicitly disabled
   const useTmux = options.tmux !== false && (await hasTmux());
   const tmuxConfig = useTmux
-    ? { sessionName: `prloom-review-${plan.frontmatter.id}` }
+    ? { sessionName: `prloom-review-${planId}` }
     : undefined;
 
   if (tmuxConfig) {
     log.info(
       `   Spawning in tmux session: ${tmuxConfig.sessionName}`,
-      plan.frontmatter.id
+      planId
     );
   }
 
@@ -1046,24 +1051,24 @@ async function runReviewAgent(
       await waitForProcess(execResult.pid);
     }
 
-    log.info(`   Review agent completed`, plan.frontmatter.id);
+    log.info(`   Review agent completed`, planId);
 
     // Read and process review result
     const result = readReviewResultFile(ps.worktree);
 
     log.info(
       `   Verdict: ${result.verdict}, ${result.comments.length} inline comments`,
-      plan.frontmatter.id
+      planId
     );
 
     // Submit review to GitHub (all comments posted atomically)
-    log.info(`   Submitting review to PR #${ps.pr}`, plan.frontmatter.id);
+    log.info(`   Submitting review to PR #${ps.pr}`, planId);
     await submitPRReview(repoRoot, ps.pr, {
       verdict: result.verdict,
       summary: result.summary,
       comments: result.comments,
     });
-    log.success(`   Review submitted to GitHub`, plan.frontmatter.id);
+    log.success(`   Review submitted to GitHub`, planId);
 
     // Set status back to active - the triage flow will pick up the review
     // comments on the next poll cycle
@@ -1073,17 +1078,17 @@ async function runReviewAgent(
     ps.pollOnce = true;
     log.info(
       `   Scheduled poll to process review feedback`,
-      plan.frontmatter.id
+      planId
     );
   } catch (error) {
-    log.error(`   Review failed: ${error}`, plan.frontmatter.id);
-    log.info(`   Blocking plan`, plan.frontmatter.id);
+    log.error(`   Review failed: ${error}`, planId);
+    log.info(`   Blocking plan`, planId);
     ps.blocked = true;
     ps.lastError = `Review failed: ${error}`;
 
     log.info(
       `   Posting review error comment to PR #${ps.pr}`,
-      plan.frontmatter.id
+      planId
     );
     await postPRComment(
       repoRoot,

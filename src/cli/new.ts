@@ -5,7 +5,13 @@ import { getAdapter, type AgentName } from "../lib/adapters/index.js";
 import { nanoid } from "nanoid";
 import { generatePlanSkeleton } from "../lib/plan.js";
 import { renderDesignerNewPrompt } from "../lib/template.js";
-import { ensureInboxDir, getInboxPath, setPlanStatus } from "../lib/state.js";
+import {
+  ensureInboxDir,
+  getInboxPath,
+  setPlanStatus,
+  loadState,
+  saveState,
+} from "../lib/state.js";
 import { getCurrentBranch, ensureRemoteBranchExists } from "../lib/git.js";
 import { confirm } from "./prompt.js";
 
@@ -14,7 +20,8 @@ export async function runNew(
   planId?: string,
   agentOverride?: string,
   noDesigner?: boolean,
-  model?: string
+  model?: string,
+  branchPreference?: string
 ): Promise<void> {
   const config = loadConfig(repoRoot);
 
@@ -55,15 +62,24 @@ export async function runNew(
     process.exit(1);
   }
 
-  // Create plan skeleton with deterministic frontmatter
-  const skeleton = generatePlanSkeleton(id, baseBranch);
+  // Create plan skeleton (pure markdown, no frontmatter)
+  const skeleton = generatePlanSkeleton();
   writeFileSync(planPath, skeleton);
 
-  // Save status as draft in state
-  setPlanStatus(repoRoot, id, "draft");
+  // Save plan metadata in state.json
+  const state = loadState(repoRoot);
+  state.plans[id] = {
+    status: "draft",
+    baseBranch,
+    branch: branchPreference,
+  };
+  saveState(repoRoot, state);
 
   console.log(`Created plan in inbox: ${planPath}`);
   console.log(`Base branch: ${baseBranch}`);
+  if (branchPreference) {
+    console.log(`Branch preference: ${branchPreference}`);
+  }
   console.log(`Worker agent: ${workerAgent}`);
 
   // Skip designer session if --no-designer flag is used

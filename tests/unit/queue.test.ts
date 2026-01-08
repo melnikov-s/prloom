@@ -33,7 +33,7 @@ test("runQueue transitions draft to queued (via state.plans)", async () => {
   // Use simple ID without hyphens to avoid resolver extracting suffix
   const id = "abc123";
   const inboxPath = getInboxPath(repoRoot, id);
-  const skeleton = generatePlanSkeleton(id);
+  const skeleton = generatePlanSkeleton();
   writeFileSync(inboxPath, skeleton);
 
   // Set initial status to draft in state.plans
@@ -54,8 +54,8 @@ test("runStatus shows draft/queued labels from state.plans", async () => {
   const path1 = getInboxPath(repoRoot, id1);
   const path2 = getInboxPath(repoRoot, id2);
 
-  writeFileSync(path1, generatePlanSkeleton(id1));
-  writeFileSync(path2, generatePlanSkeleton(id2));
+  writeFileSync(path1, generatePlanSkeleton());
+  writeFileSync(path2, generatePlanSkeleton());
 
   // Set status in state.plans
   setPlanStatus(repoRoot, id1, "draft");
@@ -81,7 +81,7 @@ test("runQueue is idempotent (already queued)", async () => {
   // Use simple ID without hyphens
   const id = "xyz789";
   const inboxPath = getInboxPath(repoRoot, id);
-  const skeleton = generatePlanSkeleton(id);
+  const skeleton = generatePlanSkeleton();
   writeFileSync(inboxPath, skeleton);
 
   // Set to queued in state.plans
@@ -104,7 +104,7 @@ test("runQueue is idempotent (already queued)", async () => {
 test("getPlanMeta defaults to draft when no meta exists", () => {
   const id = "nometa";
   const inboxPath = getInboxPath(repoRoot, id);
-  writeFileSync(inboxPath, generatePlanSkeleton(id));
+  writeFileSync(inboxPath, generatePlanSkeleton());
 
   // Don't call setPlanStatus - should default to draft
   const meta = getPlanMeta(repoRoot, id);

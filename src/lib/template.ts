@@ -54,7 +54,7 @@ export function renderWorkerPrompt(
   }
 
   let prompt = compiled({
-    plan_title: plan.title || plan.frontmatter.id,
+    plan_title: plan.title,
     plan_objective: plan.objective,
     plan_context: plan.context,
     plan_todos: planTodos,
@@ -205,7 +205,7 @@ export function renderReviewPrompt(
 
   return compiled({
     pr_number: prNumber,
-    plan_title: plan.title || plan.frontmatter.id,
+    plan_title: plan.title,
     plan_objective: plan.objective,
     plan_context: plan.context,
     branch,
