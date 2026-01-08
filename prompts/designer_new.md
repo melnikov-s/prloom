@@ -73,7 +73,7 @@ Each TODO item represents a **single commit**. Think of them as the git log you 
 - `Trace the code to understand X` — this is research, not a commit
 - `Validate acceptance criteria` — this is testing, not a commit
 
-The Worker will run tests and type-checks before each commit automatically.
+If there are tests or type-checks to run, specify them in the Context section (e.g., `npm test`, `npm run typecheck`). The Worker will only run what you specify.
 
 ## Important
 

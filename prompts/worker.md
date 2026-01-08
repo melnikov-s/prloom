@@ -38,8 +38,16 @@ You are implementing exactly ONE TODO item from this plan.
    - Append ONE bullet to `## Progress Log` summarizing what you did
 2. Implement only the specified TODO item
 3. Do NOT create commits yourself — the dispatcher commits after detecting `[x]`
-4. Run tests if specified in the Context section
+4. Run tests/linting if specified in the Context section
 5. Exit when done. The system detects completion from the checkbox.
+
+## Handling Lint/Format/Test Failures
+
+If tests, linting, or formatting fail:
+
+- **If caused by your changes**: Fix the issues before marking complete
+- **If pre-existing** (not caused by your changes): Mark `[b]` and note the blocker in the Progress Log
+- Do NOT spend time fixing unrelated issues — mark blocked and move on
 
 ## Important
 
