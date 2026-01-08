@@ -14,7 +14,6 @@ import {
   listInboxPlanIds,
   getInboxPath,
   deleteInboxPlan,
-  deleteInboxMeta,
   type State,
   type PlanState,
 } from "./state.js";
@@ -185,11 +184,6 @@ export async function runDispatcher(
           state.plans[id].status = "queued";
         }
       }
-      // Merge control_cursor (take the max to not re-process commands)
-      state.control_cursor = Math.max(
-        state.control_cursor,
-        diskState.control_cursor
-      );
 
       // 1. Consume IPC commands
       const { commands, newCursor } = consume(repoRoot, state.control_cursor);

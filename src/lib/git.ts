@@ -302,3 +302,33 @@ export function ensureWorktreePrloomDir(worktreePath: string): void {
     mkdirSync(prloomDir, { recursive: true });
   }
 }
+
+/**
+ * Remove a git worktree and its directory.
+ * Uses `git worktree remove --force` to clean up.
+ */
+export async function removeWorktree(
+  repoRoot: string,
+  worktreePath: string
+): Promise<void> {
+  if (!existsSync(worktreePath)) {
+    return;
+  }
+
+  try {
+    await execa("git", ["worktree", "remove", "--force", worktreePath], {
+      cwd: repoRoot,
+    });
+  } catch (error) {
+    // If git worktree remove fails, try to prune and remove manually
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    // Prune stale worktree entries
+    await execa("git", ["worktree", "prune"], { cwd: repoRoot });
+
+    // If directory still exists, remove it manually
+    if (existsSync(worktreePath)) {
+      const { rm } = await import("fs/promises");
+      await rm(worktreePath, { recursive: true, force: true });
+    }
+  }
+}

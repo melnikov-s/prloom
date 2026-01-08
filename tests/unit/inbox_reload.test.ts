@@ -168,37 +168,32 @@ test("plan status survives state reload with other plans present", () => {
   expect(state.plans[id2]?.status).toBe("queued");
 });
 
-test("ingestInboxPlans uses frontmatter ID for metadata lookup (filename has branch prefix)", async () => {
-  // Simulate a plan file with a branch-prefixed filename but short frontmatter ID
-  const frontmatterId = "abc123";
-  const filename = `my-feature-${frontmatterId}`;
+test("ingestInboxPlans uses filename as plan ID (frontmatter ID is ignored)", async () => {
+  // Plan file with branch-prefixed filename
+  // With per-worktree storage, the plan ID IS the filename, not the frontmatter ID
+  const filename = "my-feature-abc123";
   const inboxDir = join(repoRoot, "prloom", ".local", "inbox");
   const inboxPath = join(inboxDir, `${filename}.md`);
 
   writeFileSync(
     inboxPath,
     `---
-id: ${frontmatterId}
+id: abc123
 ---
 ## TODO
 - [ ] A task
 `
   );
 
-  // Set status using the frontmatter ID (as setPlanStatus does)
-  setPlanStatus(repoRoot, frontmatterId, "queued");
+  // Set status using the filename (which is now the plan ID)
+  setPlanStatus(repoRoot, filename, "queued");
 
-  // Verify it's stored under the frontmatter ID
+  // Verify it's stored under the filename
   const state = loadState(repoRoot);
-  expect(state.plans[frontmatterId]?.status).toBe("queued");
-  expect(state.plans[filename]).toBeUndefined(); // NOT stored under filename
+  expect(state.plans[filename]?.status).toBe("queued");
 
-  // ingestInboxPlans should find the queued status by reading the frontmatter ID
-  // (We can't fully test ingestion without mocking git, but we can verify the lookup works)
+  // The config and ingestion will use the filename as the plan ID
   const config = loadConfig(repoRoot);
-
-  // The state passed to ingestInboxPlans should have the plans metadata
-  // accessible via the frontmatter ID
-  const planMeta = state.plans[frontmatterId] ?? { status: "draft" as const };
+  const planMeta = state.plans[filename] ?? { status: "draft" as const };
   expect(planMeta.status).toBe("queued");
 });

@@ -14,18 +14,22 @@ export interface PlanState {
   /** Agent to use for this plan */
   agent?: AgentName;
 
-  // Plan creation fields - set when plan is created via `prloom new`
   /** Base branch to create the worktree from (captured at plan creation) */
   baseBranch?: string;
 
-  // Activation fields - only populated after plan is activated by dispatcher
+  /** Full path to worktree (only set after activation) */
   worktree?: string;
-  /** Git branch name (user preference before activation, actual name after) */
-  branch?: string;
-  pr?: number;
-  planRelpath?: string; // e.g. "prloom/.local/plan.md" (gitignored)
 
-  /** Plan execution status - covers full lifecycle from draft to done */
+  /** Git branch name */
+  branch?: string;
+
+  /** GitHub PR number */
+  pr?: number;
+
+  /** Relative path to plan file in worktree */
+  planRelpath?: string;
+
+  /** Plan execution status */
   status:
     | "draft"
     | "queued"
@@ -35,16 +39,16 @@ export interface PlanState {
     | "triaging"
     | "done";
 
-  /** Whether the plan is blocked (can happen at any status) */
+  /** Whether the plan is blocked */
   blocked?: boolean;
 
-  /** Active tmux session name when running with --tmux */
+  /** Active tmux session name */
   tmuxSession?: string;
 
-  /** Active agent process PID when running without tmux */
+  /** Active agent process PID */
   pid?: number;
 
-  /** Force a one-time PR feedback poll without shifting schedule */
+  /** Force a one-time PR feedback poll */
   pollOnce?: boolean;
 
   /** Flag to trigger a review agent run */
@@ -54,10 +58,10 @@ export interface PlanState {
   lastIssueCommentId?: number;
   lastReviewId?: number;
   lastReviewCommentId?: number;
-  lastPolledAt?: string; // ISO timestamp
-  lastError?: string; // For visibility in prloom status
+  lastPolledAt?: string;
+  lastError?: string;
 
-  // Retry tracking to detect stuck TODOs
+  // Retry tracking
   lastTodoIndex?: number;
   todoRetryCount?: number;
 }
@@ -67,16 +71,18 @@ export interface State {
   plans: Record<string, PlanState>;
 }
 
-const SWARM_DIR = "prloom/.local";
+const PRLOOM_DIR = "prloom/.local";
+const WORKTREES_DIR = "prloom/.local/worktrees";
+const INBOX_DIR = "inbox";
 const STATE_FILE = "state.json";
 const LOCK_FILE = "lock";
 
-function getSwarmDir(repoRoot: string): string {
-  return join(repoRoot, SWARM_DIR);
+function getPrloomDir(repoRoot: string): string {
+  return join(repoRoot, PRLOOM_DIR);
 }
 
-function ensureSwarmDir(repoRoot: string): void {
-  const dir = getSwarmDir(repoRoot);
+function ensurePrloomDir(repoRoot: string): void {
+  const dir = getPrloomDir(repoRoot);
   if (!existsSync(dir)) {
     mkdirSync(dir, { recursive: true });
   }
@@ -99,8 +105,8 @@ function isProcessAlive(pid: number): boolean {
 }
 
 export function acquireLock(repoRoot: string): void {
-  ensureSwarmDir(repoRoot);
-  const lockPath = join(getSwarmDir(repoRoot), LOCK_FILE);
+  ensurePrloomDir(repoRoot);
+  const lockPath = join(getPrloomDir(repoRoot), LOCK_FILE);
 
   if (existsSync(lockPath)) {
     const raw = readFileSync(lockPath, "utf-8");
@@ -118,62 +124,104 @@ export function acquireLock(repoRoot: string): void {
 }
 
 export function releaseLock(repoRoot: string): void {
-  const lockPath = join(getSwarmDir(repoRoot), LOCK_FILE);
+  const lockPath = join(getPrloomDir(repoRoot), LOCK_FILE);
   if (existsSync(lockPath)) {
     unlinkSync(lockPath);
   }
 }
 
-// State
+// State - stored per-worktree, scanned on load
 
+/**
+ * Load state by scanning worktrees and inbox.
+ * Each worktree has its own state.json, inbox plans have metadata in .json files.
+ */
 export function loadState(repoRoot: string): State {
-  ensureSwarmDir(repoRoot);
-  const statePath = join(getSwarmDir(repoRoot), STATE_FILE);
+  const plans: Record<string, PlanState> = {};
+  const worktreesDir = join(repoRoot, WORKTREES_DIR);
 
-  if (!existsSync(statePath)) {
-    return { control_cursor: 0, plans: {} };
-  }
-
-  try {
-    const raw = readFileSync(statePath, "utf-8");
-    const parsed = JSON.parse(raw);
-    // Migration: merge legacy inbox into plans if present
-    if (parsed.inbox && typeof parsed.inbox === "object") {
-      for (const [id, meta] of Object.entries(parsed.inbox)) {
-        if (!parsed.plans[id] && meta && typeof meta === "object") {
-          parsed.plans[id] = meta as PlanState;
+  // Scan worktrees
+  if (existsSync(worktreesDir)) {
+    for (const name of readdirSync(worktreesDir)) {
+      const worktreePath = join(worktreesDir, name);
+      const statePath = join(worktreePath, PRLOOM_DIR, STATE_FILE);
+      
+      if (!existsSync(statePath)) continue;
+      
+      try {
+        const raw = readFileSync(statePath, "utf-8");
+        const state = JSON.parse(raw);
+        if (state.id) {
+          plans[state.id] = { ...state, worktree: worktreePath };
         }
+      } catch {
+        // Skip corrupt state files
       }
-      delete parsed.inbox;
     }
-    return parsed as State;
-  } catch {
-    return { control_cursor: 0, plans: {} };
+  }
+
+  // Scan inbox
+  const inboxDir = join(getPrloomDir(repoRoot), INBOX_DIR);
+  if (existsSync(inboxDir)) {
+    for (const file of readdirSync(inboxDir)) {
+      if (!file.endsWith(".md")) continue;
+      
+      const id = file.replace(/\.md$/, "");
+      if (plans[id]) continue; // Already activated
+      
+      // Load metadata from .json file if exists
+      const metaPath = join(inboxDir, `${id}.json`);
+      if (existsSync(metaPath)) {
+        try {
+          const meta = JSON.parse(readFileSync(metaPath, "utf-8"));
+          plans[id] = { status: "draft", ...meta };
+        } catch {
+          plans[id] = { status: "draft" };
+        }
+      } else {
+        plans[id] = { status: "draft" };
+      }
+    }
+  }
+
+  return { control_cursor: 0, plans };
+}
+
+/**
+ * Save state to per-worktree files and inbox metadata.
+ */
+export function saveState(repoRoot: string, state: State): void {
+  for (const [id, ps] of Object.entries(state.plans)) {
+    if (ps.worktree) {
+      // Active plan - save to worktree state.json
+      const stateDir = join(ps.worktree, PRLOOM_DIR);
+      if (!existsSync(stateDir)) {
+        mkdirSync(stateDir, { recursive: true });
+      }
+      
+      const statePath = join(stateDir, STATE_FILE);
+      const { worktree, ...rest } = ps;
+      writeFileSync(statePath, JSON.stringify({ id, ...rest }, null, 2));
+    } else if (ps.status === "draft" || ps.status === "queued") {
+      // Inbox plan - save metadata to .json file
+      ensureInboxDir(repoRoot);
+      const metaPath = join(getPrloomDir(repoRoot), INBOX_DIR, `${id}.json`);
+      writeFileSync(metaPath, JSON.stringify(ps, null, 2));
+    }
   }
 }
 
-export function saveState(repoRoot: string, state: State): void {
-  ensureSwarmDir(repoRoot);
-  const statePath = join(getSwarmDir(repoRoot), STATE_FILE);
-  const tempPath = statePath + ".tmp";
-
-  writeFileSync(tempPath, JSON.stringify(state, null, 2));
-  renameSync(tempPath, statePath);
-}
-
-// Inbox (file storage - plans waiting to be activated)
-
-const INBOX_DIR = "inbox";
+// Inbox
 
 export function ensureInboxDir(repoRoot: string): void {
-  const inboxDir = join(getSwarmDir(repoRoot), INBOX_DIR);
+  const inboxDir = join(getPrloomDir(repoRoot), INBOX_DIR);
   if (!existsSync(inboxDir)) {
     mkdirSync(inboxDir, { recursive: true });
   }
 }
 
 export function getInboxPath(repoRoot: string, planId: string): string {
-  const inboxDir = join(getSwarmDir(repoRoot), INBOX_DIR);
+  const inboxDir = join(getPrloomDir(repoRoot), INBOX_DIR);
   const exactPath = join(inboxDir, `${planId}.md`);
 
   if (existsSync(exactPath)) {
@@ -193,13 +241,12 @@ export function getInboxPath(repoRoot: string, planId: string): string {
 }
 
 export function listInboxPlanIds(repoRoot: string): string[] {
-  const inboxDir = join(getSwarmDir(repoRoot), INBOX_DIR);
+  const inboxDir = join(getPrloomDir(repoRoot), INBOX_DIR);
   if (!existsSync(inboxDir)) {
     return [];
   }
 
-  const files = readdirSync(inboxDir);
-  return files
+  return readdirSync(inboxDir)
     .filter((f) => f.endsWith(".md"))
     .map((f) => f.replace(/\.md$/, ""));
 }
@@ -209,23 +256,17 @@ export function deleteInboxPlan(repoRoot: string, planId: string): void {
   if (existsSync(inboxPath)) {
     unlinkSync(inboxPath);
   }
-  // Also delete legacy metadata file if it exists
   const metaPath = inboxPath.replace(/\.md$/, ".json");
   if (existsSync(metaPath)) {
     unlinkSync(metaPath);
   }
 }
 
-// Plan metadata helpers (stored in state.plans)
+// Plan metadata helpers
 
 export function getPlanMeta(repoRoot: string, planId: string): PlanState {
   const state = loadState(repoRoot);
   return state.plans[planId] ?? { status: "draft" };
-}
-
-/** @deprecated Use getPlanMeta instead */
-export function getInboxMeta(repoRoot: string, planId: string): PlanState {
-  return getPlanMeta(repoRoot, planId);
 }
 
 export function setPlanStatus(
@@ -240,23 +281,8 @@ export function setPlanStatus(
   saveState(repoRoot, state);
 }
 
-/** @deprecated Use setPlanStatus instead */
-export function setInboxStatus(
-  repoRoot: string,
-  planId: string,
-  status: "draft" | "queued",
-  agent?: AgentName
-): void {
-  setPlanStatus(repoRoot, planId, status, agent);
-}
-
 export function deletePlanMeta(repoRoot: string, planId: string): void {
   const state = loadState(repoRoot);
   delete state.plans[planId];
   saveState(repoRoot, state);
-}
-
-/** @deprecated Use deletePlanMeta instead */
-export function deleteInboxMeta(repoRoot: string, planId: string): void {
-  deletePlanMeta(repoRoot, planId);
 }

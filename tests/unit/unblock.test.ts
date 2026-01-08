@@ -9,9 +9,11 @@ import {
 } from "../../src/lib/state.js";
 
 const TEST_DIR = "/tmp/prloom-test-unblock";
+const WORKTREE_DIR = join(TEST_DIR, "prloom/.local/worktrees/test-branch");
 
 beforeEach(() => {
   mkdirSync(join(TEST_DIR, "prloom", ".local"), { recursive: true });
+  mkdirSync(join(WORKTREE_DIR, "prloom", ".local"), { recursive: true });
 });
 
 afterEach(() => {
@@ -23,9 +25,9 @@ test("saveState persists retry counters", () => {
     control_cursor: 0,
     plans: {
       "test-plan": {
-        worktree: "/path/to/worktree",
+        worktree: WORKTREE_DIR,
         branch: "test-branch",
-        planRelpath: "prloom/plans/test-plan.md",
+        planRelpath: "prloom/.local/test-plan.md",
         baseBranch: "main",
         status: "active",
         lastTodoIndex: 2,
@@ -47,9 +49,9 @@ test("saveState with undefined retry counters clears them", () => {
     control_cursor: 0,
     plans: {
       "test-plan": {
-        worktree: "/path/to/worktree",
+        worktree: WORKTREE_DIR,
         branch: "test-branch",
-        planRelpath: "prloom/plans/test-plan.md",
+        planRelpath: "prloom/.local/test-plan.md",
         baseBranch: "main",
         status: "active",
         lastTodoIndex: 2,
@@ -64,9 +66,9 @@ test("saveState with undefined retry counters clears them", () => {
     control_cursor: 0,
     plans: {
       "test-plan": {
-        worktree: "/path/to/worktree",
+        worktree: WORKTREE_DIR,
         branch: "test-branch",
-        planRelpath: "prloom/plans/test-plan.md",
+        planRelpath: "prloom/.local/test-plan.md",
         baseBranch: "main",
         status: "active",
         lastTodoIndex: undefined,
@@ -98,9 +100,9 @@ test("saveState persists blocked property", () => {
     control_cursor: 0,
     plans: {
       "test-plan": {
-        worktree: "/path/to/worktree",
+        worktree: WORKTREE_DIR,
         branch: "test-branch",
-        planRelpath: "prloom/plans/test-plan.md",
+        planRelpath: "prloom/.local/test-plan.md",
         baseBranch: "main",
         status: "active",
         blocked: true,
@@ -121,9 +123,9 @@ test("blocked property is independent of status", () => {
     control_cursor: 0,
     plans: {
       "test-plan": {
-        worktree: "/path/to/worktree",
+        worktree: WORKTREE_DIR,
         branch: "test-branch",
-        planRelpath: "prloom/plans/test-plan.md",
+        planRelpath: "prloom/.local/test-plan.md",
         baseBranch: "main",
         status: "review",
         blocked: true,
@@ -144,9 +146,9 @@ test("unblocking preserves original status", () => {
     control_cursor: 0,
     plans: {
       "test-plan": {
-        worktree: "/path/to/worktree",
+        worktree: WORKTREE_DIR,
         branch: "test-branch",
-        planRelpath: "prloom/plans/test-plan.md",
+        planRelpath: "prloom/.local/test-plan.md",
         baseBranch: "main",
         status: "review",
         blocked: true,

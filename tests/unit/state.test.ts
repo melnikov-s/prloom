@@ -10,9 +10,11 @@ import {
 } from "../../src/lib/state.js";
 
 const TEST_DIR = "/tmp/prloom-test-state";
+const WORKTREE_DIR = join(TEST_DIR, "prloom/.local/worktrees/test-plan-xyz");
 
 beforeEach(() => {
   mkdirSync(TEST_DIR, { recursive: true });
+  mkdirSync(join(WORKTREE_DIR, "prloom", ".local"), { recursive: true });
 });
 
 afterEach(() => {
@@ -31,9 +33,9 @@ test("saveState and loadState round-trip", () => {
     control_cursor: 100,
     plans: {
       "test-plan": {
-        worktree: "/path/to/worktree",
+        worktree: WORKTREE_DIR,
         branch: "test-plan-xyz",
-        planRelpath: "plans/test-plan.md",
+        planRelpath: "prloom/.local/test-plan.md",
         baseBranch: "develop",
         status: "active",
       },
@@ -43,9 +45,10 @@ test("saveState and loadState round-trip", () => {
   saveState(TEST_DIR, state);
   const loaded = loadState(TEST_DIR);
 
-  expect(loaded.control_cursor).toBe(100);
-  expect(loaded.plans["test-plan"]?.worktree).toBe("/path/to/worktree");
-  expect(loaded.plans["test-plan"]?.planRelpath).toBe("plans/test-plan.md");
+  // Note: control_cursor is not persisted in per-worktree storage, always 0
+  expect(loaded.control_cursor).toBe(0);
+  expect(loaded.plans["test-plan"]?.worktree).toBe(WORKTREE_DIR);
+  expect(loaded.plans["test-plan"]?.planRelpath).toBe("prloom/.local/test-plan.md");
 });
 
 test("acquireLock creates lock file", () => {

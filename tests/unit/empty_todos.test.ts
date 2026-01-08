@@ -10,7 +10,7 @@ import {
   saveState,
   loadState,
   getInboxPath,
-  setInboxStatus,
+  setPlanStatus,
   type State,
 } from "../../src/lib/state.js";
 import { generatePlanSkeleton } from "../../src/lib/plan.js";
@@ -47,7 +47,7 @@ id: ${id}
   writeFileSync(inboxPath, content);
 
   // Set inbox status to queued via state (not frontmatter)
-  setInboxStatus(repoRoot, id, "queued");
+  setPlanStatus(repoRoot, id, "queued");
 
   const config = loadConfig(repoRoot);
   const state = loadState(repoRoot);
@@ -74,7 +74,7 @@ id: ${id}
   writeFileSync(inboxPath, content);
 
   // Set inbox status to draft (default) - should NOT be ingested
-  setInboxStatus(repoRoot, id, "draft");
+  setPlanStatus(repoRoot, id, "draft");
 
   const config = loadConfig(repoRoot);
   const state = loadState(repoRoot);

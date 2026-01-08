@@ -7,15 +7,24 @@ import { saveState } from "../../src/lib/state.js";
 import { generatePlanSkeleton } from "../../src/lib/plan.js";
 
 let repoRoot: string;
+let worktreesDir: string;
 
 beforeEach(() => {
   repoRoot = mkdtempSync(join(tmpdir(), "prloom-resolver-test-"));
+  worktreesDir = join(repoRoot, "prloom/.local/worktrees");
   mkdirSync(join(repoRoot, "prloom", ".local", "inbox"), { recursive: true });
 });
 
 afterEach(() => {
   rmSync(repoRoot, { recursive: true });
 });
+
+// Helper to create a worktree directory structure
+function createWorktreeDir(branchName: string): string {
+  const worktreePath = join(worktreesDir, branchName);
+  mkdirSync(join(worktreePath, "prloom", ".local"), { recursive: true });
+  return worktreePath;
+}
 
 test("resolvePlanId: exact ID match (inbox)", async () => {
   const id = "abcde";
@@ -28,13 +37,16 @@ test("resolvePlanId: exact ID match (inbox)", async () => {
 
 test("resolvePlanId: exact ID match (state)", async () => {
   const id = "fghij";
+  const branchName = "some-branch";
+  const worktreePath = createWorktreeDir(branchName);
+  
   saveState(repoRoot, {
     control_cursor: 0,
     plans: {
       [id]: {
-        worktree: "/tmp/fake",
-        branch: "some-branch",
-        planRelpath: "prloom/plans/fghij.md",
+        worktree: worktreePath,
+        branch: branchName,
+        planRelpath: "prloom/.local/fghij.md",
         baseBranch: "main",
         status: "active",
       },
@@ -53,7 +65,7 @@ test("resolvePlanId: branch match (state)", async () => {
   const planPath = join(repoRoot, "prloom", ".local", "inbox", `${id}.md`);
   writeFileSync(planPath, generatePlanSkeleton());
   
-  // Store branch in state
+  // Store branch in state (inbox plan, no worktree)
   saveState(repoRoot, {
     control_cursor: 0,
     plans: {
@@ -72,13 +84,15 @@ test("resolvePlanId: branch match (state)", async () => {
 test("resolvePlanId: fully qualified branch match (state)", async () => {
   const id = "pqrst";
   const fullBranch = "fix-bug-12345";
+  const worktreePath = createWorktreeDir(fullBranch);
+  
   saveState(repoRoot, {
     control_cursor: 0,
     plans: {
       [id]: {
-        worktree: "/tmp/fake",
+        worktree: worktreePath,
         branch: fullBranch,
-        planRelpath: "prloom/plans/pqrst.md",
+        planRelpath: "prloom/.local/pqrst.md",
         baseBranch: "main",
         status: "active",
       },
@@ -104,7 +118,7 @@ test("resolvePlanId: ambiguous match throws error", async () => {
     generatePlanSkeleton()
   );
 
-  // Both have same branch in state
+  // Both have same branch in state (inbox plans, no worktrees)
   saveState(repoRoot, {
     control_cursor: 0,
     plans: {

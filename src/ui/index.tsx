@@ -7,7 +7,7 @@ import { App, getAvailableActions, type ActionDef } from "./App.js";
 import { dispatcherEvents, type DispatcherUIState } from "../lib/events.js";
 import {
   loadState,
-  setInboxStatus,
+  setPlanStatus,
   listInboxPlanIds,
   getInboxPath,
 } from "../lib/state.js";
@@ -50,7 +50,7 @@ function TUIRunner({ repoRoot }: TUIRunnerProps): React.ReactElement {
     async (action: ActionDef, planId: string) => {
       if (action.key === "activate") {
         // Handle activate action directly - set inbox status to queued
-        setInboxStatus(repoRoot, planId, "queued");
+        setPlanStatus(repoRoot, planId, "queued");
         // Refresh state to update TUI
         const newState = loadState(repoRoot);
         dispatcherEvents.setState(newState);
