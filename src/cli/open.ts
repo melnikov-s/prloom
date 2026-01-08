@@ -107,6 +107,11 @@ export async function runOpen(
   console.log(`Worktree: ${ps.worktree}`);
 
   // Resume the latest agent session in this worktree
+  if (!ps.worktree) {
+    console.error("Plan has no worktree - it may not have been activated yet.");
+    process.exit(1);
+  }
+
   if (adapter.resume) {
     await adapter.resume({ cwd: ps.worktree });
   } else {

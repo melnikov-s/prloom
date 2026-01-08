@@ -601,9 +601,8 @@ export async function processActivePlans(
           );
 
           const prompt = renderWorkerPrompt(repoRoot, plan, todo);
-          const workerConfig = getAgentConfig(config, "worker");
-          const agentName = ps.agent ?? workerConfig.agent;
-          const adapter = getAdapter(agentName);
+          const workerConfig = getAgentConfig(config, "worker", ps.agent);
+          const adapter = getAdapter(workerConfig.agent);
 
           // Build tmux config if available and not explicitly disabled
           const useTmux = options.tmux !== false && (await hasTmux());
@@ -698,9 +697,11 @@ export async function processActivePlans(
           // Commit and push
           log.info(`   Committing: ${todo.text}`, planId);
           const committed = await commitAll(ps.worktree, todo.text);
-          if (committed) {
+          if (committed && ps.branch) {
             log.info(`   Pushing to origin: ${ps.branch}`, planId);
             await push(ps.worktree, ps.branch);
+          } else if (committed) {
+            log.warn(`   No branch set, skipping push`, planId);
           } else {
             log.info(`   No changes to commit`, planId);
           }

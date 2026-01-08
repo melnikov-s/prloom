@@ -1,6 +1,6 @@
 import { join } from "path";
 import { existsSync, readFileSync } from "fs";
-import { loadConfig } from "../lib/config.js";
+import { loadConfig, getAgentConfig } from "../lib/config.js";
 import { getAdapter, type AgentName } from "../lib/adapters/index.js";
 import { renderDesignerEditPrompt } from "../lib/template.js";
 import {
@@ -108,18 +108,14 @@ export async function runEdit(
 
   const existingPlan = readFileSync(planPath, "utf-8");
 
-  // Resolve agent: CLI flag > config.designer > config.default
-  const agentName =
-    (agentOverride as AgentName) ??
-    config.agents.designer ??
-    config.agents.default;
+  // Resolve agent: CLI flag > config default
+  const designerConfig = getAgentConfig(config, "designer", agentOverride as AgentName);
+  const adapter = getAdapter(designerConfig.agent);
 
-  const adapter = getAdapter(agentName);
-
-  console.log(`Agent: ${agentName}`);
+  console.log(`Agent: ${designerConfig.agent}`);
 
   const prompt = renderDesignerEditPrompt(cwd, planPath, existingPlan);
-  await adapter.interactive({ cwd, prompt });
+  await adapter.interactive({ cwd, prompt, model: designerConfig.model });
 
   console.log("");
   console.log("Designer session ended.");

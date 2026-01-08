@@ -29,6 +29,13 @@ export async function runPoll(repoRoot: string, planId: string): Promise<void> {
     return;
   }
 
+  if (!ps.worktree || !ps.planRelpath) {
+    console.log(`Plan ${planId} not yet activated (no worktree).`);
+    console.log("");
+    console.log("Hint: The plan may still be in the inbox awaiting dispatch.");
+    return;
+  }
+
   const planPath = join(ps.worktree, ps.planRelpath);
   if (!existsSync(planPath)) {
     console.error(`Plan file not found: ${planPath}`);

@@ -102,13 +102,38 @@ Create `prloom/config.json`:
 {
   "agents": {
     "default": "opencode",
-    "designer": "codex"
+    "opencode": {
+      "default": "gpt-4",
+      "designer": "claude-sonnet-4-20250514",
+      "worker": "gpt-4-turbo"
+    },
+    "claude": {
+      "default": "sonnet",
+      "designer": "opus"
+    }
   },
   "worktrees_dir": "prloom/.local/worktrees",
   "github_poll_interval_ms": 60000,
   "base_branch": "main"
 }
 ```
+
+### Agent Configuration
+
+The `agents` config allows you to:
+- Set a default agent app (e.g., `opencode`, `claude`, `codex`, `gemini`)
+- Configure model preferences per agent, with stage-specific overrides
+
+**Structure:**
+- `agents.default`: Which agent app to use (e.g., `"opencode"`)
+- `agents.<agent>`: Model configuration for that agent
+  - `default`: Default model for all stages
+  - `designer`: Model override for the designer stage
+  - `worker`: Model override for the worker stage
+  - `reviewer`: Model override for the reviewer stage
+  - `triage`: Model override for the triage stage
+
+This design keeps model identifiers scoped to their agent (since each agent uses different model names), while making it easy to switch between agents.
 
 ## Repository Context
 

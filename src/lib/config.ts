@@ -2,19 +2,40 @@ import { join, resolve } from "path";
 import { existsSync, readFileSync } from "fs";
 import { type AgentName, isAgentName } from "./adapters/index.js";
 
+export type AgentStage = "designer" | "worker" | "reviewer" | "triage";
+
+/**
+ * Model configuration for a specific agent.
+ * Maps stage names to model identifiers, with a default fallback.
+ */
+export interface AgentModelConfig {
+  default?: string;
+  designer?: string;
+  worker?: string;
+  reviewer?: string;
+  triage?: string;
+}
+
+/**
+ * Agents configuration.
+ * - `default`: which agent to use by default
+ * - `[agentName]`: model configuration per agent
+ */
+export interface AgentsConfig {
+  default: AgentName;
+  opencode?: AgentModelConfig;
+  claude?: AgentModelConfig;
+  codex?: AgentModelConfig;
+  gemini?: AgentModelConfig;
+  manual?: AgentModelConfig;
+}
+
+/**
+ * Resolved agent config for a specific stage.
+ */
 export interface AgentStageConfig {
   agent: AgentName;
   model?: string;
-}
-
-export type AgentStage = "designer" | "worker" | "reviewer" | "triage";
-
-export interface AgentsConfig {
-  default: AgentStageConfig;
-  designer?: AgentStageConfig;
-  worker?: AgentStageConfig;
-  reviewer?: AgentStageConfig;
-  triage?: AgentStageConfig;
 }
 
 export interface Config {
@@ -26,7 +47,7 @@ export interface Config {
 
 const DEFAULTS: Config = {
   agents: {
-    default: { agent: "opencode" },
+    default: "opencode",
   },
   worktrees_dir: "prloom/.local/worktrees",
   github_poll_interval_ms: 60000, // 60 seconds for GitHub API rate limits
@@ -45,13 +66,15 @@ export function loadConfig(repoRoot: string): Config {
     const parsed = JSON.parse(raw);
 
     // Parse agents config
+    const defaultAgent = parseAgentName(parsed.agents?.default) ?? DEFAULTS.agents.default;
+    
     const agents: AgentsConfig = {
-      default:
-        parseAgentStageConfig(parsed.agents?.default) ?? DEFAULTS.agents.default,
-      designer: parseAgentStageConfig(parsed.agents?.designer),
-      worker: parseAgentStageConfig(parsed.agents?.worker),
-      reviewer: parseAgentStageConfig(parsed.agents?.reviewer),
-      triage: parseAgentStageConfig(parsed.agents?.triage),
+      default: defaultAgent,
+      opencode: parseAgentModelConfig(parsed.agents?.opencode),
+      claude: parseAgentModelConfig(parsed.agents?.claude),
+      codex: parseAgentModelConfig(parsed.agents?.codex),
+      gemini: parseAgentModelConfig(parsed.agents?.gemini),
+      manual: parseAgentModelConfig(parsed.agents?.manual),
     };
 
     return {
@@ -69,15 +92,20 @@ export function loadConfig(repoRoot: string): Config {
   }
 }
 
-function parseAgentStageConfig(value: unknown): AgentStageConfig | undefined {
+function parseAgentModelConfig(value: unknown): AgentModelConfig | undefined {
   if (typeof value === "object" && value !== null) {
     const obj = value as Record<string, unknown>;
-    const agentName = parseAgentName(obj.agent);
-    if (agentName) {
-      return {
-        agent: agentName,
-        model: typeof obj.model === "string" ? obj.model : undefined,
-      };
+    const config: AgentModelConfig = {};
+    
+    if (typeof obj.default === "string") config.default = obj.default;
+    if (typeof obj.designer === "string") config.designer = obj.designer;
+    if (typeof obj.worker === "string") config.worker = obj.worker;
+    if (typeof obj.reviewer === "string") config.reviewer = obj.reviewer;
+    if (typeof obj.triage === "string") config.triage = obj.triage;
+    
+    // Only return if at least one model is configured
+    if (Object.keys(config).length > 0) {
+      return config;
     }
   }
   return undefined;
@@ -92,10 +120,23 @@ function parseAgentName(value: unknown): AgentName | undefined {
 
 /**
  * Get the agent configuration for a specific stage.
- * Falls back to the default config if the stage is not configured.
+ * Resolution order:
+ * 1. Agent's stage-specific model (e.g., agents.opencode.worker)
+ * 2. Agent's default model (e.g., agents.opencode.default)
+ * 3. Just the agent name with no model
  */
-export function getAgentConfig(config: Config, stage: AgentStage): AgentStageConfig {
-  return config.agents[stage] ?? config.agents.default;
+export function getAgentConfig(
+  config: Config,
+  stage: AgentStage,
+  agentOverride?: AgentName
+): AgentStageConfig {
+  const agent = agentOverride ?? config.agents.default;
+  const agentModels = config.agents[agent];
+  
+  // Try stage-specific model, then default model for this agent
+  const model = agentModels?.[stage] ?? agentModels?.default;
+  
+  return { agent, model };
 }
 
 export function resolveWorktreesDir(repoRoot: string, config: Config): string {

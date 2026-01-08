@@ -55,7 +55,7 @@ test("loadConfig uses defaults for missing fields", () => {
 
 test("resolveWorktreesDir resolves relative path", () => {
   const config = {
-    agents: { default: { agent: "opencode" as const } },
+    agents: { default: "opencode" as const },
     worktrees_dir: "../worktrees",
     github_poll_interval_ms: 60000,
     base_branch: "main",
@@ -68,18 +68,21 @@ test("resolveWorktreesDir resolves relative path", () => {
 test("loadConfig returns default agents when not specified", () => {
   const config = loadConfig(TEST_DIR);
 
-  expect(config.agents.default.agent).toBe("opencode");
-  expect(config.agents.designer).toBeUndefined();
+  expect(config.agents.default).toBe("opencode");
+  expect(config.agents.opencode).toBeUndefined();
 });
 
-test("loadConfig reads agents from config file", () => {
+test("loadConfig reads agents from config file with new structure", () => {
   mkdirSync(join(TEST_DIR, "prloom"), { recursive: true });
   writeFileSync(
     join(TEST_DIR, "prloom", "config.json"),
     JSON.stringify({
       agents: {
-        default: { agent: "claude" },
-        designer: { agent: "codex" },
+        default: "claude",
+        claude: {
+          default: "sonnet",
+          designer: "opus",
+        },
       },
       base_branch: "develop",
     })
@@ -87,8 +90,9 @@ test("loadConfig reads agents from config file", () => {
 
   const config = loadConfig(TEST_DIR);
 
-  expect(config.agents.default.agent).toBe("claude");
-  expect(config.agents.designer?.agent).toBe("codex");
+  expect(config.agents.default).toBe("claude");
+  expect(config.agents.claude?.default).toBe("sonnet");
+  expect(config.agents.claude?.designer).toBe("opus");
 });
 
 test("loadConfig ignores invalid agent names", () => {
@@ -97,8 +101,10 @@ test("loadConfig ignores invalid agent names", () => {
     join(TEST_DIR, "prloom", "config.json"),
     JSON.stringify({
       agents: {
-        default: { agent: "invalid-agent" },
-        designer: { agent: "codex" },
+        default: "invalid-agent",
+        opencode: {
+          default: "gpt-4",
+        },
       },
       base_branch: "develop",
     })
@@ -107,51 +113,87 @@ test("loadConfig ignores invalid agent names", () => {
   const config = loadConfig(TEST_DIR);
 
   // Falls back to default since "invalid-agent" isn't valid
-  expect(config.agents.default.agent).toBe("opencode");
-  expect(config.agents.designer?.agent).toBe("codex");
+  expect(config.agents.default).toBe("opencode");
+  expect(config.agents.opencode?.default).toBe("gpt-4");
 });
 
-test("loadConfig reads agent model from config file", () => {
+test("loadConfig reads agent models from config file", () => {
   mkdirSync(join(TEST_DIR, "prloom"), { recursive: true });
   writeFileSync(
     join(TEST_DIR, "prloom", "config.json"),
     JSON.stringify({
       agents: {
-        default: { agent: "opencode", model: "gpt-4" },
-        reviewer: { agent: "claude", model: "claude-sonnet-4-20250514" },
+        default: "opencode",
+        opencode: {
+          default: "gpt-4",
+          reviewer: "claude-sonnet-4-20250514",
+        },
       },
     })
   );
 
   const config = loadConfig(TEST_DIR);
 
-  expect(config.agents.default.agent).toBe("opencode");
-  expect(config.agents.default.model).toBe("gpt-4");
-  expect(config.agents.reviewer?.agent).toBe("claude");
-  expect(config.agents.reviewer?.model).toBe("claude-sonnet-4-20250514");
+  expect(config.agents.default).toBe("opencode");
+  expect(config.agents.opencode?.default).toBe("gpt-4");
+  expect(config.agents.opencode?.reviewer).toBe("claude-sonnet-4-20250514");
 });
 
-test("getAgentConfig returns stage config or falls back to default", () => {
+test("getAgentConfig returns stage-specific model or falls back to default", () => {
   mkdirSync(join(TEST_DIR, "prloom"), { recursive: true });
   writeFileSync(
     join(TEST_DIR, "prloom", "config.json"),
     JSON.stringify({
       agents: {
-        default: { agent: "opencode", model: "gpt-4" },
-        reviewer: { agent: "claude", model: "claude-sonnet-4-20250514" },
+        default: "opencode",
+        opencode: {
+          default: "gpt-4",
+          reviewer: "claude-sonnet-4-20250514",
+        },
       },
     })
   );
 
   const config = loadConfig(TEST_DIR);
 
-  // Reviewer is configured
+  // Reviewer has specific model
   const reviewerConfig = getAgentConfig(config, "reviewer");
-  expect(reviewerConfig.agent).toBe("claude");
+  expect(reviewerConfig.agent).toBe("opencode");
   expect(reviewerConfig.model).toBe("claude-sonnet-4-20250514");
 
-  // Worker is not configured, falls back to default
+  // Worker uses default model
   const workerConfig = getAgentConfig(config, "worker");
   expect(workerConfig.agent).toBe("opencode");
   expect(workerConfig.model).toBe("gpt-4");
+});
+
+test("getAgentConfig respects agent override parameter", () => {
+  mkdirSync(join(TEST_DIR, "prloom"), { recursive: true });
+  writeFileSync(
+    join(TEST_DIR, "prloom", "config.json"),
+    JSON.stringify({
+      agents: {
+        default: "opencode",
+        opencode: {
+          default: "gpt-4",
+        },
+        claude: {
+          default: "sonnet",
+          worker: "opus",
+        },
+      },
+    })
+  );
+
+  const config = loadConfig(TEST_DIR);
+
+  // Default agent (opencode)
+  const defaultWorker = getAgentConfig(config, "worker");
+  expect(defaultWorker.agent).toBe("opencode");
+  expect(defaultWorker.model).toBe("gpt-4");
+
+  // Override to claude
+  const claudeWorker = getAgentConfig(config, "worker", "claude");
+  expect(claudeWorker.agent).toBe("claude");
+  expect(claudeWorker.model).toBe("opus");
 });
