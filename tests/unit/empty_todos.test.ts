@@ -54,8 +54,8 @@ id: ${id}
 
   await ingestInboxPlans(repoRoot, "/tmp/worktrees", config, state, noopLogger);
 
-  // Verify it was NOT ingested (still in inbox, not in state.plans)
-  expect(Object.keys(state.plans)).not.toContain(id);
+  // Verify it was NOT activated (no worktree assigned, still in inbox)
+  expect(state.plans[id]?.worktree).toBeUndefined();
   const ids = (await import("../../src/lib/state.js")).listInboxPlanIds(
     repoRoot
   );
@@ -81,8 +81,8 @@ id: ${id}
 
   await ingestInboxPlans(repoRoot, "/tmp/worktrees", config, state, noopLogger);
 
-  // Verify it was NOT ingested (still in inbox)
-  expect(Object.keys(state.plans)).not.toContain(id);
+  // Verify it was NOT activated (no worktree assigned, still in inbox)
+  expect(state.plans[id]?.worktree).toBeUndefined();
   // Should still be in inbox
   const ids = (await import("../../src/lib/state.js")).listInboxPlanIds(
     repoRoot
@@ -108,8 +108,8 @@ id: ${id}
 
   await ingestInboxPlans(repoRoot, "/tmp/worktrees", config, state, noopLogger);
 
-  // Verify it was NOT ingested (defaults to draft)
-  expect(Object.keys(state.plans)).not.toContain(id);
+  // Verify it was NOT activated (no worktree assigned, defaults to draft)
+  expect(state.plans[id]?.worktree).toBeUndefined();
 });
 
 test("processActivePlans: blocks active plan with no TODOs", async () => {

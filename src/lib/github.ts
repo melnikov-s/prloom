@@ -93,7 +93,7 @@ export interface FeedbackCursors {
   lastReviewCommentId?: number;
 }
 
-const BOT_MARKER = "<!-- prloom:bot -->";
+const BOT_MARKER = "🤖";
 
 // Get authenticated GitHub user
 
@@ -233,12 +233,9 @@ export async function postPRComment(
 
 // Bot detection
 
-export function isBotFeedback(feedback: PRFeedback, botLogin: string): boolean {
-  // Check author
-  if (feedback.author === botLogin) return true;
-  // Check marker in body
-  if (feedback.body.includes(BOT_MARKER)) return true;
-  return false;
+export function isBotFeedback(feedback: PRFeedback, _botLogin: string): boolean {
+  // Check if message starts with bot emoji marker
+  return feedback.body.trimStart().startsWith(BOT_MARKER);
 }
 
 // Filter new feedback based on cursors
