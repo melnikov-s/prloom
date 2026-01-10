@@ -162,6 +162,10 @@ export function readTraceFile(worktreePath: string): Array<{
   planId?: string;
   todoCompleted?: string;
   ts: string;
+  // Extended properties from failing/throwing shims
+  failed?: boolean;
+  action?: string;
+  attempt?: number;
 }> {
   const tracePath = join(worktreePath, "prloom", ".local", "e2e-trace.jsonl");
   if (!existsSync(tracePath)) {
@@ -575,4 +579,73 @@ export function applyEnvOverrides(
       }
     }
   };
+}
+
+/**
+ * Create a "failing" opencode shim that does NOT mark TODOs complete.
+ * Used for testing retry/blocking behavior.
+ */
+export function createFailingOpencodeShim(binDir: string): void {
+  const shim = `#!/usr/bin/env node
+const fs = require("fs");
+const path = require("path");
+
+// The shim runs with cwd set to the worktree
+const cwd = process.cwd();
+const tracePath = path.join(cwd, "prloom", ".local", "e2e-trace.jsonl");
+const changeFile = path.join(cwd, "e2e.txt");
+
+// Write trace entry
+function appendTrace(entry) {
+  fs.mkdirSync(path.dirname(tracePath), { recursive: true });
+  fs.appendFileSync(tracePath, JSON.stringify({ ...entry, ts: new Date().toISOString() }) + "\\n");
+}
+
+// Write trace entry for the failed attempt
+appendTrace({ hook: "worker", failed: true });
+
+// Modify e2e.txt to create a committable change (but don't mark TODO done)
+const changeContent = fs.existsSync(changeFile) 
+  ? fs.readFileSync(changeFile, "utf-8") 
+  : "";
+fs.writeFileSync(changeFile, changeContent + \`Failed attempt at \${new Date().toISOString()}\\n\`);
+
+console.log("[opencode shim] Simulating failure - NOT marking TODO complete");
+process.exit(0);
+`;
+
+  const opencodePath = join(binDir, "opencode");
+  writeFileSync(opencodePath, shim);
+  chmodSync(opencodePath, 0o755);
+}
+
+/**
+ * Create a plugin that throws an error.
+ * Used for testing hook error handling.
+ */
+export function createThrowingPlugin(pluginsDir: string, hookPoint: string = "beforeTodo"): string {
+  const pluginContent = `
+const fs = require("fs");
+const path = require("path");
+
+module.exports = function plugin(config) {
+  const appendTrace = (worktree, entry) => {
+    const tracePath = path.join(worktree, "prloom", ".local", "e2e-trace.jsonl");
+    fs.mkdirSync(path.dirname(tracePath), { recursive: true });
+    fs.appendFileSync(tracePath, JSON.stringify({ ...entry, ts: new Date().toISOString() }) + "\\n");
+  };
+
+  return {
+    ${hookPoint}: async (plan, ctx) => {
+      appendTrace(ctx.worktree, { hook: "${hookPoint}", planId: ctx.planId, action: "throwing" });
+      throw new Error("E2E test: intentional hook error");
+    },
+  };
+};
+`;
+
+  mkdirSync(pluginsDir, { recursive: true });
+  const pluginPath = join(pluginsDir, "throwing-plugin.js");
+  writeFileSync(pluginPath, pluginContent);
+  return pluginPath;
 }
