@@ -43,8 +43,35 @@ const DEFAULT_BRIDGES: Record<string, BridgeConfig> = {
 };
 
 // ============================================================================
+// Plugin Configuration
+// ============================================================================
+
+/**
+ * Configuration for a plugin.
+ */
+export interface PluginConfig {
+  /** Whether the plugin is enabled (default: true) */
+  enabled?: boolean;
+  /** Module path or npm package name */
+  module: string;
+  /** Freeform configuration passed to the plugin factory */
+  config?: unknown;
+}
+
+// ============================================================================
 // Preset Configuration
 // ============================================================================
+
+/**
+ * Plugin override configuration for presets.
+ * Allows enabling/disabling plugins or modifying their config.
+ */
+export interface PluginOverride {
+  /** Whether the plugin is enabled (overrides plugin's enabled field) */
+  enabled?: boolean;
+  /** Configuration overrides (merged with plugin's config) */
+  config?: unknown;
+}
 
 /**
  * Partial config that can be used in presets or worktree overrides.
@@ -55,6 +82,8 @@ export interface PresetConfig {
   agents?: Partial<AgentsConfig>;
   github_poll_interval_ms?: number;
   base_branch?: string;
+  /** Plugin overrides (enable/disable, config overrides) */
+  plugins?: Record<string, PluginOverride>;
 }
 
 export type AgentStage = "designer" | "worker" | "reviewer" | "triage";
@@ -102,6 +131,10 @@ export interface Config {
   base_branch: string;
   bus: BusConfig;
   bridges: Record<string, BridgeConfig>;
+  /** Plugin configurations */
+  plugins?: Record<string, PluginConfig>;
+  /** Order in which plugins are loaded (determines hook execution order) */
+  pluginOrder?: string[];
 }
 
 const DEFAULTS: Config = {
@@ -168,6 +201,10 @@ export function loadConfig(repoRoot: string): Config {
       }
     }
 
+    // Parse plugins config
+    const plugins = parsePlugins(parsed.plugins);
+    const pluginOrder = parsePluginOrder(parsed.pluginOrder);
+
     return {
       agents,
       github,
@@ -181,6 +218,8 @@ export function loadConfig(repoRoot: string): Config {
           : DEFAULTS.base_branch,
       bus,
       bridges,
+      plugins,
+      pluginOrder,
     };
   } catch {
     return { ...DEFAULTS };
@@ -202,6 +241,40 @@ function parsePresets(
   }
 
   return Object.keys(result).length > 0 ? result : undefined;
+}
+
+function parsePlugins(
+  value: unknown
+): Record<string, PluginConfig> | undefined {
+  if (typeof value !== "object" || value === null) {
+    return undefined;
+  }
+
+  const result: Record<string, PluginConfig> = {};
+  for (const [name, plugin] of Object.entries(value)) {
+    if (typeof plugin === "object" && plugin !== null) {
+      const pluginObj = plugin as Record<string, unknown>;
+      // Validate required module field
+      if (typeof pluginObj.module === "string") {
+        result[name] = {
+          module: pluginObj.module,
+          enabled: pluginObj.enabled as boolean | undefined,
+          config: pluginObj.config,
+        };
+      }
+    }
+  }
+
+  return Object.keys(result).length > 0 ? result : undefined;
+}
+
+function parsePluginOrder(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+
+  const result = value.filter((v): v is string => typeof v === "string");
+  return result.length > 0 ? result : undefined;
 }
 
 function parseAgentModelConfig(value: unknown): AgentModelConfig | undefined {
@@ -343,6 +416,46 @@ export function writeWorktreeConfig(
 // ============================================================================
 
 /**
+ * Merge plugin configurations with overrides from presets or worktree config.
+ * 
+ * @param basePlugins - Original plugins from global config
+ * @param overrides - Plugin overrides from preset or worktree config
+ * @returns Merged plugins config
+ */
+function mergePluginConfigs(
+  basePlugins: Record<string, PluginConfig> | undefined,
+  overrides: Record<string, PluginOverride> | undefined
+): Record<string, PluginConfig> | undefined {
+  if (!basePlugins) return undefined;
+  if (!overrides) return basePlugins;
+
+  const result: Record<string, PluginConfig> = {};
+  
+  for (const [name, plugin] of Object.entries(basePlugins)) {
+    const override = overrides[name];
+    if (!override) {
+      result[name] = plugin;
+      continue;
+    }
+
+    // Merge the plugin config with overrides
+    result[name] = {
+      ...plugin,
+      // Override enabled if specified
+      enabled: override.enabled !== undefined ? override.enabled : plugin.enabled,
+      // Deep merge config if specified
+      config: override.config !== undefined
+        ? typeof plugin.config === "object" && plugin.config !== null && typeof override.config === "object" && override.config !== null
+          ? { ...plugin.config as Record<string, unknown>, ...override.config as Record<string, unknown> }
+          : override.config
+        : plugin.config,
+    };
+  }
+
+  return Object.keys(result).length > 0 ? result : undefined;
+}
+
+/**
  * Resolve final config by merging global config, preset, and worktree overrides.
  *
  * Resolution order:
@@ -376,6 +489,15 @@ export function resolveConfig(
     | Record<string, BridgeConfig>
     | undefined;
 
+  // Merge plugin configs with proper override handling
+  let mergedPlugins = globalConfig.plugins;
+  if (preset.plugins) {
+    mergedPlugins = mergePluginConfigs(mergedPlugins, preset.plugins);
+  }
+  if (worktreeConfig?.plugins) {
+    mergedPlugins = mergePluginConfigs(mergedPlugins, worktreeConfig.plugins);
+  }
+
   return {
     agents: mergedAgents ?? DEFAULTS.agents,
     github: mergedGithub ?? DEFAULTS.github,
@@ -387,6 +509,8 @@ export function resolveConfig(
     base_branch: (merged.base_branch as string) ?? DEFAULTS.base_branch,
     bus: mergedBus ?? DEFAULTS.bus,
     bridges: mergedBridges ?? DEFAULTS.bridges,
+    plugins: mergedPlugins,
+    pluginOrder: globalConfig.pluginOrder,
   };
 }
 

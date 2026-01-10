@@ -1,6 +1,6 @@
 import { join } from "path";
-import { existsSync, readFileSync } from "fs";
-import { loadConfig, getAgentConfig } from "../lib/config.js";
+import { existsSync, readFileSync, writeFileSync } from "fs";
+import { loadConfig, getAgentConfig, resolveConfig } from "../lib/config.js";
 import { getAdapter, type AgentName } from "../lib/adapters/index.js";
 import { renderDesignerEditPrompt } from "../lib/template.js";
 import {
@@ -14,6 +14,7 @@ import { parsePlan } from "../lib/plan.js";
 import { resolvePlanId } from "../lib/resolver.js";
 import { promptSelection } from "../ui/Selection.js";
 import { confirm } from "./prompt.js";
+import { loadPlugins, runHooks, buildHookContext } from "../lib/hooks/index.js";
 
 export async function runEdit(
   repoRoot: string,
@@ -119,6 +120,35 @@ export async function runEdit(
 
   console.log("");
   console.log("Designer session ended.");
+
+  // Run afterDesign hooks
+  // Use resolved config with preset (from state) so plugin overrides take effect
+  const planMeta = state.plans[planId];
+  const resolvedConfig = resolveConfig(config, planMeta?.preset);
+  const hookRegistry = await loadPlugins(resolvedConfig, repoRoot);
+  if (hookRegistry.afterDesign && hookRegistry.afterDesign.length > 0) {
+    console.log("Running afterDesign hooks...");
+    try {
+      const planContent = readFileSync(planPath, "utf-8");
+      const ctx = buildHookContext({
+        repoRoot,
+        worktree: cwd,
+        planId,
+        hookPoint: "afterDesign",
+        currentPlan: planContent,
+        config: resolvedConfig,
+      });
+      const updatedPlan = await runHooks("afterDesign", planContent, ctx, hookRegistry);
+      if (updatedPlan !== planContent) {
+        writeFileSync(planPath, updatedPlan);
+        console.log("Plan modified by afterDesign hooks.");
+      }
+    } catch (error) {
+      console.error(`afterDesign hook error: ${error}`);
+      console.log("Plan left unchanged due to hook error.");
+      return; // Issue #3 fix: Abort on hook error for consistency with new.ts
+    }
+  }
 
   // For inbox plans: check if still draft and prompt to queue
   if (isInbox) {

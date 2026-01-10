@@ -72,6 +72,13 @@ import {
   createCommentAction,
   createReviewAction,
 } from "./bus/index.js";
+import {
+  loadPlugins,
+  runHooks,
+  buildHookContext,
+  type HookRegistry,
+} from "./hooks/index.js";
+import { writeFileSync } from "fs";
 
 export interface DispatcherOptions {
   /** Run workers in tmux sessions for observation */
@@ -178,6 +185,7 @@ export async function runDispatcher(
   await initBusRunner(repoRoot, config);
   log.info("Bus initialized with bridges");
 
+
   while (true) {
     try {
       // Reload state from disk to pick up external changes (e.g., UI changing plan status)
@@ -215,7 +223,14 @@ export async function runDispatcher(
       );
 
       // 3. Process active plans from state
-      await processActivePlans(repoRoot, config, state, botLogin, options, log);
+      await processActivePlans(
+        repoRoot,
+        config,
+        state,
+        botLogin,
+        options,
+        log
+      );
 
       saveState(repoRoot, state);
 
@@ -426,6 +441,63 @@ export function getFeedbackPollDecision(opts: {
   };
 }
 
+/**
+ * Helper to run hooks at a lifecycle point and update the plan file if modified.
+ *
+ * @returns The updated plan (re-parsed if modified)
+ */
+async function runPlanHooks(
+  hookPoint: "afterDesign" | "beforeTodo" | "afterTodo" | "beforeFinish" | "afterFinish",
+  plan: ReturnType<typeof parsePlan>,
+  planPath: string,
+  repoRoot: string,
+  worktree: string,
+  planId: string,
+  prNumber: number | undefined,
+  planConfig: Config,
+  hookRegistry: HookRegistry,
+  log: Logger,
+  todoCompleted?: string
+): Promise<ReturnType<typeof parsePlan>> {
+  // Skip if no hooks registered for this point
+  if (!hookRegistry[hookPoint] || hookRegistry[hookPoint]!.length === 0) {
+    return plan;
+  }
+
+  const ctx = buildHookContext({
+    repoRoot,
+    worktree,
+    planId,
+    hookPoint,
+    changeRequestRef: prNumber?.toString(),
+    todoCompleted,
+    currentPlan: plan.raw,
+    config: planConfig,
+  });
+
+  try {
+    const originalContent = plan.raw;
+    const updatedContent = await runHooks(
+      hookPoint,
+      originalContent,
+      ctx,
+      hookRegistry
+    );
+
+    // If plan was modified by hooks, write and re-parse
+    if (updatedContent !== originalContent) {
+      writeFileSync(planPath, updatedContent);
+      log.info(`   Hooks modified plan at ${hookPoint}`, planId);
+      return parsePlan(planPath);
+    }
+  } catch (error) {
+    log.error(`   Hook error at ${hookPoint}: ${error}`, planId);
+    throw error;
+  }
+
+  return plan;
+}
+
 export async function processActivePlans(
   repoRoot: string,
   config: Config,
@@ -454,6 +526,16 @@ export async function processActivePlans(
       const worktreeConfig = loadWorktreeConfig(ps.worktree);
       const planConfig = resolveConfig(config, ps.preset, worktreeConfig);
       const githubEnabled = planConfig.github.enabled;
+
+      let hookRegistry: HookRegistry = {};
+      if (planConfig.plugins) {
+        try {
+          hookRegistry = await loadPlugins(planConfig, repoRoot);
+        } catch (error) {
+          log.error(`Failed to load plugins for ${planId}: ${error}`, planId);
+          hookRegistry = {};
+        }
+      }
 
       const planPath = join(ps.worktree, ps.planRelpath);
 
@@ -666,6 +748,20 @@ export async function processActivePlans(
             planId
           );
 
+          // Run beforeTodo hooks
+          plan = await runPlanHooks(
+            "beforeTodo",
+            plan,
+            planPath,
+            repoRoot,
+            ps.worktree,
+            planId,
+            ps.pr,
+            planConfig,
+            hookRegistry,
+            log
+          );
+
           const prompt = renderWorkerPrompt(repoRoot, plan, todo);
           const workerConfig = getAgentConfig(config, "worker", ps.agent);
           const adapter = getAdapter(workerConfig.agent);
@@ -760,6 +856,23 @@ export async function processActivePlans(
           ps.todoRetryCount = undefined;
           log.success(`   ✓ TODO #${todo.index + 1} marked complete`, planId);
 
+          // Run afterTodo hooks
+          const todoText = todo.text;
+          let afterTodoPlan = parsePlan(planPath);
+          afterTodoPlan = await runPlanHooks(
+            "afterTodo",
+            afterTodoPlan,
+            planPath,
+            repoRoot,
+            ps.worktree,
+            planId,
+            ps.pr,
+            planConfig,
+            hookRegistry,
+            log,
+            todoText
+          );
+
           // Commit and push (push only if GitHub is enabled)
           log.info(`   Committing: ${todo.text}`, planId);
           const committed = await commitAll(ps.worktree, todo.text);
@@ -795,6 +908,29 @@ export async function processActivePlans(
             }
 
             log.success(`🎉 All TODOs complete for ${planId}`, planId);
+
+            // Run beforeFinish hooks
+            let finishPlan = parsePlan(planPath);
+            finishPlan = await runPlanHooks(
+              "beforeFinish",
+              finishPlan,
+              planPath,
+              repoRoot,
+              ps.worktree,
+              planId,
+              ps.pr,
+              planConfig,
+              hookRegistry,
+              log
+            );
+
+            // Re-check if hooks added new TODOs
+            const newTodos = findNextUnchecked(finishPlan);
+            if (newTodos) {
+              log.info(`   Hooks added new TODOs, continuing work`, planId);
+              continue;
+            }
+
             log.info(`   Setting plan status to: review`, planId);
             ps.status = "review";
             // Emit state update immediately so TUI shows review status
@@ -811,6 +947,20 @@ export async function processActivePlans(
             } else {
               log.success(`✅ Plan ${planId} complete`, planId);
             }
+
+            // Run afterFinish hooks
+            await runPlanHooks(
+              "afterFinish",
+              parsePlan(planPath),
+              planPath,
+              repoRoot,
+              ps.worktree,
+              planId,
+              ps.pr,
+              planConfig,
+              hookRegistry,
+              log
+            );
           }
         } else {
           // All TODOs done
@@ -825,6 +975,29 @@ export async function processActivePlans(
           }
 
           log.success(`🎉 All TODOs complete for ${planId}`, planId);
+
+          // Run beforeFinish hooks
+          let finishPlan2 = parsePlan(planPath);
+          finishPlan2 = await runPlanHooks(
+            "beforeFinish",
+            finishPlan2,
+            planPath,
+            repoRoot,
+            ps.worktree,
+            planId,
+            ps.pr,
+            planConfig,
+            hookRegistry,
+            log
+          );
+
+          // Re-check if hooks added new TODOs
+          const newTodos2 = findNextUnchecked(finishPlan2);
+          if (newTodos2) {
+            log.info(`   Hooks added new TODOs, continuing work`, planId);
+            continue;
+          }
+
           log.info(`   Setting plan status to: review`, planId);
           ps.status = "review";
           // Emit state update immediately so TUI shows review status
@@ -838,11 +1011,27 @@ export async function processActivePlans(
           } else {
             log.success(`✅ Plan ${planId} complete`, planId);
           }
+
+          // Run afterFinish hooks
+          await runPlanHooks(
+            "afterFinish",
+            parsePlan(planPath),
+            planPath,
+            repoRoot,
+            ps.worktree,
+            planId,
+            ps.pr,
+            planConfig,
+            hookRegistry,
+            log
+          );
         }
       }
     } catch (error) {
       log.error(`Error processing ${planId}: ${error}`, planId);
       ps.lastError = String(error);
+      // Per RFC: "If a hook throws, abort." Block the plan to prevent retry loops.
+      ps.blocked = true;
     }
   }
 }
@@ -1092,12 +1281,7 @@ async function runReviewAgent(
     log.info(`   Queueing review for PR #${ps.pr}`, planId);
     appendBusAction(
       ps.worktree,
-      createReviewAction(
-        ps.pr,
-        result.verdict,
-        result.summary,
-        result.comments
-      )
+      createReviewAction(ps.pr, result.verdict, result.summary, result.comments)
     );
     log.success(`   Review action queued`, planId);
 

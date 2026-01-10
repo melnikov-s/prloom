@@ -1,6 +1,5 @@
-import { join } from "path";
-import { existsSync, writeFileSync } from "fs";
-import { loadConfig, getAgentConfig, getPresetNames } from "../lib/config.js";
+import { existsSync, writeFileSync, readFileSync } from "fs";
+import { loadConfig, getAgentConfig, getPresetNames, resolveConfig } from "../lib/config.js";
 import { getAdapter, type AgentName } from "../lib/adapters/index.js";
 import { nanoid } from "nanoid";
 import { generatePlanSkeleton } from "../lib/plan.js";
@@ -14,6 +13,7 @@ import {
 } from "../lib/state.js";
 import { getCurrentBranch, ensureRemoteBranchExists } from "../lib/git.js";
 import { confirm } from "./prompt.js";
+import { loadPlugins, runHooks, buildHookContext } from "../lib/hooks/index.js";
 
 export async function runNew(
   repoRoot: string,
@@ -132,6 +132,34 @@ export async function runNew(
 
   console.log("");
   console.log("Designer session ended.");
+
+  // Run afterDesign hooks
+  // Use resolved config with preset so plugin overrides take effect
+  const resolvedConfig = resolveConfig(config, selectedPreset);
+  const hookRegistry = await loadPlugins(resolvedConfig, repoRoot);
+  if (hookRegistry.afterDesign && hookRegistry.afterDesign.length > 0) {
+    console.log("Running afterDesign hooks...");
+    try {
+      const planContent = readFileSync(planPath, "utf-8");
+      const ctx = buildHookContext({
+        repoRoot,
+        worktree: repoRoot, // For inbox plans, worktree is the repo root
+        planId: id,
+        hookPoint: "afterDesign",
+        currentPlan: planContent,
+        config: resolvedConfig,
+      });
+      const updatedPlan = await runHooks("afterDesign", planContent, ctx, hookRegistry);
+      if (updatedPlan !== planContent) {
+        writeFileSync(planPath, updatedPlan);
+        console.log("Plan modified by afterDesign hooks.");
+      }
+    } catch (error) {
+      console.error(`afterDesign hook error: ${error}`);
+      console.log("Plan left as draft due to hook error.");
+      return;
+    }
+  }
 
   // Prompt to queue the plan
   const shouldQueue = await confirm("Queue this plan for the dispatcher?");

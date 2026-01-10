@@ -47,8 +47,8 @@ export type HookContext = {
   hookPoint: string;
   changeRequestRef?: string; // PR number if applicable
 
-  // Run agent using configured adapter, tracked as part of this plan's session
-  runAgent: (prompt: string, files?: string[]) => Promise<string>;
+  // Run agent with automatic plan context injection
+  runAgent: (prompt: string, options?: { files?: string[] }) => Promise<string>;
 
   // Emit action to outbox for bridge delivery (e.g., post GitHub comment)
   emitAction: (action: Action) => void;
@@ -62,7 +62,57 @@ export type Hook = (plan: string, ctx: HookContext) => Promise<string>;
 
 **Blocking during execution:** While a hook is executing, the plan is blocked—no polling, no worker execution. This ensures hooks have exclusive access.
 
-**Why `runAgent`?** Uses prloom's configured adapter and associates sessions with the plan ID.
+---
+
+### Plan Context Injection
+
+**Problem:** Plugin authors using `runAgent` need the agent to understand the plan format—section structure, TODO syntax, and conventions. Without this, authors must either:
+
+1. Duplicate prompt knowledge from prloom's internal prompts
+2. Hope the agent infers the format correctly
+
+Both are fragile. If the plan format changes, plugins break.
+
+**Solution:** `runAgent` automatically injects plan context. The agent receives:
+
+1. The plan format specification (sections, TODO syntax)
+2. The current plan content
+3. The plugin author's prompt
+
+This means a design reviewer plugin is simply:
+
+```ts
+afterDesign: async (plan, ctx) => {
+  return ctx.runAgent(`Review this plan for gaps and security considerations.`);
+};
+```
+
+The agent knows it's working with a plan and how to produce valid output.
+
+**Implementation:**
+
+```ts
+async function runAgent(
+  prompt: string,
+  options?: { files?: string[] }
+): Promise<string> {
+  const systemPrompt = `You are modifying a prloom plan. The plan follows this format:
+${PLAN_FORMAT_DOCS}
+
+You will receive the current plan. Apply the user's instructions and return the complete updated plan.`;
+
+  return adapter.run({
+    system: systemPrompt,
+    user: `Current plan:\n${currentPlan}\n\nInstructions: ${prompt}`,
+    files: options?.files,
+    sessionId: planSessionId,
+  });
+}
+```
+
+---
+
+**Why `runAgent`?** Uses prloom's configured adapter, associates sessions with the plan ID, and automatically provides plan format context.
 
 **Why `emitAction`?** Allows hooks to trigger external actions (post comment, submit review) via the File Bus. Bridges handle delivery.
 
