@@ -77,6 +77,12 @@ yargs(hideBin(process.argv))
           alias: "b",
           type: "string",
           describe: "Preferred branch name (defaults to plan ID)",
+        })
+        .option("preset", {
+          alias: "p",
+          type: "string",
+          describe:
+            "Configuration preset to use (e.g., default, quick, local-only)",
         }),
     async (argv) => {
       const { runNew } = await import("./new.js");
@@ -86,7 +92,8 @@ yargs(hideBin(process.argv))
         argv.agent,
         argv["no-designer"],
         argv.model,
-        argv.branch
+        argv.branch,
+        argv.preset
       );
     }
   )
@@ -122,7 +129,8 @@ yargs(hideBin(process.argv))
     (yargs) =>
       yargs.option("tmux", {
         type: "boolean",
-        describe: "Run workers in tmux sessions (auto-enabled if tmux is installed)",
+        describe:
+          "Run workers in tmux sessions (auto-enabled if tmux is installed)",
         default: true,
       }),
     async (argv) => {

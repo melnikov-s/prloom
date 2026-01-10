@@ -1,6 +1,6 @@
 import { join } from "path";
 import { existsSync, writeFileSync } from "fs";
-import { loadConfig, getAgentConfig } from "../lib/config.js";
+import { loadConfig, getAgentConfig, getPresetNames } from "../lib/config.js";
 import { getAdapter, type AgentName } from "../lib/adapters/index.js";
 import { nanoid } from "nanoid";
 import { generatePlanSkeleton } from "../lib/plan.js";
@@ -21,12 +21,31 @@ export async function runNew(
   agentOverride?: string,
   noDesigner?: boolean,
   model?: string,
-  branchPreference?: string
+  branchPreference?: string,
+  presetOverride?: string
 ): Promise<void> {
   const config = loadConfig(repoRoot);
 
   // Ensure inbox directory exists
   ensureInboxDir(repoRoot);
+
+  // Resolve preset: CLI flag > interactive selection > "default" if exists > none
+  let selectedPreset: string | undefined = presetOverride;
+
+  if (!selectedPreset) {
+    const availablePresets = getPresetNames(config);
+
+    if (availablePresets.length > 0) {
+      // Show interactive preset picker
+      const { selectPreset } = await import("../ui/PresetPicker.js");
+      selectedPreset = await selectPreset(availablePresets);
+
+      if (selectedPreset === undefined) {
+        console.log("Plan creation cancelled.");
+        process.exit(0);
+      }
+    }
+  }
 
   // Resolve designer agent: CLI flag > config.designer > config.default
   const designerConfig = getAgentConfig(config, "designer");
@@ -72,6 +91,7 @@ export async function runNew(
     status: "draft",
     baseBranch,
     branch: branchPreference,
+    preset: selectedPreset,
   };
   saveState(repoRoot, state);
 
@@ -79,6 +99,9 @@ export async function runNew(
   console.log(`Base branch: ${baseBranch}`);
   if (branchPreference) {
     console.log(`Branch preference: ${branchPreference}`);
+  }
+  if (selectedPreset) {
+    console.log(`Preset: ${selectedPreset}`);
   }
   console.log(`Worker agent: ${workerAgent}`);
 

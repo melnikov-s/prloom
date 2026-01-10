@@ -1,7 +1,11 @@
 import { test, expect, beforeEach, afterEach } from "bun:test";
 import { mkdirSync, rmSync, writeFileSync } from "fs";
 import { join } from "path";
-import { loadConfig, resolveWorktreesDir, getAgentConfig } from "../../src/lib/config.js";
+import {
+  loadConfig,
+  resolveWorktreesDir,
+  getAgentConfig,
+} from "../../src/lib/config.js";
 
 const TEST_DIR = "/tmp/prloom-test-config";
 
@@ -56,6 +60,7 @@ test("loadConfig uses defaults for missing fields", () => {
 test("resolveWorktreesDir resolves relative path", () => {
   const config = {
     agents: { default: "opencode" as const },
+    github: { enabled: true },
     worktrees_dir: "../worktrees",
     github_poll_interval_ms: 60000,
     base_branch: "main",

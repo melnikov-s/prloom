@@ -4,6 +4,9 @@ import {
   loadConfig,
   resolveWorktreesDir,
   getAgentConfig,
+  resolveConfig,
+  loadWorktreeConfig,
+  writeWorktreeConfig,
   type Config,
 } from "./config.js";
 import {
@@ -263,10 +266,20 @@ export async function ingestInboxPlans(
         continue;
       }
 
+      // Resolve per-plan config (global + preset, worktree config applied later)
+      const planConfig = resolveConfig(config, planMeta.preset);
+      const githubEnabled = planConfig.github.enabled;
+
       log.info(`📥 Ingesting inbox plan: ${actualId} (from ${planId}.md)`);
+      if (planMeta.preset) {
+        log.info(`   Preset: ${planMeta.preset}`);
+      }
+      if (!githubEnabled) {
+        log.info(`   GitHub integration: disabled (local-only mode)`);
+      }
 
       // Determine base branch for this plan (from state, falls back to config)
-      const baseBranch = planMeta.baseBranch ?? config.base_branch;
+      const baseBranch = planMeta.baseBranch ?? planConfig.base_branch;
       log.info(`   Base branch: ${baseBranch}`);
 
       // Create branch and worktree
@@ -291,13 +304,22 @@ export async function ingestInboxPlans(
       }
       log.info(`   Created worktree: ${worktreePath}`);
 
+      // Write worktree config if preset was selected
+      if (planMeta.preset && config.presets?.[planMeta.preset]) {
+        const presetConfig = config.presets[planMeta.preset];
+        if (presetConfig) {
+          writeWorktreeConfig(worktreePath, presetConfig);
+          log.info(`   Wrote worktree config for preset: ${planMeta.preset}`);
+        }
+      }
+
       // Plan stays in .local/ - not committed to repo
       // Copy to worktree's local dir for worker access
       const planRelpath = `prloom/.local/plan.md`;
       log.info(`   Copying plan to worktree local: ${planRelpath}`);
       copyFileToWorktree(inboxPath, worktreePath, planRelpath);
 
-      // Create empty initial commit and push to create PR
+      // Create empty initial commit
       const worktreePlanPath = join(worktreePath, planRelpath);
       const planForPR = parsePlan(worktreePlanPath);
       const prTitle = planForPR.title || actualId;
@@ -306,19 +328,25 @@ export async function ingestInboxPlans(
         worktreePath,
         `${prTitle}\n\n${extractBody(planForPR)}`
       );
-      log.info(`   Pushing branch to origin: ${branch}`);
-      await push(worktreePath, branch);
 
-      // Create draft PR
-      log.info(`   Creating draft PR...`);
-      const pr = await createDraftPR(
-        repoRoot,
-        branch,
-        baseBranch,
-        prTitle,
-        extractBody(planForPR)
-      );
-      log.info(`   Created draft PR #${pr}`);
+      let pr: number | undefined;
+
+      // Only push and create PR if GitHub is enabled
+      if (githubEnabled) {
+        log.info(`   Pushing branch to origin: ${branch}`);
+        await push(worktreePath, branch);
+
+        // Create draft PR
+        log.info(`   Creating draft PR...`);
+        pr = await createDraftPR(
+          repoRoot,
+          branch,
+          baseBranch,
+          prTitle,
+          extractBody(planForPR)
+        );
+        log.info(`   Created draft PR #${pr}`);
+      }
 
       // Update plan state with active status and activation fields
       state.plans[actualId] = {
@@ -341,7 +369,11 @@ export async function ingestInboxPlans(
       log.info(`   Removing plan from inbox`);
       deleteInboxPlan(repoRoot, planId);
 
-      log.success(`✅ Ingested ${actualId} → PR #${pr}`);
+      if (githubEnabled) {
+        log.success(`✅ Ingested ${actualId} → PR #${pr}`);
+      } else {
+        log.success(`✅ Ingested ${actualId} (local-only, no PR)`);
+      }
     } catch (error) {
       log.error(
         `❌ Failed to ingest plan ${planId}: ${
@@ -402,6 +434,11 @@ export async function processActivePlans(
         continue;
       }
 
+      // Resolve per-plan config (global + preset + worktree overrides)
+      const worktreeConfig = loadWorktreeConfig(ps.worktree);
+      const planConfig = resolveConfig(config, ps.preset, worktreeConfig);
+      const githubEnabled = planConfig.github.enabled;
+
       const planPath = join(ps.worktree, ps.planRelpath);
 
       if (!existsSync(planPath)) {
@@ -409,8 +446,8 @@ export async function processActivePlans(
         continue;
       }
 
-      // Check PR state - remove if merged/closed
-      if (ps.pr) {
+      // Check PR state - remove if merged/closed (only if GitHub is enabled)
+      if (githubEnabled && ps.pr) {
         const prState = await getPRState(repoRoot, ps.pr);
         if (prState === "merged" || prState === "closed") {
           log.info(
@@ -451,10 +488,11 @@ export async function processActivePlans(
 
       // Poll and triage feedback (even if status=done)
       // Throttle to avoid GitHub rate limits
-      if (ps.pr) {
+      // Only poll if GitHub is enabled
+      if (githubEnabled && ps.pr) {
         const decision = getFeedbackPollDecision({
           now: Date.now(),
-          pollIntervalMs: config.github_poll_interval_ms,
+          pollIntervalMs: planConfig.github_poll_interval_ms,
           lastPolledAt: ps.lastPolledAt,
           pollOnce: ps.pollOnce,
         });
@@ -476,7 +514,7 @@ export async function processActivePlans(
             if (!isManualAgent) {
               await runTriage(
                 repoRoot,
-                config,
+                planConfig,
                 ps as ActivatedPlanState,
                 planId,
                 plan,
@@ -691,12 +729,14 @@ export async function processActivePlans(
           ps.todoRetryCount = undefined;
           log.success(`   ✓ TODO #${todo.index + 1} marked complete`, planId);
 
-          // Commit and push
+          // Commit and push (push only if GitHub is enabled)
           log.info(`   Committing: ${todo.text}`, planId);
           const committed = await commitAll(ps.worktree, todo.text);
-          if (committed && ps.branch) {
+          if (committed && ps.branch && githubEnabled) {
             log.info(`   Pushing to origin: ${ps.branch}`, planId);
             await push(ps.worktree, ps.branch);
+          } else if (committed && !githubEnabled) {
+            log.info(`   Committed locally (GitHub disabled)`, planId);
           } else if (committed) {
             log.warn(`   No branch set, skipping push`, planId);
           } else {
@@ -705,7 +745,7 @@ export async function processActivePlans(
 
           // Re-parse and check status
           const updated = parsePlan(planPath);
-          if (ps.pr) {
+          if (githubEnabled && ps.pr) {
             log.info(`   Updating PR #${ps.pr} body`, planId);
             await updatePRBody(repoRoot, ps.pr, extractBody(updated));
           }
@@ -730,11 +770,16 @@ export async function processActivePlans(
             if (options.useTUI) {
               dispatcherEvents.setState(state);
             }
-            if (ps.pr) {
+            if (githubEnabled && ps.pr) {
               log.info(`   Marking PR #${ps.pr} as ready for review`, planId);
               await markPRReady(repoRoot, ps.pr);
+              log.success(
+                `✅ Plan ${planId} complete, PR marked ready`,
+                planId
+              );
+            } else {
+              log.success(`✅ Plan ${planId} complete`, planId);
             }
-            log.success(`✅ Plan ${planId} complete, PR marked ready`, planId);
           }
         } else {
           // All TODOs done
@@ -755,11 +800,13 @@ export async function processActivePlans(
           if (options.useTUI) {
             dispatcherEvents.setState(state);
           }
-          if (ps.pr) {
+          if (githubEnabled && ps.pr) {
             log.info(`   Marking PR #${ps.pr} as ready for review`, planId);
             await markPRReady(repoRoot, ps.pr);
+            log.success(`✅ Plan ${planId} complete, PR marked ready`, planId);
+          } else {
+            log.success(`✅ Plan ${planId} complete`, planId);
           }
-          log.success(`✅ Plan ${planId} complete, PR marked ready`, planId);
         }
       }
     } catch (error) {
@@ -804,10 +851,10 @@ async function runTriage(
 ): Promise<void> {
   // Store previous status to restore later
   const previousStatus = ps.status;
-  
+
   // Set status to triaging
   ps.status = "triaging";
-  
+
   // Ensure .prloom directory exists in worktree
   ensureWorktreePrloomDir(ps.worktree);
 
@@ -815,10 +862,7 @@ async function runTriage(
   const adapter = getAdapter(triageConfig.agent);
   const prompt = renderTriagePrompt(repoRoot, ps.worktree, plan, feedback);
 
-  log.info(
-    `🔍 Running triage for ${planId}...`,
-    planId
-  );
+  log.info(`🔍 Running triage for ${planId}...`, planId);
   log.info(`   Using agent: ${triageConfig.agent}`, planId);
 
   // Build tmux config if available and not explicitly disabled
@@ -828,10 +872,7 @@ async function runTriage(
     : undefined;
 
   if (tmuxConfig) {
-    log.info(
-      `   Spawning in tmux session: ${tmuxConfig.sessionName}`,
-      planId
-    );
+    log.info(`   Spawning in tmux session: ${tmuxConfig.sessionName}`, planId);
   }
 
   const execResult = await adapter.execute({
@@ -856,27 +897,18 @@ async function runTriage(
 
     // Handle rebase request
     if (result.rebase_requested) {
-      log.info(
-        `  Rebase requested, rebasing on ${ps.baseBranch}...`,
-        planId
-      );
+      log.info(`  Rebase requested, rebasing on ${ps.baseBranch}...`, planId);
       const rebaseResult = await rebaseOnBaseBranch(ps.worktree, ps.baseBranch);
 
       if (rebaseResult.hasConflicts) {
-        log.warn(
-          `   Rebase conflict detected, blocking plan`,
-          planId
-        );
+        log.warn(`   Rebase conflict detected, blocking plan`, planId);
         log.info(`   Blocking plan`, planId);
         ps.blocked = true;
         ps.lastError = `Rebase conflict: ${rebaseResult.conflictFiles?.join(
           ", "
         )}`;
 
-        log.info(
-          `   Posting rebase conflict comment to PR #${ps.pr}`,
-          planId
-        );
+        log.info(`   Posting rebase conflict comment to PR #${ps.pr}`, planId);
         await postPRComment(
           repoRoot,
           ps.pr!,
@@ -919,10 +951,7 @@ ${rebaseResult.conflictFiles?.join("\n")}
 The plan is now **blocked** until conflicts are resolved.`
         );
       } else if (rebaseResult.success) {
-        log.info(
-          `   Force pushing rebased branch: ${ps.branch}`,
-          planId
-        );
+        log.info(`   Force pushing rebased branch: ${ps.branch}`, planId);
         await forcePush(ps.worktree, ps.branch);
         log.success(`   Rebased and force-pushed`, planId);
       }
@@ -934,10 +963,7 @@ The plan is now **blocked** until conflicts are resolved.`
     log.success(`   Posted triage reply`, planId);
 
     // Commit any changes from triage
-    log.info(
-      `   Committing: [prloom] ${planId}: triage`,
-      planId
-    );
+    log.info(`   Committing: [prloom] ${planId}: triage`, planId);
     const committed = await commitAll(
       ps.worktree,
       `[prloom] ${planId}: triage`
@@ -948,7 +974,7 @@ The plan is now **blocked** until conflicts are resolved.`
     } else {
       log.info(`   No changes to commit from triage`, planId);
     }
-    
+
     // Restore status to active after successful triage (unless blocked by rebase conflict)
     // The next dispatch loop will check for new TODOs and continue processing
     if (ps.status === "triaging") {
@@ -961,10 +987,7 @@ The plan is now **blocked** until conflicts are resolved.`
     ps.blocked = true;
     ps.lastError = `Triage failed: ${error}`;
 
-    log.info(
-      `   Posting triage error comment to PR #${ps.pr}`,
-      planId
-    );
+    log.info(`   Posting triage error comment to PR #${ps.pr}`, planId);
     await postPRComment(
       repoRoot,
       ps.pr!,
@@ -988,10 +1011,7 @@ async function runReviewAgent(
   log: Logger
 ): Promise<void> {
   if (!ps.pr) {
-    log.error(
-      `   Cannot review: no PR associated with plan`,
-      planId
-    );
+    log.error(`   Cannot review: no PR associated with plan`, planId);
     return;
   }
 
@@ -1000,10 +1020,7 @@ async function runReviewAgent(
 
   // Set status to reviewing
   ps.status = "reviewing";
-  log.info(
-    `🔍 Running review agent for ${planId}...`,
-    planId
-  );
+  log.info(`🔍 Running review agent for ${planId}...`, planId);
 
   const reviewerConfig = getAgentConfig(config, "reviewer");
   const adapter = getAdapter(reviewerConfig.agent);
@@ -1024,10 +1041,7 @@ async function runReviewAgent(
     : undefined;
 
   if (tmuxConfig) {
-    log.info(
-      `   Spawning in tmux session: ${tmuxConfig.sessionName}`,
-      planId
-    );
+    log.info(`   Spawning in tmux session: ${tmuxConfig.sessionName}`, planId);
   }
 
   try {
@@ -1070,20 +1084,14 @@ async function runReviewAgent(
 
     // Force an immediate poll to pick up our own review comments
     ps.pollOnce = true;
-    log.info(
-      `   Scheduled poll to process review feedback`,
-      planId
-    );
+    log.info(`   Scheduled poll to process review feedback`, planId);
   } catch (error) {
     log.error(`   Review failed: ${error}`, planId);
     log.info(`   Blocking plan`, planId);
     ps.blocked = true;
     ps.lastError = `Review failed: ${error}`;
 
-    log.info(
-      `   Posting review error comment to PR #${ps.pr}`,
-      planId
-    );
+    log.info(`   Posting review error comment to PR #${ps.pr}`, planId);
     await postPRComment(
       repoRoot,
       ps.pr,

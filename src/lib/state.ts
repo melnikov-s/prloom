@@ -13,6 +13,9 @@ export interface PlanState {
   /** Agent to use for this plan */
   agent?: AgentName;
 
+  /** Preset name used when plan was created */
+  preset?: string;
+
   /** Base branch to create the worktree from (captured at plan creation) */
   baseBranch?: string;
 
@@ -144,9 +147,9 @@ export function loadState(repoRoot: string): State {
     for (const name of readdirSync(worktreesDir)) {
       const worktreePath = join(worktreesDir, name);
       const statePath = join(worktreePath, PRLOOM_DIR, STATE_FILE);
-      
+
       if (!existsSync(statePath)) continue;
-      
+
       try {
         const raw = readFileSync(statePath, "utf-8");
         const state = JSON.parse(raw);
@@ -164,10 +167,10 @@ export function loadState(repoRoot: string): State {
   if (existsSync(inboxDir)) {
     for (const file of readdirSync(inboxDir)) {
       if (!file.endsWith(".md")) continue;
-      
+
       const id = file.replace(/\.md$/, "");
       if (plans[id]) continue; // Already activated
-      
+
       // Load metadata from .json file if exists
       const metaPath = join(inboxDir, `${id}.json`);
       if (existsSync(metaPath)) {
@@ -197,7 +200,7 @@ export function saveState(repoRoot: string, state: State): void {
       if (!existsSync(stateDir)) {
         mkdirSync(stateDir, { recursive: true });
       }
-      
+
       const statePath = join(stateDir, STATE_FILE);
       const { worktree, ...rest } = ps;
       writeFileSync(statePath, JSON.stringify({ id, ...rest }, null, 2));
