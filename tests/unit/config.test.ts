@@ -64,6 +64,8 @@ test("resolveWorktreesDir resolves relative path", () => {
     worktrees_dir: "../worktrees",
     github_poll_interval_ms: 60000,
     base_branch: "main",
+    bus: { tickIntervalMs: 1000 },
+    bridges: { github: { enabled: true } },
   };
   const resolved = resolveWorktreesDir("/repo/root", config);
 
@@ -201,4 +203,145 @@ test("getAgentConfig respects agent override parameter", () => {
   const claudeWorker = getAgentConfig(config, "worker", "claude");
   expect(claudeWorker.agent).toBe("claude");
   expect(claudeWorker.model).toBe("opus");
+});
+
+// =============================================================================
+// Bridge Configuration Tests
+// =============================================================================
+
+test("loadConfig reads bridges with pollIntervalMs", () => {
+  mkdirSync(join(TEST_DIR, "prloom"), { recursive: true });
+  writeFileSync(
+    join(TEST_DIR, "prloom", "config.json"),
+    JSON.stringify({
+      bridges: {
+        github: {
+          enabled: true,
+          pollIntervalMs: 30000,
+        },
+      },
+    })
+  );
+
+  const config = loadConfig(TEST_DIR);
+  const github = config.bridges.github;
+
+  expect(github).toBeDefined();
+  expect(github!.enabled).toBe(true);
+  expect(github!.pollIntervalMs).toBe(30000);
+});
+
+test("loadConfig preserves all bridge config fields", () => {
+  mkdirSync(join(TEST_DIR, "prloom"), { recursive: true });
+  writeFileSync(
+    join(TEST_DIR, "prloom", "config.json"),
+    JSON.stringify({
+      bridges: {
+        github: {
+          enabled: true,
+          pollIntervalMs: 45000,
+          customField: "custom-value",
+          nested: { key: "value" },
+        },
+        buildkite: {
+          enabled: true,
+          pollIntervalMs: 120000,
+          module: "./bridges/buildkite.ts",
+          orgSlug: "my-org",
+        },
+      },
+    })
+  );
+
+  const config = loadConfig(TEST_DIR);
+  const github = config.bridges.github;
+  const buildkite = config.bridges.buildkite;
+
+  // GitHub bridge preserves all fields
+  expect(github).toBeDefined();
+  expect(github!.enabled).toBe(true);
+  expect(github!.pollIntervalMs).toBe(45000);
+  expect((github as any).customField).toBe("custom-value");
+  expect((github as any).nested).toEqual({ key: "value" });
+
+  // Buildkite bridge preserves all fields
+  expect(buildkite).toBeDefined();
+  expect(buildkite!.enabled).toBe(true);
+  expect(buildkite!.pollIntervalMs).toBe(120000);
+  expect(buildkite!.module).toBe("./bridges/buildkite.ts");
+  expect((buildkite as any).orgSlug).toBe("my-org");
+});
+
+test("loadConfig defaults bridge enabled to true", () => {
+  mkdirSync(join(TEST_DIR, "prloom"), { recursive: true });
+  writeFileSync(
+    join(TEST_DIR, "prloom", "config.json"),
+    JSON.stringify({
+      bridges: {
+        github: {
+          pollIntervalMs: 30000,
+          // enabled not specified - should default to true
+        },
+      },
+    })
+  );
+
+  const config = loadConfig(TEST_DIR);
+  const github = config.bridges.github;
+
+  expect(github).toBeDefined();
+  expect(github!.enabled).toBe(true);
+});
+
+test("loadConfig respects bridge enabled=false", () => {
+  mkdirSync(join(TEST_DIR, "prloom"), { recursive: true });
+  writeFileSync(
+    join(TEST_DIR, "prloom", "config.json"),
+    JSON.stringify({
+      bridges: {
+        github: {
+          enabled: false,
+          pollIntervalMs: 30000,
+        },
+      },
+    })
+  );
+
+  const config = loadConfig(TEST_DIR);
+  const github = config.bridges.github;
+
+  expect(github).toBeDefined();
+  expect(github!.enabled).toBe(false);
+  expect(github!.pollIntervalMs).toBe(30000);
+});
+
+test("loadConfig reads bus.tickIntervalMs", () => {
+  mkdirSync(join(TEST_DIR, "prloom"), { recursive: true });
+  writeFileSync(
+    join(TEST_DIR, "prloom", "config.json"),
+    JSON.stringify({
+      bus: {
+        tickIntervalMs: 500,
+      },
+    })
+  );
+
+  const config = loadConfig(TEST_DIR);
+
+  expect(config.bus.tickIntervalMs).toBe(500);
+});
+
+test("loadConfig defaults bus.tickIntervalMs to 1000", () => {
+  const config = loadConfig(TEST_DIR);
+
+  expect(config.bus.tickIntervalMs).toBe(1000);
+});
+
+test("loadConfig defaults bridges.github to enabled with 60s poll interval", () => {
+  const config = loadConfig(TEST_DIR);
+  const github = config.bridges.github;
+
+  expect(github).toBeDefined();
+  expect(github!.enabled).toBe(true);
+  expect(github!.pollIntervalMs).toBe(60000);
 });

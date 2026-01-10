@@ -227,11 +227,23 @@ export async function postPRComment(
   repoRoot: string,
   prNumber: number,
   body: string
-): Promise<void> {
+): Promise<{ id: number }> {
   const markedBody = `${BOT_MARKER}\n${body}`;
-  await execa("gh", ["pr", "comment", String(prNumber), "--body", markedBody], {
-    cwd: repoRoot,
-  });
+  // Use gh api to get the comment ID back
+  const result = await execa(
+    "gh",
+    [
+      "api",
+      `repos/{owner}/{repo}/issues/${prNumber}/comments`,
+      "--method",
+      "POST",
+      "-f",
+      `body=${markedBody}`,
+    ],
+    { cwd: repoRoot }
+  );
+  const response = JSON.parse(result.stdout);
+  return { id: response.id };
 }
 
 // Bot detection
@@ -307,12 +319,13 @@ export interface ReviewSubmission {
 /**
  * Submit a PR review with inline comments.
  * All comments are posted atomically as a single review.
+ * Returns the created review ID.
  */
 export async function submitPRReview(
   repoRoot: string,
   prNumber: number,
   review: ReviewSubmission
-): Promise<void> {
+): Promise<{ id: number }> {
   // Map verdict to GitHub event name
   const eventMap = {
     approve: "APPROVE",
@@ -334,7 +347,7 @@ export async function submitPRReview(
   };
 
   // Use gh api to submit the review
-  await execa(
+  const result = await execa(
     "gh",
     [
       "api",
@@ -349,4 +362,6 @@ export async function submitPRReview(
       input: JSON.stringify(payload),
     }
   );
+  const response = JSON.parse(result.stdout);
+  return { id: response.id };
 }

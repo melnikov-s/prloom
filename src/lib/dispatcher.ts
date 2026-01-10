@@ -40,13 +40,7 @@ import {
   markPRReady,
   getPRState,
   getCurrentGitHubUser,
-  getPRComments,
-  getPRReviews,
-  getPRReviewComments,
-  postPRComment,
-  filterNewFeedback,
   getMaxFeedbackIds,
-  submitPRReview,
   type PRFeedback,
 } from "./github.js";
 import { getAdapter } from "./adapters/index.js";
@@ -68,6 +62,16 @@ import {
   readReviewResultFile,
 } from "./template.js";
 import { dispatcherEvents } from "./events.js";
+import {
+  initBusRunner,
+  tickBusEvents,
+  tickBusActions,
+  readBusEventsForTriage,
+  feedbackToEvents,
+  appendBusAction,
+  createCommentAction,
+  createReviewAction,
+} from "./bus/index.js";
 
 export interface DispatcherOptions {
   /** Run workers in tmux sessions for observation */
@@ -170,6 +174,10 @@ export async function runDispatcher(
 
   log.info("Dispatcher started. Press Ctrl+C to stop.");
 
+  // Initialize bus runner (loads bridges including custom modules)
+  await initBusRunner(repoRoot, config);
+  log.info("Bus initialized with bridges");
+
   while (true) {
     try {
       // Reload state from disk to pick up external changes (e.g., UI changing plan status)
@@ -216,12 +224,20 @@ export async function runDispatcher(
         dispatcherEvents.setState(state);
       }
 
-      // Main loop: check files every 5 seconds
-      await sleepUntilIpcOrTimeout(repoRoot, state.control_cursor, 5000);
+      // Main loop: tick interval is configurable (default: 1000ms per RFC)
+      await sleepUntilIpcOrTimeout(
+        repoRoot,
+        state.control_cursor,
+        config.bus.tickIntervalMs
+      );
     } catch (error) {
       log.error(`Dispatcher error: ${error}`);
 
-      await sleepUntilIpcOrTimeout(repoRoot, state.control_cursor, 5000);
+      await sleepUntilIpcOrTimeout(
+        repoRoot,
+        state.control_cursor,
+        config.bus.tickIntervalMs
+      );
     }
   }
 }
@@ -486,63 +502,78 @@ export async function processActivePlans(
         continue;
       }
 
-      // Poll and triage feedback (even if status=done)
-      // Throttle to avoid GitHub rate limits
-      // Only poll if GitHub is enabled
-      if (githubEnabled && ps.pr) {
-        const decision = getFeedbackPollDecision({
-          now: Date.now(),
-          pollIntervalMs: planConfig.github_poll_interval_ms,
-          lastPolledAt: ps.lastPolledAt,
-          pollOnce: ps.pollOnce,
-        });
+      // =================================================================
+      // Bus Tick: Poll all bridges for events and route pending actions
+      // Bridges handle their own timing internally (self-throttle)
+      // =================================================================
+      if (ps.worktree) {
+        // Handle one-off poll request (e.g., `prloom poll <id>`)
+        // This forces an immediate poll by clearing bridge state timestamps
+        if (ps.pollOnce) {
+          ps.pollOnce = undefined;
+          // TODO: Could signal bridges to skip their timing check
+        }
 
-        if (decision.shouldPoll) {
-          if (decision.clearPollOnce) {
-            ps.pollOnce = undefined;
-          }
-          log.info(`🔄 Polling for new comments on ${planId}`, planId);
-          const newFeedback = await pollNewFeedback(repoRoot, ps, botLogin);
+        // Tick all bridges - they self-throttle based on their config
+        // This polls bridges and appends events to events.jsonl
+        await tickBusEvents(repoRoot, ps.worktree, ps, planConfig, log);
 
-          if (newFeedback.length > 0) {
-            log.info(
-              `💬 ${newFeedback.length} new feedback for ${planId}`,
-              planId
+        // Route any pending actions to bridges
+        await tickBusActions(repoRoot, ps.worktree, ps, planConfig, log);
+
+        // Read events from the bus with deduplication (RFC: append → read → dedupe → triage)
+        // This reads from events.jsonl, deduplicates by Event.id, and updates offsets
+        const newEvents = readBusEventsForTriage(ps.worktree);
+
+        // Process any new events
+        if (newEvents.length > 0) {
+          log.info(`💬 ${newEvents.length} new events for ${planId}`, planId);
+
+          // Convert GitHub events to PRFeedback for triage compatibility
+          const newFeedback: PRFeedback[] = newEvents
+            .filter((e) => e.source === "github")
+            .map((e) => ({
+              id: (e.context?.feedbackId as number) ?? 0,
+              type:
+                (e.context?.feedbackType as PRFeedback["type"]) ??
+                "issue_comment",
+              author: (e.context?.author as string) ?? "",
+              body: e.body,
+              path: e.context?.path as string | undefined,
+              line: e.context?.line as number | undefined,
+              diffHunk: e.context?.diffHunk as string | undefined,
+              reviewState: e.context?.reviewState as string | undefined,
+              createdAt:
+                (e.context?.createdAt as string) ?? new Date().toISOString(),
+              inReplyToId: e.context?.inReplyToId as number | undefined,
+            }));
+
+          // Run triage for GitHub feedback (skip for manual agent plans)
+          if (!isManualAgent && newFeedback.length > 0 && ps.pr) {
+            await runTriage(
+              repoRoot,
+              planConfig,
+              ps as ActivatedPlanState,
+              planId,
+              plan,
+              newFeedback,
+              options,
+              log
             );
-
-            // Skip automated triage for manual agent plans
-            if (!isManualAgent) {
-              await runTriage(
-                repoRoot,
-                planConfig,
-                ps as ActivatedPlanState,
-                planId,
-                plan,
-                newFeedback,
-                options,
-                log
-              );
-            }
 
             // Re-parse plan after triage may have modified it
             plan = parsePlan(planPath);
 
-            // Update cursors to max IDs from processed feedback
+            // Update cursors from processed feedback
             const maxIds = getMaxFeedbackIds(newFeedback);
             if (maxIds.lastIssueCommentId)
               ps.lastIssueCommentId = maxIds.lastIssueCommentId;
             if (maxIds.lastReviewId) ps.lastReviewId = maxIds.lastReviewId;
             if (maxIds.lastReviewCommentId)
               ps.lastReviewCommentId = maxIds.lastReviewCommentId;
-          } else {
-            log.info(`✓ No new comments found for ${planId}`, planId);
           }
 
-          // Only update the polling schedule timestamp on normal polling cycles.
-          // For one-off polls (`prloom poll <id>`), keep schedule intact.
-          if (decision.shouldUpdateLastPolledAt) {
-            ps.lastPolledAt = new Date().toISOString();
-          }
+          // TODO: Handle non-GitHub events (e.g., Buildkite) here
         }
       }
 
@@ -816,29 +847,6 @@ export async function processActivePlans(
   }
 }
 
-async function pollNewFeedback(
-  repoRoot: string,
-  ps: PlanState,
-  botLogin: string
-): Promise<PRFeedback[]> {
-  if (!ps.pr) return [];
-
-  const [comments, reviews, reviewComments] = await Promise.all([
-    getPRComments(repoRoot, ps.pr),
-    getPRReviews(repoRoot, ps.pr),
-    getPRReviewComments(repoRoot, ps.pr),
-  ]);
-
-  const allFeedback = [...comments, ...reviews, ...reviewComments];
-  const cursors = {
-    lastIssueCommentId: ps.lastIssueCommentId,
-    lastReviewId: ps.lastReviewId,
-    lastReviewCommentId: ps.lastReviewCommentId,
-  };
-
-  return filterNewFeedback(allFeedback, cursors, botLogin);
-}
-
 async function runTriage(
   repoRoot: string,
   config: Config,
@@ -909,10 +917,7 @@ async function runTriage(
         )}`;
 
         log.info(`   Posting rebase conflict comment to PR #${ps.pr}`, planId);
-        await postPRComment(
-          repoRoot,
-          ps.pr!,
-          `\u26a0\ufe0f **Rebase conflict detected**
+        const rebaseMessage = `⚠️ **Rebase conflict detected**
 
 The following files have conflicts:
 \`\`\`
@@ -948,7 +953,11 @@ ${rebaseResult.conflictFiles?.join("\n")}
    prloom unpause ${planId}
    \`\`\`
 
-The plan is now **blocked** until conflicts are resolved.`
+The plan is now **blocked** until conflicts are resolved.`;
+        // Post via bus action
+        appendBusAction(
+          ps.worktree,
+          createCommentAction(ps.pr!, rebaseMessage)
         );
       } else if (rebaseResult.success) {
         log.info(`   Force pushing rebased branch: ${ps.branch}`, planId);
@@ -957,10 +966,15 @@ The plan is now **blocked** until conflicts are resolved.`
       }
     }
 
-    // Post triage reply
+    // Post triage reply via bus
     log.info(`   Posting triage reply to PR #${ps.pr}`, planId);
-    await postPRComment(repoRoot, ps.pr!, result.reply_markdown);
-    log.success(`   Posted triage reply`, planId);
+    if (ps.worktree && ps.pr) {
+      appendBusAction(
+        ps.worktree,
+        createCommentAction(ps.pr, result.reply_markdown)
+      );
+    }
+    log.success(`   Queued triage reply for delivery`, planId);
 
     // Commit any changes from triage
     log.info(`   Committing: [prloom] ${planId}: triage`, planId);
@@ -988,11 +1002,16 @@ The plan is now **blocked** until conflicts are resolved.`
     ps.lastError = `Triage failed: ${error}`;
 
     log.info(`   Posting triage error comment to PR #${ps.pr}`, planId);
-    await postPRComment(
-      repoRoot,
-      ps.pr!,
-      `⚠️ Triage failed to produce a valid result file. Human attention needed.\n\nError: ${error}`
-    );
+    // Post via bus action
+    if (ps.worktree && ps.pr) {
+      appendBusAction(
+        ps.worktree,
+        createCommentAction(
+          ps.pr,
+          `⚠️ Triage failed to produce a valid result file. Human attention needed.\n\nError: ${error}`
+        )
+      );
+    }
   }
 }
 
@@ -1069,14 +1088,18 @@ async function runReviewAgent(
       planId
     );
 
-    // Submit review to GitHub (all comments posted atomically)
-    log.info(`   Submitting review to PR #${ps.pr}`, planId);
-    await submitPRReview(repoRoot, ps.pr, {
-      verdict: result.verdict,
-      summary: result.summary,
-      comments: result.comments,
-    });
-    log.success(`   Review submitted to GitHub`, planId);
+    // Submit review via bus action (routes through GitHub bridge)
+    log.info(`   Queueing review for PR #${ps.pr}`, planId);
+    appendBusAction(
+      ps.worktree,
+      createReviewAction(
+        ps.pr,
+        result.verdict,
+        result.summary,
+        result.comments
+      )
+    );
+    log.success(`   Review action queued`, planId);
 
     // Set status back to active - the triage flow will pick up the review
     // comments on the next poll cycle
@@ -1092,11 +1115,16 @@ async function runReviewAgent(
     ps.lastError = `Review failed: ${error}`;
 
     log.info(`   Posting review error comment to PR #${ps.pr}`, planId);
-    await postPRComment(
-      repoRoot,
-      ps.pr,
-      `⚠️ Review agent failed to produce a valid result file. Human attention needed.\n\nError: ${error}`
-    );
+    // Post via bus action
+    if (ps.worktree && ps.pr) {
+      appendBusAction(
+        ps.worktree,
+        createCommentAction(
+          ps.pr,
+          `⚠️ Review agent failed to produce a valid result file. Human attention needed.\n\nError: ${error}`
+        )
+      );
+    }
   }
 }
 

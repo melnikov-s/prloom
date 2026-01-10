@@ -188,12 +188,13 @@ Bridges are TypeScript modules. A bridge can be:
 
 ### Timing
 
-prloom calls `events()` on all bridges **every second**. Bridges handle their own timing internally using persisted state:
+prloom calls `events()` on all bridges **every tick** (configurable via `bus.tickIntervalMs`, default 1 second). Bridges handle their own timing internally using persisted state and their config:
 
 ```ts
 async events(ctx, state) {
+  const pollInterval = ctx.config?.pollIntervalMs ?? 60000;  // Default 60s
   const lastPoll = state?.lastPollTime ?? 0;
-  if (Date.now() - lastPoll < 120000) {  // 2 minutes
+  if (Date.now() - lastPoll < pollInterval) {
     return { events: [], state };  // Too soon, skip
   }
 
@@ -202,7 +203,7 @@ async events(ctx, state) {
 }
 ```
 
-If a bridge wants user-configurable timing, it can read its own config file.
+Bridge-specific configuration (like `pollIntervalMs`) is passed via `ctx.config` from the user's config file.
 
 ### Types (Discriminated)
 
@@ -212,6 +213,8 @@ export type BridgeContext = {
   worktree: string;
   branch?: string;
   changeRequestRef?: string;
+  /** Bridge-specific config from prloom/config.json (e.g., pollIntervalMs) */
+  config?: JsonValue;
 };
 
 export type ActionResult =
@@ -263,12 +266,13 @@ export type Bridge = InboundBridge | OutboundBridge | FullBridge;
 ```json
 {
   "bus": {
-    "tickIntervalMs": 1000 // Optional, default 1000
+    "tickIntervalMs": 1000
   },
   "bridges": {
-    "github": { "enabled": true },
+    "github": { "enabled": true, "pollIntervalMs": 60000 },
     "buildkite": {
       "enabled": true,
+      "pollIntervalMs": 120000,
       "module": "./bridges/buildkite.ts"
     }
   }
@@ -276,7 +280,8 @@ export type Bridge = InboundBridge | OutboundBridge | FullBridge;
 ```
 
 - `tickIntervalMs`: How often prloom calls bridge `events()` methods (default: 1 second)
-- Bridges handle their own timing internally (see Timing section above)
+- Each bridge config is passed to the bridge via `ctx.config`
+- `enabled` is standard; other options are freeform per bridge (e.g., `pollIntervalMs`)
 
 ---
 
@@ -285,15 +290,16 @@ export type Bridge = InboundBridge | OutboundBridge | FullBridge;
 ### GitHub (Full Bridge)
 
 ```ts
-const POLL_INTERVAL = 30000;
+const DEFAULT_POLL_INTERVAL = 60000;
 
 const githubBridge: FullBridge = {
   name: "github",
   targets: ["github-pr"],
 
   async events(ctx, state) {
-    // Handle timing internally
-    if (Date.now() - (state?.lastPollTime ?? 0) < POLL_INTERVAL) {
+    // Use configured poll interval, fallback to default
+    const pollInterval = ctx.config?.pollIntervalMs ?? DEFAULT_POLL_INTERVAL;
+    if (Date.now() - (state?.lastPollTime ?? 0) < pollInterval) {
       return { events: [], state };
     }
 

@@ -15,6 +15,34 @@ const DEFAULT_GITHUB: GithubConfig = {
 };
 
 // ============================================================================
+// Bus Configuration
+// ============================================================================
+
+export interface BusConfig {
+  /** How often to tick the bus (call bridge events), in ms. Default: 1000 */
+  tickIntervalMs: number;
+}
+
+const DEFAULT_BUS: BusConfig = {
+  tickIntervalMs: 1000,
+};
+
+export interface BridgeConfig {
+  /** Whether this bridge is enabled */
+  enabled: boolean;
+  /** Poll interval in ms for event polling (default: 60000 for GitHub) */
+  pollIntervalMs?: number;
+  /** Optional path to custom bridge module */
+  module?: string;
+  /** Additional freeform config properties (tokens, slugs, etc.) */
+  [key: string]: unknown;
+}
+
+const DEFAULT_BRIDGES: Record<string, BridgeConfig> = {
+  github: { enabled: true, pollIntervalMs: 60000 },
+};
+
+// ============================================================================
 // Preset Configuration
 // ============================================================================
 
@@ -72,6 +100,8 @@ export interface Config {
   worktrees_dir: string;
   github_poll_interval_ms: number;
   base_branch: string;
+  bus: BusConfig;
+  bridges: Record<string, BridgeConfig>;
 }
 
 const DEFAULTS: Config = {
@@ -82,6 +112,8 @@ const DEFAULTS: Config = {
   worktrees_dir: "prloom/.local/worktrees",
   github_poll_interval_ms: 60000, // 60 seconds for GitHub API rate limits
   base_branch: "main",
+  bus: DEFAULT_BUS,
+  bridges: DEFAULT_BRIDGES,
 };
 
 export function loadConfig(repoRoot: string): Config {
@@ -116,6 +148,26 @@ export function loadConfig(repoRoot: string): Config {
     // Parse presets
     const presets = parsePresets(parsed.presets);
 
+    // Parse bus config
+    const bus: BusConfig = {
+      tickIntervalMs: parsed.bus?.tickIntervalMs ?? DEFAULTS.bus.tickIntervalMs,
+    };
+
+    // Parse bridges config
+    const bridges: Record<string, BridgeConfig> = { ...DEFAULT_BRIDGES };
+    if (typeof parsed.bridges === "object" && parsed.bridges !== null) {
+      for (const [name, cfg] of Object.entries(parsed.bridges)) {
+        if (typeof cfg === "object" && cfg !== null) {
+          const cfgObj = cfg as Record<string, unknown>;
+          // Preserve all bridge config fields (enabled, module, pollIntervalMs, etc.)
+          bridges[name] = {
+            ...cfgObj,
+            enabled: cfgObj.enabled !== false, // Default to true unless explicitly disabled
+          } as BridgeConfig;
+        }
+      }
+    }
+
     return {
       agents,
       github,
@@ -127,6 +179,8 @@ export function loadConfig(repoRoot: string): Config {
         typeof parsed.base_branch === "string" && parsed.base_branch.trim()
           ? parsed.base_branch
           : DEFAULTS.base_branch,
+      bus,
+      bridges,
     };
   } catch {
     return { ...DEFAULTS };
@@ -317,6 +371,10 @@ export function resolveConfig(
   // Build result with proper defaults fallback
   const mergedAgents = merged.agents as AgentsConfig | undefined;
   const mergedGithub = merged.github as GithubConfig | undefined;
+  const mergedBus = merged.bus as BusConfig | undefined;
+  const mergedBridges = merged.bridges as
+    | Record<string, BridgeConfig>
+    | undefined;
 
   return {
     agents: mergedAgents ?? DEFAULTS.agents,
@@ -327,6 +385,8 @@ export function resolveConfig(
       (merged.github_poll_interval_ms as number) ??
       DEFAULTS.github_poll_interval_ms,
     base_branch: (merged.base_branch as string) ?? DEFAULTS.base_branch,
+    bus: mergedBus ?? DEFAULTS.bus,
+    bridges: mergedBridges ?? DEFAULTS.bridges,
   };
 }
 
