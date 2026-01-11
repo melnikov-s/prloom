@@ -43,7 +43,7 @@ afterEach(() => {
 // Directory Management Tests
 // =============================================================================
 
-test("initBusDir creates .bus directory structure", () => {
+test("initBusDir creates bus directory structure", () => {
   expect(hasBusDir(TEST_WORKTREE)).toBe(false);
 
   initBusDir(TEST_WORKTREE);

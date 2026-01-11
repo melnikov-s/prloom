@@ -27,7 +27,7 @@ import type {
 // Constants
 // =============================================================================
 
-const BUS_DIR = "prloom/.bus";
+const BUS_DIR = "prloom/.local/bus";
 const EVENTS_FILE = "events.jsonl";
 const ACTIONS_FILE = "actions.jsonl";
 const STATE_DIR = "state";
@@ -46,7 +46,7 @@ export function getBusDir(worktree: string): string {
 
 /**
  * Initialize the bus directory structure in a worktree.
- * Creates .bus/, .bus/state/, events.jsonl, and actions.jsonl.
+ * Creates .local/bus/, .local/bus/state/, events.jsonl, and actions.jsonl.
  */
 export function initBusDir(worktree: string): void {
   const busDir = getBusDir(worktree);

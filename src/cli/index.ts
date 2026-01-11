@@ -26,7 +26,43 @@ async function getRepoRoot(): Promise<string> {
 yargs(hideBin(process.argv))
   .scriptName("prloom")
   .version(packageJson.version)
-  .usage("$0 <command> [options]")
+  .usage("$0 [command] [options]")
+
+  // Default command: init if needed, then start dispatcher
+  .command(
+    "$0",
+    "Initialize (if needed) and start the dispatcher",
+    (yargs) =>
+      yargs.option("tmux", {
+        type: "boolean",
+        describe:
+          "Run workers in tmux sessions (auto-enabled if tmux is installed)",
+        default: true,
+      }),
+    async (argv) => {
+      const repoRoot = await getRepoRoot();
+      const { isInitialized, runInit } = await import("./init.js");
+
+      // Auto-initialize if not already initialized
+      if (!isInitialized(repoRoot)) {
+        await runInit(repoRoot, { yes: false, force: false });
+      }
+
+      const { runDispatcher } = await import("../lib/dispatcher.js");
+      const { renderTUI } = await import("../ui/index.js");
+
+      // Start dispatcher in background
+      runDispatcher(repoRoot, { tmux: argv.tmux, useTUI: true }).catch(
+        (err) => {
+          console.error("Dispatcher error:", err);
+          process.exit(1);
+        }
+      );
+
+      // Render TUI (blocks until quit)
+      await renderTUI(repoRoot);
+    }
+  )
 
   // prloom init
   .command(
@@ -119,35 +155,6 @@ yargs(hideBin(process.argv))
       const planIdInput = argv["plan-id"] as string | undefined;
       const { runEdit } = await import("./edit.js");
       await runEdit(repoRoot, planIdInput, argv.agent, argv["no-designer"]);
-    }
-  )
-
-  // prloom start
-  .command(
-    "start",
-    "Start the dispatcher",
-    (yargs) =>
-      yargs.option("tmux", {
-        type: "boolean",
-        describe:
-          "Run workers in tmux sessions (auto-enabled if tmux is installed)",
-        default: true,
-      }),
-    async (argv) => {
-      const repoRoot = await getRepoRoot();
-      const { runDispatcher } = await import("../lib/dispatcher.js");
-      const { renderTUI } = await import("../ui/index.js");
-
-      // Start dispatcher in background
-      runDispatcher(repoRoot, { tmux: argv.tmux, useTUI: true }).catch(
-        (err) => {
-          console.error("Dispatcher error:", err);
-          process.exit(1);
-        }
-      );
-
-      // Render TUI (blocks until quit)
-      await renderTUI(repoRoot);
     }
   )
 
@@ -334,7 +341,6 @@ yargs(hideBin(process.argv))
     }
   )
 
-  .demandCommand(1, "You need to specify a command")
   .strict()
   .help()
   .parse();

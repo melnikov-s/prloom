@@ -295,7 +295,7 @@ test("buildHookContext includes todoCompleted for afterTodo", () => {
 // =============================================================================
 
 test("HookContext.emitAction appends action to bus", () => {
-  // Set up worktree with prloom directory (bus will create prloom/.bus)
+  // Set up worktree with prloom directory (bus will create prloom/.local/bus)
   const worktree = join(TEST_DIR, "worktree");
   mkdirSync(join(worktree, "prloom"), { recursive: true });
 
@@ -315,8 +315,8 @@ test("HookContext.emitAction appends action to bus", () => {
     payload: { type: "comment", message: "Test comment" },
   });
 
-  // Verify action was written to outbox (prloom/.bus/actions.jsonl)
-  const actionsPath = join(worktree, "prloom", ".bus", "actions.jsonl");
+  // Verify action was written to outbox (prloom/.local/bus/actions.jsonl)
+  const actionsPath = join(worktree, "prloom", ".local", "bus", "actions.jsonl");
   expect(existsSync(actionsPath)).toBe(true);
 
   const content = readFileSync(actionsPath, "utf-8");

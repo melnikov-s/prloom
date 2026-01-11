@@ -122,7 +122,7 @@ describe("Bus Runner", () => {
       await tickBusEvents(repoRoot, worktree, ps, baseConfig, mockLogger);
 
       // Bus directory should now exist
-      const busPath = join(worktree, "prloom", ".bus");
+      const busPath = join(worktree, "prloom", ".local", "bus");
       expect(() => readFileSync(join(busPath, "events.jsonl"))).not.toThrow();
     });
 

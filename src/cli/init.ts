@@ -13,6 +13,15 @@ export interface InitOptions {
   force?: boolean;
 }
 
+/**
+ * Check if prloom is initialized in a repository.
+ * Checks for the existence of prloom/config.json.
+ */
+export function isInitialized(repoRoot: string): boolean {
+  const configPath = join(repoRoot, "prloom", "config.json");
+  return existsSync(configPath);
+}
+
 export async function runInit(
   cwd: string,
   opts: InitOptions = {}
