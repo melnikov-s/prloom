@@ -2,23 +2,25 @@ import React, { useState, useEffect, useCallback } from "react";
 import { render, useInput, useApp } from "ink";
 import { join } from "path";
 import { existsSync } from "fs";
-import { execa } from "execa";
 import { App, getAvailableActions, type ActionDef } from "./App.js";
 import { dispatcherEvents, type DispatcherUIState } from "../lib/events.js";
-import {
-  loadState,
-  setPlanStatus,
-  listInboxPlanIds,
-  getInboxPath,
-} from "../lib/state.js";
+import { loadConfig, getPresetNames } from "../lib/config.js";
+import { loadState, setPlanStatus } from "../lib/state.js";
 import { parsePlan } from "../lib/plan.js";
 import { enqueue, type IpcCommand } from "../lib/ipc.js";
 
 interface TUIRunnerProps {
   repoRoot: string;
+  spawnPlan?: (args: string[]) => void;
 }
 
-function TUIRunner({ repoRoot }: TUIRunnerProps): React.ReactElement {
+interface RenderTUIOptions {
+  stdin?: NodeJS.ReadStream;
+  stdout?: NodeJS.WriteStream;
+  spawnPlan?: (args: string[]) => void;
+}
+
+function TUIRunner({ repoRoot, spawnPlan }: TUIRunnerProps): React.ReactElement {
   const { exit } = useApp();
 
   const [uiState, setUIState] = useState<DispatcherUIState>(
@@ -33,6 +35,12 @@ function TUIRunner({ repoRoot }: TUIRunnerProps): React.ReactElement {
   const [expandedPlanId, setExpandedPlanId] = useState<string | null>(null);
   const [selectedActionIndex, setSelectedActionIndex] = useState(0);
   const [isInActionMode, setIsInActionMode] = useState(false);
+  const [isCreatingPlan, setIsCreatingPlan] = useState(false);
+  const [newPlanBranch, setNewPlanBranch] = useState("");
+  const [newPlanBranchError, setNewPlanBranchError] =
+    useState<string | null>(null);
+  const [newPlanPresets, setNewPlanPresets] = useState<string[]>([]);
+  const [selectedPresetIndex, setSelectedPresetIndex] = useState(0);
 
   // Get plan IDs for navigation
   const allPlanIds = Object.keys(uiState.state.plans);
@@ -74,10 +82,118 @@ function TUIRunner({ repoRoot }: TUIRunnerProps): React.ReactElement {
     [repoRoot, exit]
   );
 
+  const startNewPlan = useCallback(
+    async (branch: string, preset?: string) => {
+      exit();
+      const args = ["new", "--branch", branch];
+      if (preset) {
+        args.push("--preset", preset);
+      }
+      if (spawnPlan) {
+        spawnPlan(args);
+        return;
+      }
+      const { spawn } = await import("child_process");
+      spawn("prloom", args, {
+        stdio: "inherit",
+        detached: true,
+      });
+    },
+    [exit, spawnPlan]
+  );
+
+  const openNewPlanDialog = useCallback(() => {
+    const config = loadConfig(repoRoot);
+    const presets = getPresetNames(config);
+    setNewPlanBranch("");
+    setNewPlanBranchError(null);
+    setNewPlanPresets(presets);
+    setSelectedPresetIndex(0);
+    setIsCreatingPlan(true);
+  }, [repoRoot]);
+
+  const closeNewPlanDialog = useCallback(() => {
+    setIsCreatingPlan(false);
+    setNewPlanBranch("");
+    setNewPlanBranchError(null);
+    setNewPlanPresets([]);
+    setSelectedPresetIndex(0);
+  }, []);
+
   // Handle keyboard input
   useInput((input, key) => {
-    // Quit
-    if (input === "q" || (key.ctrl && input === "c")) {
+    if (key.ctrl && input === "c") {
+      exit();
+      return;
+    }
+
+    if (isCreatingPlan) {
+      const presetCount = newPlanPresets.length;
+
+      if (key.escape) {
+        closeNewPlanDialog();
+        return;
+      }
+
+      if (key.return) {
+        const trimmedBranch = newPlanBranch.trim();
+        if (!trimmedBranch) {
+          setNewPlanBranchError("Branch name is required.");
+          return;
+        }
+        const preset =
+          presetCount > 0 ? newPlanPresets[selectedPresetIndex] : undefined;
+        startNewPlan(trimmedBranch, preset);
+        return;
+      }
+
+      if (key.backspace) {
+        setNewPlanBranch((prev) => prev.slice(0, -1));
+        if (newPlanBranchError) {
+          setNewPlanBranchError(null);
+        }
+        return;
+      }
+
+      if (presetCount > 0) {
+        if (key.upArrow) {
+          setSelectedPresetIndex((prev) =>
+            prev > 0 ? prev - 1 : presetCount - 1
+          );
+          return;
+        }
+        if (key.downArrow) {
+          setSelectedPresetIndex((prev) =>
+            prev < presetCount - 1 ? prev + 1 : 0
+          );
+          return;
+        }
+      }
+
+      if (
+        input &&
+        !key.ctrl &&
+        !key.meta &&
+        !key.upArrow &&
+        !key.downArrow &&
+        !key.leftArrow &&
+        !key.rightArrow
+      ) {
+        setNewPlanBranch((prev) => prev + input);
+        if (newPlanBranchError) {
+          setNewPlanBranchError(null);
+        }
+      }
+
+      return;
+    }
+
+    if (input === "n" || input === "N") {
+      openNewPlanDialog();
+      return;
+    }
+
+    if (input === "q") {
       exit();
       return;
     }
@@ -208,18 +324,37 @@ function TUIRunner({ repoRoot }: TUIRunnerProps): React.ReactElement {
       expandedPlanId={expandedPlanId}
       selectedActionIndex={selectedActionIndex}
       isInActionMode={isInActionMode}
+      isCreatingPlan={isCreatingPlan}
+      newPlanBranch={newPlanBranch}
+      newPlanBranchError={newPlanBranchError}
+      newPlanPresets={newPlanPresets}
+      selectedPresetIndex={selectedPresetIndex}
     />
   );
 }
 
-export async function renderTUI(repoRoot: string): Promise<void> {
+export async function renderTUI(
+  repoRoot: string,
+  options: RenderTUIOptions = {}
+): Promise<void> {
   dispatcherEvents.start();
 
   // Initialize with current state
   const initialState = loadState(repoRoot);
   dispatcherEvents.setState(initialState);
 
-  const { waitUntilExit } = render(<TUIRunner repoRoot={repoRoot} />);
+  const renderOptions: { stdin?: NodeJS.ReadStream; stdout?: NodeJS.WriteStream } = {};
+  if (options.stdin) {
+    renderOptions.stdin = options.stdin;
+  }
+  if (options.stdout) {
+    renderOptions.stdout = options.stdout;
+  }
+
+  const { waitUntilExit } = render(
+    <TUIRunner repoRoot={repoRoot} spawnPlan={options.spawnPlan} />,
+    renderOptions
+  );
 
   await waitUntilExit();
 }

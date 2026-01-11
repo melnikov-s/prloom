@@ -12,8 +12,12 @@ import {
   saveState,
 } from "../lib/state.js";
 import { getCurrentBranch, ensureRemoteBranchExists } from "../lib/git.js";
-import { confirm } from "./prompt.js";
+import { confirm, promptText } from "./prompt.js";
 import { loadPlugins, runHooks, buildHookContext } from "../lib/hooks/index.js";
+
+interface RunNewOptions {
+  promptBranch?: (message: string) => Promise<string>;
+}
 
 export async function runNew(
   repoRoot: string,
@@ -22,7 +26,8 @@ export async function runNew(
   noDesigner?: boolean,
   model?: string,
   branchPreference?: string,
-  presetOverride?: string
+  presetOverride?: string,
+  options: RunNewOptions = {}
 ): Promise<void> {
   const config = loadConfig(repoRoot);
 
@@ -70,6 +75,22 @@ export async function runNew(
     process.exit(1);
   }
 
+  const promptBranch =
+    options.promptBranch ??
+    ((message: string) =>
+      promptText(message, {
+        required: true,
+        requiredMessage: "Branch name is required.",
+      }));
+
+  let resolvedBranchPreference =
+    typeof branchPreference === "string" ? branchPreference.trim() : undefined;
+
+  if (!resolvedBranchPreference) {
+    const enteredBranch = await promptBranch("Branch name");
+    resolvedBranchPreference = enteredBranch.trim();
+  }
+
   // Generate plan ID if not provided
   const id = planId ?? nanoid(5);
   const planPath = getInboxPath(repoRoot, id);
@@ -90,15 +111,15 @@ export async function runNew(
   state.plans[id] = {
     status: "draft",
     baseBranch,
-    branch: branchPreference,
+    branch: resolvedBranchPreference,
     preset: selectedPreset,
   };
   saveState(repoRoot, state);
 
   console.log(`Created plan in inbox: ${planPath}`);
   console.log(`Base branch: ${baseBranch}`);
-  if (branchPreference) {
-    console.log(`Branch preference: ${branchPreference}`);
+  if (resolvedBranchPreference) {
+    console.log(`Branch preference: ${resolvedBranchPreference}`);
   }
   if (selectedPreset) {
     console.log(`Preset: ${selectedPreset}`);

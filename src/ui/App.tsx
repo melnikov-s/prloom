@@ -35,7 +35,9 @@ export function Header({ startedAt }: HeaderProps): React.ReactElement {
       <Box>
         <Text dimColor>Running: {formatUptime(startedAt)}</Text>
         <Text dimColor> | </Text>
-        <Text dimColor>(arrows to navigate, space to expand, q to quit)</Text>
+        <Text dimColor>
+          (arrows to navigate, space to expand, n for new plan, q to quit)
+        </Text>
       </Box>
     </Box>
   );
@@ -269,6 +271,8 @@ const ACTIONS: ActionDef[] = [
   },
 ];
 
+const NEW_PLAN_ACTIONS = ["New"];
+
 interface ActionButtonProps {
   label: string;
   isSelected: boolean;
@@ -387,6 +391,76 @@ function ExpandedPlanView({
       <Box paddingX={1} marginTop={1}>
         <Text dimColor>
           (space to execute, up to select plan, left/right for actions)
+        </Text>
+      </Box>
+    </Box>
+  );
+}
+
+interface NewPlanPanelProps {
+  branchName: string;
+  branchError?: string | null;
+  presets: string[];
+  selectedPresetIndex: number;
+}
+
+function NewPlanPanel({
+  branchName,
+  branchError,
+  presets,
+  selectedPresetIndex,
+}: NewPlanPanelProps): React.ReactElement {
+  const branchDisplay = branchName.trim() ? branchName : "<enter branch name>";
+  const branchColor = branchName.trim() ? "cyan" : "gray";
+
+  return (
+    <Box
+      flexDirection="column"
+      borderStyle="single"
+      borderColor="cyan"
+      paddingX={1}
+    >
+      <Text bold>NEW PLAN</Text>
+      <Text dimColor>Enter a branch name, then pick a preset.</Text>
+      <Box marginTop={1} flexDirection="column">
+        <Text>
+          <Text bold>Branch: </Text>
+          <Text color={branchColor}>{branchDisplay}</Text>
+          <Text color="cyan">▏</Text>
+        </Text>
+        {branchError ? <Text color="red">{branchError}</Text> : null}
+      </Box>
+      <Box marginTop={1} flexDirection="column">
+        <Text bold dimColor>
+          PRESETS
+        </Text>
+        {presets.length === 0 ? (
+          <Text dimColor>(no presets configured)</Text>
+        ) : (
+          presets.map((preset, idx) => (
+            <Box key={preset}>
+              <Text color={idx === selectedPresetIndex ? "cyan" : undefined}>
+                {idx === selectedPresetIndex ? "▸ " : "  "}
+                {preset}
+                {preset === "default" && (
+                  <Text dimColor> (standard workflow)</Text>
+                )}
+              </Text>
+            </Box>
+          ))
+        )}
+      </Box>
+      <Box paddingX={1} marginTop={1}>
+        <Text bold dimColor>
+          ACTIONS:{" "}
+        </Text>
+        {NEW_PLAN_ACTIONS.map((action) => (
+          <ActionButton key={action} label={action} isSelected={true} />
+        ))}
+      </Box>
+      <Box paddingX={1} marginTop={1}>
+        <Text dimColor>
+          (type to edit branch, ↑/↓ for presets, Enter to start, Esc to cancel)
         </Text>
       </Box>
     </Box>
@@ -570,6 +644,11 @@ interface AppProps {
   expandedPlanId: string | null;
   selectedActionIndex: number;
   isInActionMode: boolean;
+  isCreatingPlan: boolean;
+  newPlanBranch: string;
+  newPlanBranchError?: string | null;
+  newPlanPresets: string[];
+  selectedPresetIndex: number;
 }
 
 export function App({
@@ -579,19 +658,35 @@ export function App({
   expandedPlanId,
   selectedActionIndex,
   isInActionMode,
+  isCreatingPlan,
+  newPlanBranch,
+  newPlanBranchError,
+  newPlanPresets,
+  selectedPresetIndex,
 }: AppProps): React.ReactElement {
   return (
     <Box flexDirection="column">
       <Box flexDirection="column">
-        <ActivityPanel events={uiState.events} />
-        <InteractivePlanPanel
-          uiState={uiState}
-          planTodos={planTodos}
-          selectedPlanIndex={selectedPlanIndex}
-          expandedPlanId={expandedPlanId}
-          selectedActionIndex={selectedActionIndex}
-          isInActionMode={isInActionMode}
-        />
+        {isCreatingPlan ? (
+          <NewPlanPanel
+            branchName={newPlanBranch}
+            branchError={newPlanBranchError}
+            presets={newPlanPresets}
+            selectedPresetIndex={selectedPresetIndex}
+          />
+        ) : (
+          <>
+            <ActivityPanel events={uiState.events} />
+            <InteractivePlanPanel
+              uiState={uiState}
+              planTodos={planTodos}
+              selectedPlanIndex={selectedPlanIndex}
+              expandedPlanId={expandedPlanId}
+              selectedActionIndex={selectedActionIndex}
+              isInActionMode={isInActionMode}
+            />
+          </>
+        )}
       </Box>
       <Header startedAt={uiState.startedAt} />
     </Box>
