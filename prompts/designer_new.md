@@ -78,5 +78,5 @@ If there are tests or type-checks to run, specify them in the Context section (e
 ## Important
 
 - The plan template already has a `## Progress Log` section — do NOT duplicate it
-- Leave the frontmatter (`id`, `status`, `agent`, `base_branch`) alone, except for the `branch` field
-- **IMPORTANT**: Set the `branch` field to a descriptive, slug-friendly name for this feature (e.g., `fix-pdf-viewer`, `add-resize-handle`). The system will use this to create the git branch.
+- The plan file is markdown-only: do NOT add YAML frontmatter or metadata fields
+- Branch preference is set outside the plan (e.g., `prloom new --branch`), so you do not need to set it here

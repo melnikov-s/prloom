@@ -4,16 +4,9 @@ PRLoom is a CLI tool that orchestrates coding work through **plans** - markdown 
 
 ## What is a Plan?
 
-A plan is a markdown file with YAML frontmatter that describes a unit of work:
+A plan is a markdown file with structured sections that describes a unit of work:
 
 ```markdown
----
-id: add-user-auth
-status: queued
-agent: manual
-base_branch: main
----
-
 ## Title
 
 Add email/password authentication
@@ -38,6 +31,8 @@ Add user authentication with email/password login.
 
 <!-- Append entries here -->
 ```
+
+Plan metadata (status, agent, base branch, branch preference) is stored in `prloom/.local/inbox/<id>.json` before dispatch and `prloom/.local/state.json` once active.
 
 ## Plan Lifecycle
 
