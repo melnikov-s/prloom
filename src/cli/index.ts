@@ -307,6 +307,33 @@ yargs(hideBin(process.argv))
     }
   )
 
+  // prloom delete
+  .command(
+    "delete [plan-id]",
+    "Delete a plan (removes worktree or inbox files)",
+    (yargs) =>
+      yargs
+        .positional("plan-id", {
+          type: "string",
+          describe: "Plan ID to delete",
+        })
+        .option("force", {
+          alias: "f",
+          type: "boolean",
+          describe: "Skip confirmation prompt",
+          default: false,
+        }),
+    async (argv) => {
+      const repoRoot = await getRepoRoot();
+      const { runDelete } = await import("./delete.js");
+      await runDelete(
+        repoRoot,
+        argv["plan-id"] as string | undefined,
+        argv.force
+      );
+    }
+  )
+
   .demandCommand(1, "You need to specify a command")
   .strict()
   .help()
