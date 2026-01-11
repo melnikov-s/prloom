@@ -190,7 +190,10 @@ Do NOT include any other text or explanation, just the plan content.`;
 
       // Wait for completion
       if (execResult.tmuxSession) {
-        await waitForExitCodeFile(execResult.tmuxSession);
+        const waitResult = await waitForExitCodeFile(execResult.tmuxSession);
+        if (waitResult.timedOut || (waitResult.sessionDied && !waitResult.found)) {
+          throw new Error(`Hook agent session failed: ${waitResult.timedOut ? 'timeout' : 'session died without exit code'}`);
+        }
       } else if (execResult.pid) {
         await waitForProcess(execResult.pid);
       }

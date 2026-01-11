@@ -110,14 +110,50 @@ export async function waitForTmuxSession(sessionName: string): Promise<void> {
 
 /**
  * Wait for exit code file to appear (command completed).
- * Polls every second until the file exists.
+ * Also checks if the tmux session is still alive - if the session dies without
+ * creating the exit code file, we stop waiting and return.
+ * 
+ * @param sessionName - The tmux session name
+ * @param timeoutMs - Maximum time to wait (default: 2 hours)
+ * @returns Object indicating whether the exit code file was found
  */
-export async function waitForExitCodeFile(sessionName: string): Promise<void> {
+export async function waitForExitCodeFile(
+  sessionName: string,
+  timeoutMs: number = 2 * 60 * 60 * 1000
+): Promise<{ found: boolean; timedOut: boolean; sessionDied: boolean }> {
   const { exitCodeFile } = getWorkerLogPaths(sessionName);
+  const startTime = Date.now();
+  let sessionCheckCount = 0;
+  
   while (true) {
+    // Check if exit code file exists
     if (existsSync(exitCodeFile)) {
-      return;
+      return { found: true, timedOut: false, sessionDied: false };
     }
+    
+    // Check for timeout
+    const elapsed = Date.now() - startTime;
+    if (elapsed >= timeoutMs) {
+      console.error(`[waitForExitCodeFile] Timeout waiting for ${sessionName} after ${elapsed}ms`);
+      return { found: false, timedOut: true, sessionDied: false };
+    }
+    
+    // Every 10 seconds, check if the tmux session is still alive
+    sessionCheckCount++;
+    if (sessionCheckCount >= 10) {
+      sessionCheckCount = 0;
+      const sessionExists = await hasSession(sessionName);
+      if (!sessionExists) {
+        // Session died - give it one more second for the file to appear
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+        if (existsSync(exitCodeFile)) {
+          return { found: true, timedOut: false, sessionDied: false };
+        }
+        console.error(`[waitForExitCodeFile] Session ${sessionName} died without creating exit code file`);
+        return { found: false, timedOut: false, sessionDied: true };
+      }
+    }
+    
     await new Promise((resolve) => setTimeout(resolve, 1000));
   }
 }

@@ -79,6 +79,13 @@ import {
   type HookRegistry,
 } from "./hooks/index.js";
 import { writeFileSync } from "fs";
+import {
+  logDispatcherError,
+  logAdapterError,
+  logFatalError,
+  logWarning,
+  flushErrorBuffer,
+} from "./errors.js";
 
 export interface DispatcherOptions {
   /** Run workers in tmux sessions for observation */
@@ -247,6 +254,7 @@ export async function runDispatcher(
       );
     } catch (error) {
       log.error(`Dispatcher error: ${error}`);
+      logDispatcherError(undefined, `Main loop error: ${error}`, error);
 
       await sleepUntilIpcOrTimeout(
         repoRoot,
@@ -410,6 +418,13 @@ export async function ingestInboxPlans(
         `❌ Failed to ingest plan ${planId}: ${
           error instanceof Error ? error.message : error
         }`
+      );
+      logDispatcherError(
+        undefined,
+        `Failed to ingest plan ${planId}`,
+        error,
+        planId,
+        { inboxPath }
       );
     }
   }
@@ -792,16 +807,84 @@ export async function processActivePlans(
               `   [spawned detached process: ${execResult.pid}]`,
               planId
             );
+          } else if (execResult.exitCode !== undefined && execResult.exitCode !== 0) {
+            // Adapter failed to spawn - log and continue to retry logic
+            log.warn(
+              `   ⚠️ Adapter failed to spawn worker (exitCode: ${execResult.exitCode})`,
+              planId
+            );
+            logAdapterError(
+              ps.worktree,
+              `Adapter failed to spawn worker for TODO #${todo.index + 1}`,
+              undefined,
+              planId,
+              { exitCode: execResult.exitCode, agent: workerConfig.agent, todoText: todo.text }
+            );
+            continue;
+          } else if (!execResult.tmuxSession && !execResult.pid) {
+            // No session, no pid, no error - something went wrong silently
+            log.warn(
+              `   ⚠️ Adapter returned no session/pid and no error`,
+              planId
+            );
+            logAdapterError(
+              ps.worktree,
+              `Adapter returned no session/pid for TODO #${todo.index + 1}`,
+              undefined,
+              planId,
+              { execResult, agent: workerConfig.agent, todoText: todo.text }
+            );
+            continue;
           }
 
           // Poll for completion
           if (execResult.tmuxSession) {
-            await waitForExitCodeFile(execResult.tmuxSession);
+            const waitResult = await waitForExitCodeFile(execResult.tmuxSession);
+            
+            if (waitResult.timedOut) {
+              log.error(
+                `   ❌ Worker timed out for TODO #${todo.index + 1}`,
+                planId
+              );
+              logFatalError(
+                ps.worktree,
+                "adapter",
+                `Worker timed out waiting for exit code file`,
+                undefined,
+                planId,
+                { tmuxSession: execResult.tmuxSession, todoText: todo.text }
+              );
+              continue;
+            }
+            
+            if (waitResult.sessionDied && !waitResult.found) {
+              log.error(
+                `   ❌ Tmux session died without creating exit code file for TODO #${todo.index + 1}`,
+                planId
+              );
+              logFatalError(
+                ps.worktree,
+                "adapter",
+                `Tmux session died without creating exit code file`,
+                undefined,
+                planId,
+                { tmuxSession: execResult.tmuxSession, todoText: todo.text }
+              );
+              continue;
+            }
+            
             const tmuxResult = readExecutionResult(execResult.tmuxSession);
             if (tmuxResult.exitCode !== 0) {
               log.warn(
                 `   ⚠️ Worker exited with code ${tmuxResult.exitCode}`,
                 planId
+              );
+              logAdapterError(
+                ps.worktree,
+                `Worker exited with non-zero code for TODO #${todo.index + 1}`,
+                undefined,
+                planId,
+                { exitCode: tmuxResult.exitCode, tmuxSession: execResult.tmuxSession }
               );
             }
           } else if (execResult.pid) {
@@ -815,6 +898,13 @@ export async function processActivePlans(
             log.warn(
               `   ⚠️ Worker exited with code ${execResult.exitCode}`,
               planId
+            );
+            logAdapterError(
+              ps.worktree,
+              `Worker exited with code ${execResult.exitCode} for TODO #${todo.index + 1}`,
+              undefined,
+              planId,
+              { exitCode: execResult.exitCode }
             );
           }
 
@@ -846,6 +936,20 @@ export async function processActivePlans(
             } else {
               log.warn(`   No worker log found at: ${logPath}`, planId);
             }
+
+            // Log the error for diagnosis
+            logWarning(
+              ps.worktree,
+              "adapter",
+              `TODO #${todo.index + 1} not marked complete by worker`,
+              planId,
+              { 
+                exitCode: execResult.exitCode, 
+                todoText: todo.text,
+                logPath,
+                retryCount: ps.todoRetryCount ?? 0
+              }
+            );
 
             // Don't commit/push, let retry logic handle it on next iteration
             continue;
@@ -1032,6 +1136,14 @@ export async function processActivePlans(
       ps.lastError = String(error);
       // Per RFC: "If a hook throws, abort." Block the plan to prevent retry loops.
       ps.blocked = true;
+      logFatalError(
+        ps.worktree,
+        "dispatcher",
+        `Error processing plan, blocking: ${error}`,
+        error,
+        planId,
+        { status: ps.status }
+      );
     }
   }
 }
@@ -1081,7 +1193,21 @@ async function runTriage(
 
   // Wait for tmux session or detached process to complete
   if (execResult.tmuxSession) {
-    await waitForExitCodeFile(execResult.tmuxSession);
+    const waitResult = await waitForExitCodeFile(execResult.tmuxSession);
+    if (waitResult.timedOut || (waitResult.sessionDied && !waitResult.found)) {
+      log.error(`   ❌ Triage session failed (timeout or session died)`, planId);
+      logFatalError(
+        ps.worktree,
+        "triage",
+        `Triage session failed: ${waitResult.timedOut ? 'timeout' : 'session died'}`,
+        undefined,
+        planId,
+        { tmuxSession: execResult.tmuxSession }
+      );
+      ps.blocked = true;
+      ps.lastError = `Triage failed: ${waitResult.timedOut ? 'timeout' : 'session died without exit code'}`;
+      return;
+    }
   } else if (execResult.pid) {
     await waitForProcess(execResult.pid);
   }
@@ -1262,7 +1388,19 @@ async function runReviewAgent(
 
     // Wait for tmux session or detached process to complete
     if (execResult.tmuxSession) {
-      await waitForExitCodeFile(execResult.tmuxSession);
+      const waitResult = await waitForExitCodeFile(execResult.tmuxSession);
+      if (waitResult.timedOut || (waitResult.sessionDied && !waitResult.found)) {
+        log.error(`   ❌ Review session failed (timeout or session died)`, planId);
+        logFatalError(
+          ps.worktree,
+          "review",
+          `Review session failed: ${waitResult.timedOut ? 'timeout' : 'session died'}`,
+          undefined,
+          planId,
+          { tmuxSession: execResult.tmuxSession }
+        );
+        throw new Error(`Review session failed: ${waitResult.timedOut ? 'timeout' : 'session died without exit code'}`);
+      }
     } else if (execResult.pid) {
       await waitForProcess(execResult.pid);
     }

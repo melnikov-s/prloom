@@ -34,6 +34,7 @@ import {
 } from "./manager.js";
 import { BridgeRegistry, routeAction } from "./registry.js";
 import { githubBridge } from "./bridges/github.js";
+import { logBusError, logBridgeError, logWarning } from "../errors.js";
 
 // =============================================================================
 // Bus Runner State
@@ -195,6 +196,14 @@ export async function tickBusEvents(
       }
     } catch (error) {
       log.warn(`Bridge ${bridge.name} events() failed: ${error}`, ps.branch);
+      logBridgeError(
+        worktree,
+        bridge.name,
+        `Bridge events() failed: ${error}`,
+        error,
+        undefined,
+        { branch: ps.branch }
+      );
     }
   }
 
@@ -286,6 +295,13 @@ export async function tickBusActions(
           `No bridge claims target "${action.target.target}" for action ${action.id}`,
           ps.branch
         );
+        logBusError(
+          worktree,
+          `No bridge claims target "${action.target.target}"`,
+          undefined,
+          undefined,
+          { actionId: action.id, target: action.target }
+        );
         continue;
       }
 
@@ -301,6 +317,13 @@ export async function tickBusActions(
             `⚠ Action ${action.id} failed (will retry): ${result.result.error}`,
             ps.branch
           );
+          logBusError(
+            worktree,
+            `Action failed (retryable): ${result.result.error}`,
+            undefined,
+            undefined,
+            { actionId: action.id, bridgeName: result.bridgeName, retryable: true }
+          );
           // Don't advance offset - this and all remaining actions will be retried
           hitRetryableFailure = true;
         } else {
@@ -308,12 +331,26 @@ export async function tickBusActions(
             `✗ Action ${action.id} failed (not retryable): ${result.result.error}`,
             ps.branch
           );
+          logBusError(
+            worktree,
+            `Action failed (not retryable): ${result.result.error}`,
+            undefined,
+            undefined,
+            { actionId: action.id, bridgeName: result.bridgeName, retryable: false }
+          );
           // Non-retryable failure - continue processing remaining actions
         }
       }
     } catch (error) {
       // Unexpected error - treat as retryable
       log.error(`Action routing error (will retry): ${error}`, ps.branch);
+      logBusError(
+        worktree,
+        `Action routing error (unexpected): ${error}`,
+        error,
+        undefined,
+        { actionId: action.id }
+      );
       hitRetryableFailure = true;
     }
   }
