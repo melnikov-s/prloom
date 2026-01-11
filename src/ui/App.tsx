@@ -234,6 +234,12 @@ interface ActionDef {
 
 const ACTIONS: ActionDef[] = [
   {
+    label: "Edit",
+    key: "edit",
+    command: "edit",
+    showFor: (status, blocked) => status === "draft" && !blocked,
+  },
+  {
     label: "Activate",
     key: "activate",
     ipcType: "activate",

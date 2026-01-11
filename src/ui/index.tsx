@@ -68,6 +68,17 @@ function TUIRunner({ repoRoot, spawnPlan }: TUIRunnerProps): React.ReactElement 
           type: action.ipcType as IpcCommand["type"],
           plan_id: planId,
         });
+      } else if (action.command === "edit") {
+        // Edit command: run synchronously then restart TUI
+        exit();
+        const { spawnSync } = await import("child_process");
+        spawnSync("prloom", [action.command, planId], {
+          stdio: "inherit",
+        });
+        // After the edit process completes, restart the TUI
+        spawnSync("prloom", ["start"], {
+          stdio: "inherit",
+        });
       } else if (action.command) {
         // For watch/logs, we need to spawn a new process
         // Since we're in the TUI, we'll exit and run the command
@@ -93,10 +104,14 @@ function TUIRunner({ repoRoot, spawnPlan }: TUIRunnerProps): React.ReactElement 
         spawnPlan(args);
         return;
       }
-      const { spawn } = await import("child_process");
-      spawn("prloom", args, {
+      const { spawnSync } = await import("child_process");
+      spawnSync("prloom", args, {
         stdio: "inherit",
-        detached: true,
+      });
+      // After the new plan process completes, restart the TUI
+      const { spawnSync: restartSync } = await import("child_process");
+      restartSync("prloom", ["start"], {
+        stdio: "inherit",
       });
     },
     [exit, spawnPlan]
