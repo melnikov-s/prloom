@@ -77,15 +77,9 @@ export const claudeAdapter: AgentAdapter = {
 
   async interactive({ cwd, prompt, model }): Promise<void> {
     const args: string[] = [];
+    if (prompt) args.push("-p", prompt);
     if (model) args.push("--model", model);
     await execa("claude", args, {
-      cwd,
-      stdio: "inherit",
-    });
-  },
-
-  async resume({ cwd }): Promise<void> {
-    await execa("claude", ["--continue"], {
       cwd,
       stdio: "inherit",
     });

@@ -86,11 +86,4 @@ export const geminiAdapter: AgentAdapter = {
       stdio: "inherit",
     });
   },
-
-  async resume({ cwd }): Promise<void> {
-    await execa("gemini", ["--resume", "latest"], {
-      cwd,
-      stdio: "inherit",
-    });
-  },
 };

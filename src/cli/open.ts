@@ -70,7 +70,7 @@ export async function runOpen(
     const sessionInfo = tmuxRunning
       ? `tmux session "${ps.tmuxSession}"`
       : `process ${ps.pid}`;
-    console.log(`⚠️  Agent is currently running (${sessionInfo})`);
+    console.log(`Warning: Agent is currently running (${sessionInfo})`);
 
     const shouldKill = await confirm("Kill it and take over?");
     if (!shouldKill) {
@@ -102,19 +102,14 @@ export async function runOpen(
   const agentName = ps.agent ?? workerConfig.agent;
   const adapter = getAdapter(agentName);
 
-  console.log(`Resuming session for ${planId}...`);
+  console.log(`Opening session for ${planId}...`);
   console.log(`Agent: ${agentName}`);
   console.log(`Worktree: ${ps.worktree}`);
 
-  // Resume the latest agent session in this worktree
   if (!ps.worktree) {
     console.error("Plan has no worktree - it may not have been activated yet.");
     process.exit(1);
   }
 
-  if (adapter.resume) {
-    await adapter.resume({ cwd: ps.worktree });
-  } else {
-    await adapter.interactive({ cwd: ps.worktree });
-  }
+  await adapter.interactive({ cwd: ps.worktree });
 }

@@ -79,11 +79,4 @@ export const codexAdapter: AgentAdapter = {
       stdio: "inherit",
     });
   },
-
-  async resume({ cwd }): Promise<void> {
-    await execa("codex", ["resume", "--last"], {
-      cwd,
-      stdio: "inherit",
-    });
-  },
 };

@@ -85,11 +85,4 @@ export const opencodeAdapter: AgentAdapter = {
       stdio: "inherit",
     });
   },
-
-  async resume({ cwd }): Promise<void> {
-    await execa("opencode", ["--continue"], {
-      cwd,
-      stdio: "inherit",
-    });
-  },
 };
