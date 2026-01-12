@@ -161,7 +161,7 @@ Some context here.
     expect(call.args).not.toContain("--continue");
     expect(call.args).not.toContain("-c");
 
-    // Verify the prompt contains designer edit content
+    // Verify the prompt contains designer edit content and references the plan path
     const promptIdx = call.args.indexOf("--prompt");
     expect(promptIdx).toBeGreaterThanOrEqual(0);
 
@@ -170,8 +170,8 @@ Some context here.
       throw new Error("Expected --prompt to have a value");
     }
     expect(promptContent).toContain("Designer: Edit an Existing Plan");
-    expect(promptContent).toContain("Test Plan");
-    expect(promptContent).toContain("First task");
+    expect(promptContent).toContain("Read the current plan from:");
+    expect(promptContent).toContain("test-edit-plan.md");
   } finally {
     // Restore environment
     process.env.PATH = originalPath;

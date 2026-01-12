@@ -58,7 +58,7 @@ test("renderDesignerNewPrompt includes path and context", () => {
   expect(prompt).toContain("/repo");
 });
 
-test("renderDesignerEditPrompt includes existing plan", () => {
+test("renderDesignerEditPrompt references plan path", () => {
   const existingPlan = "---\nid: old\n---\n\n## Objective\n\nOld plan";
   const prompt = renderDesignerEditPrompt(
     "/repo",
@@ -68,7 +68,7 @@ test("renderDesignerEditPrompt includes existing plan", () => {
 
   expect(prompt).toContain("Designer: Edit an Existing Plan");
   expect(prompt).toContain("/repo/plan.md");
-  expect(prompt).toContain("Old plan");
+  expect(prompt).toContain("Read the current plan from:");
 });
 
 // loadAgentContext tests
