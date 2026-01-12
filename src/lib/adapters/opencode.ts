@@ -80,6 +80,12 @@ export const opencodeAdapter: AgentAdapter = {
   async interactive({ cwd, prompt, model }): Promise<void> {
     const args = prompt ? ["--prompt", prompt] : [];
     if (model) args.push("--model", model);
+    
+    // Debug: print the command being run
+    console.log(`\n[DEBUG] Running: opencode ${args.map(a => a.length > 100 ? `"${a.slice(0, 100)}..."` : `"${a}"`).join(" ")}`);
+    console.log(`[DEBUG] cwd: ${cwd}`);
+    console.log(`[DEBUG] prompt length: ${prompt?.length ?? 0} chars\n`);
+    
     await execa("opencode", args, {
       cwd,
       stdio: "inherit",
