@@ -1,7 +1,7 @@
 import { loadState, deleteInboxPlan, listInboxPlanIds } from "../lib/state.js";
 import { removeWorktree } from "../lib/git.js";
 import { resolvePlanId } from "../lib/resolver.js";
-import { promptSelection } from "../ui/Selection.js";
+import { promptSelectionWithConfirm } from "../ui/Selection.js";
 import { confirm } from "./prompt.js";
 
 export async function runDelete(
@@ -13,9 +13,26 @@ export async function runDelete(
   const state = loadState(repoRoot);
 
   if (planIdInput) {
+    // Direct ID provided - use readline confirmation (no ink involved)
     planId = await resolvePlanId(repoRoot, planIdInput);
+
+    const ps = state.plans[planId];
+    const isInbox = !ps?.worktree;
+    const location = isInbox ? "inbox" : "worktree";
+
+    if (!force) {
+      const shouldDelete = await confirm(
+        `Delete plan "${planId}" from ${location}? This cannot be undone.`
+      );
+      if (!shouldDelete) {
+        console.log("Aborted.");
+        return;
+      }
+    }
+
+    await deletePlan(repoRoot, planId, state);
   } else {
-    // Collect options from state and inbox
+    // Interactive selection with built-in confirmation (all in ink)
     const diskIds = listInboxPlanIds(repoRoot);
     const allIds = Array.from(
       new Set([...Object.keys(state.plans), ...diskIds])
@@ -46,34 +63,38 @@ export async function runDelete(
       return;
     }
 
-    planId = await promptSelection("Select a plan to delete:", options);
-  }
-
-  const ps = state.plans[planId];
-
-  // Determine if this is an inbox plan or active worktree plan
-  const isInbox = !ps?.worktree;
-  const location = isInbox ? "inbox" : "worktree";
-
-  // Confirmation logic:
-  // - If --force is passed, skip confirmation
-  // - Otherwise, always confirm (standard CLI practice for destructive operations)
-  if (!force) {
-    const shouldDelete = await confirm(
-      `Delete plan "${planId}" from ${location}? This cannot be undone.`
+    const selectedId = await promptSelectionWithConfirm(
+      "Select a plan to delete:",
+      options,
+      (option) => {
+        const ps = state.plans[option.id];
+        const location = ps?.worktree ? "worktree" : "inbox";
+        return `Delete plan "${option.id}" from ${location}? This cannot be undone.`;
+      }
     );
-    if (!shouldDelete) {
+
+    if (!selectedId) {
       console.log("Aborted.");
       return;
     }
+
+    planId = selectedId;
+    await deletePlan(repoRoot, planId, state);
   }
+}
+
+async function deletePlan(
+  repoRoot: string,
+  planId: string,
+  state: ReturnType<typeof loadState>
+): Promise<void> {
+  const ps = state.plans[planId];
+  const isInbox = !ps?.worktree;
 
   if (isInbox) {
-    // Delete inbox plan (.md and .json files)
     deleteInboxPlan(repoRoot, planId);
     console.log(`Deleted inbox plan: ${planId}`);
   } else {
-    // Delete worktree
     if (ps?.worktree) {
       await removeWorktree(repoRoot, ps.worktree);
       console.log(`Deleted worktree for plan: ${planId}`);
