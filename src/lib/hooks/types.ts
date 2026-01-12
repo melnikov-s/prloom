@@ -5,7 +5,7 @@
  * See RFC: docs/rfc-lifecycle-hooks.md
  */
 
-import type { Action } from "../bus/types.js";
+import type { Action, Event, ReplyAddress, InlineComment, JsonValue } from "../bus/types.js";
 
 // =============================================================================
 // Hook Points
@@ -13,13 +13,15 @@ import type { Action } from "../bus/types.js";
 
 /**
  * Hook points during plan execution.
+ * See RFC: docs/rfc-plugin-bridge-primitives.md
  */
 export type HookPoint =
   | "afterDesign"
   | "beforeTodo"
   | "afterTodo"
   | "beforeFinish"
-  | "afterFinish";
+  | "afterFinish"
+  | "beforeTriage";
 
 // =============================================================================
 // Hook Context
@@ -104,3 +106,158 @@ export interface PluginConfig {
 export type PluginFactory = (
   config: unknown
 ) => Partial<Record<HookPoint, Hook>>;
+
+// =============================================================================
+// Deferred Event Info
+// =============================================================================
+
+/**
+ * Information about a deferred event.
+ */
+export interface DeferredEventInfo {
+  /** Reason for deferral */
+  reason?: string;
+  /** Timestamp when the event can be retried */
+  deferredUntil: number;
+}
+
+// =============================================================================
+// Review Submission
+// =============================================================================
+
+/**
+ * Review submission payload for emitReview helper.
+ */
+export interface ReviewSubmission {
+  verdict: "approve" | "request_changes" | "comment";
+  summary: string;
+  comments: InlineComment[];
+}
+
+// =============================================================================
+// BeforeTriage Context Extensions
+// =============================================================================
+
+/**
+ * Extended context for beforeTriage hooks.
+ * Includes event interception capabilities and plugin state management.
+ * See RFC: docs/rfc-plugin-bridge-primitives.md
+ */
+export interface BeforeTriageContext extends HookContext {
+  // =========================================================================
+  // Event Interception (beforeTriage only)
+  // =========================================================================
+
+  /** New, unprocessed events for the current plan */
+  events?: Event[];
+
+  /**
+   * Mark an event as handled. Event is added to processed IDs and never triaged.
+   */
+  markEventHandled?: (eventId: string) => void;
+
+  /**
+   * Mark an event as deferred. Event is skipped for triage and retried later.
+   * @param eventId - The event ID to defer
+   * @param reason - Optional reason for deferral
+   * @param retryAfterMs - Optional backoff time in milliseconds
+   */
+  markEventDeferred?: (
+    eventId: string,
+    reason?: string,
+    retryAfterMs?: number
+  ) => void;
+
+  /**
+   * Get IDs of events marked as handled in this invocation.
+   */
+  getHandledEventIds?: () => string[];
+
+  /**
+   * Get IDs of events marked as deferred in this invocation.
+   */
+  getDeferredEventIds?: () => string[];
+
+  /**
+   * Get detailed info about a deferred event.
+   */
+  getDeferredEventInfo?: (eventId: string) => DeferredEventInfo | undefined;
+
+  /**
+   * Get events that should be passed to triage (unmarked events).
+   */
+  getEventsForTriage?: () => Event[];
+
+  /**
+   * Save interception state (handled/deferred) to dispatcher state.
+   */
+  saveInterceptionState?: () => void;
+
+  // =========================================================================
+  // Plugin State (Per-Plan)
+  // =========================================================================
+
+  /**
+   * Get a value from plugin state.
+   * State is stored at <worktree>/prloom/.local/plugin-state/<pluginName>.json
+   */
+  getState?: (key: string) => JsonValue | undefined;
+
+  /**
+   * Set a value in plugin state.
+   * State is stored at <worktree>/prloom/.local/plugin-state/<pluginName>.json
+   */
+  setState?: (key: string, value: JsonValue) => void;
+
+  // =========================================================================
+  // Global Plugin State (Repo-Level)
+  // =========================================================================
+
+  /**
+   * Get a value from global plugin state.
+   * State is stored at <repoRoot>/prloom/.local/plugin-state-global/<pluginName>.json
+   */
+  getGlobalState?: (key: string) => JsonValue | undefined;
+
+  /**
+   * Set a value in global plugin state.
+   * State is stored at <repoRoot>/prloom/.local/plugin-state-global/<pluginName>.json
+   */
+  setGlobalState?: (key: string, value: JsonValue) => void;
+
+  // =========================================================================
+  // readEvents Helper
+  // =========================================================================
+
+  /**
+   * Read events from the bus without parsing .bus files directly.
+   * This is independent from triage cursors (plugin-managed).
+   */
+  readEvents?: (options?: {
+    types?: string[];
+    sinceId?: string;
+    limit?: number;
+  }) => Promise<{ events: Event[]; lastId?: string }>;
+
+  // =========================================================================
+  // Action Helpers
+  // =========================================================================
+
+  /**
+   * Emit a comment action.
+   */
+  emitComment?: (target: ReplyAddress, message: string) => void;
+
+  /**
+   * Emit a review action.
+   */
+  emitReview?: (target: ReplyAddress, review: ReviewSubmission) => void;
+
+  /**
+   * Emit a merge action.
+   */
+  emitMerge?: (
+    target: ReplyAddress,
+    method?: "merge" | "squash" | "rebase"
+  ) => void;
+}

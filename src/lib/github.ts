@@ -365,3 +365,110 @@ export async function submitPRReview(
   const response = JSON.parse(result.stdout);
   return { id: response.id };
 }
+
+/**
+ * Request reviewers for a PR.
+ */
+export async function requestReviewers(
+  repoRoot: string,
+  prNumber: number,
+  reviewers: string[]
+): Promise<void> {
+  await execa(
+    "gh",
+    [
+      "api",
+      `repos/{owner}/{repo}/pulls/${prNumber}/requested_reviewers`,
+      "--method",
+      "POST",
+      "--field",
+      `reviewers=${reviewers.join(",")}`,
+    ],
+    { cwd: repoRoot }
+  );
+}
+
+/**
+ * Merge a PR.
+ */
+export async function mergePR(
+  repoRoot: string,
+  prNumber: number,
+  method: "merge" | "squash" | "rebase" = "merge"
+): Promise<void> {
+  await execa(
+    "gh",
+    ["pr", "merge", prNumber.toString(), `--${method}`, "--auto"],
+    { cwd: repoRoot }
+  );
+}
+
+/**
+ * Close a PR.
+ */
+export async function closePR(
+  repoRoot: string,
+  prNumber: number
+): Promise<void> {
+  await execa("gh", ["pr", "close", prNumber.toString()], { cwd: repoRoot });
+}
+
+/**
+ * Add labels to a PR.
+ */
+export async function addLabels(
+  repoRoot: string,
+  prNumber: number,
+  labels: string[]
+): Promise<void> {
+  await execa(
+    "gh",
+    ["pr", "edit", prNumber.toString(), "--add-label", labels.join(",")],
+    { cwd: repoRoot }
+  );
+}
+
+/**
+ * Remove labels from a PR.
+ */
+export async function removeLabels(
+  repoRoot: string,
+  prNumber: number,
+  labels: string[]
+): Promise<void> {
+  await execa(
+    "gh",
+    ["pr", "edit", prNumber.toString(), "--remove-label", labels.join(",")],
+    { cwd: repoRoot }
+  );
+}
+
+/**
+ * Assign users to a PR.
+ */
+export async function assignUsers(
+  repoRoot: string,
+  prNumber: number,
+  users: string[]
+): Promise<void> {
+  await execa(
+    "gh",
+    ["pr", "edit", prNumber.toString(), "--add-assignee", users.join(",")],
+    { cwd: repoRoot }
+  );
+}
+
+/**
+ * Set milestone for a PR.
+ */
+export async function setMilestone(
+  repoRoot: string,
+  prNumber: number,
+  milestone: string | number
+): Promise<void> {
+  await execa(
+    "gh",
+    ["pr", "edit", prNumber.toString(), "--milestone", milestone.toString()],
+    { cwd: repoRoot }
+  );
+}

@@ -73,7 +73,9 @@ import {
   loadPlugins,
   runHooks,
   buildHookContext,
+  buildBeforeTriageContext,
   type HookRegistry,
+  type BeforeTriageContext,
 } from "./hooks/index.js";
 import { writeFileSync } from "fs";
 import {
@@ -602,8 +604,54 @@ export async function processActivePlans(
         if (newEvents.length > 0) {
           log.info(`💬 ${newEvents.length} new events for ${planId}`, planId);
 
+          // =============================================================
+          // Run beforeTriage hooks for event interception
+          // See RFC: docs/rfc-plugin-bridge-primitives.md
+          // =============================================================
+          let eventsForTriage = newEvents;
+
+          if (hookRegistry.beforeTriage && hookRegistry.beforeTriage.length > 0) {
+            // Run beforeTriage hooks for each plugin
+            for (const pluginName of Object.keys(planConfig.plugins ?? {})) {
+              const pluginHooks = hookRegistry.beforeTriage;
+              if (!pluginHooks || pluginHooks.length === 0) continue;
+
+              const beforeTriageCtx = buildBeforeTriageContext({
+                repoRoot,
+                worktree: ps.worktree,
+                planId,
+                events: eventsForTriage,
+                changeRequestRef: ps.pr?.toString(),
+                pluginName,
+                config: planConfig,
+              });
+
+              // Run all beforeTriage hooks
+              try {
+                await runHooks("beforeTriage", plan.raw, beforeTriageCtx, hookRegistry);
+
+                // Save interception state (handled/deferred events)
+                beforeTriageCtx.saveInterceptionState?.();
+
+                // Get events that should continue to triage
+                eventsForTriage = beforeTriageCtx.getEventsForTriage?.() ?? eventsForTriage;
+              } catch (error) {
+                log.error(
+                  `beforeTriage hook error: ${error}`,
+                  planId
+                );
+                // Continue with remaining events on hook error
+              }
+            }
+
+            if (eventsForTriage.length < newEvents.length) {
+              const handled = newEvents.length - eventsForTriage.length;
+              log.info(`🎯 ${handled} events handled/deferred by plugins`, planId);
+            }
+          }
+
           // Convert GitHub events to PRFeedback for triage compatibility
-          const newFeedback: PRFeedback[] = newEvents
+          const newFeedback: PRFeedback[] = eventsForTriage
             .filter((e) => e.source === "github")
             .map((e) => ({
               id: (e.context?.feedbackId as number) ?? 0,

@@ -22,6 +22,13 @@ import {
   postPRComment,
   submitPRReview,
   getCurrentGitHubUser,
+  requestReviewers,
+  mergePR,
+  closePR,
+  addLabels,
+  removeLabels,
+  assignUsers,
+  setMilestone,
   type PRFeedback,
   type FeedbackCursors,
 } from "../../github.js";
@@ -265,6 +272,27 @@ export const githubBridge: FullBridge = {
           comments: payload.comments,
         });
         externalId = { reviewId: result.id };
+      } else if (payload.type === "request_reviewers") {
+        ctx.log.info(`Requesting reviewers for PR #${prNumber}: ${payload.reviewers.join(", ")}`);
+        await requestReviewers(ctx.repoRoot, prNumber, payload.reviewers);
+      } else if (payload.type === "merge") {
+        ctx.log.info(`Merging PR #${prNumber} with method ${payload.method ?? "merge"}`);
+        await mergePR(ctx.repoRoot, prNumber, payload.method);
+      } else if (payload.type === "close_pr") {
+        ctx.log.info(`Closing PR #${prNumber}`);
+        await closePR(ctx.repoRoot, prNumber);
+      } else if (payload.type === "add_labels") {
+        ctx.log.info(`Adding labels to PR #${prNumber}: ${payload.labels.join(", ")}`);
+        await addLabels(ctx.repoRoot, prNumber, payload.labels);
+      } else if (payload.type === "remove_labels") {
+        ctx.log.info(`Removing labels from PR #${prNumber}: ${payload.labels.join(", ")}`);
+        await removeLabels(ctx.repoRoot, prNumber, payload.labels);
+      } else if (payload.type === "assign_users") {
+        ctx.log.info(`Assigning users to PR #${prNumber}: ${payload.users.join(", ")}`);
+        await assignUsers(ctx.repoRoot, prNumber, payload.users);
+      } else if (payload.type === "set_milestone") {
+        ctx.log.info(`Setting milestone for PR #${prNumber}: ${payload.milestone}`);
+        await setMilestone(ctx.repoRoot, prNumber, payload.milestone);
       } else {
         ctx.log.error(`Unknown payload type: ${(payload as { type: string }).type}`);
         return {

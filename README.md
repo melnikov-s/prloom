@@ -82,17 +82,127 @@ bun run build
   - With `<plan-id>`: poll once for that plan without shifting its schedule.
   - Without `<plan-id>`: poll now and reset the schedule for all active plans.
 
-## Basic Workflow
+## Extensibility
 
-1. Initialize prloom:
-   - `npx -y prloom init`
-2. Create a plan:
-   - `npx -y prloom new my-feature`
-3. Start the dispatcher:
-   - `npx -y prloom start`
-4. Review the draft PR in GitHub.
-5. Leave PR comments or a review; `prloom` triages feedback into TODOs.
-6. When the PR is ready, merge it.
+`prloom` is designed to be highly extensible via **Plugins** and the **File Bus**.
+
+### Lifecycle Hooks (Plugins)
+
+You can hook into key points of the plan execution lifecycle. Plugins are configured in `prloom/config.json`.
+
+**Available Hook Points:**
+- `afterDesign`: After the designer creates a plan.
+- `beforeTodo`: Before starting a specific TODO.
+- `afterTodo`: After completing a specific TODO.
+- `beforeFinish`: Before marking the plan as ready.
+- `afterFinish`: After the plan is marked ready/completed.
+- `beforeTriage`: After events are polled but before triage processes them. Allows plugins to intercept and claim events.
+
+**Plugin Example:**
+```ts
+export default function myPlugin(config) {
+  return {
+    afterTodo: async (plan, ctx) => {
+      // Run custom logic, call agents, or emit actions
+      const feedback = await ctx.runAgent("Review this change for style.");
+      if (feedback) {
+        ctx.emitAction({
+          type: "respond",
+          target: { target: "github-pr", token: { prNumber: ctx.changeRequestRef } },
+          payload: { type: "comment", message: feedback }
+        });
+      }
+      return plan;
+    }
+  };
+}
+```
+
+### Event Interception (beforeTriage)
+
+The `beforeTriage` hook allows plugins to intercept PR feedback events before they reach the triage agent. This enables custom routing, policy enforcement, and automation workflows.
+
+**Event Interception API:**
+```ts
+export default function policyPlugin() {
+  return {
+    beforeTriage: async (plan, ctx) => {
+      for (const event of ctx.events) {
+        if (shouldHandle(event)) {
+          // Handle the event yourself - it won't be triaged
+          ctx.markEventHandled(event.id);
+        } else if (shouldDefer(event)) {
+          // Skip for now, retry later with optional backoff
+          ctx.markEventDeferred(event.id, "waiting for CI", 60000);
+        }
+        // Unmarked events flow into triage as normal
+      }
+      return plan;
+    }
+  };
+}
+```
+
+**Plugin State Storage:**
+
+Plugins can persist state across restarts using per-plan or global storage:
+
+```ts
+// Per-plan state (stored in worktree)
+const count = ctx.getState("reviewCount") ?? 0;
+ctx.setState("reviewCount", count + 1);
+
+// Global state (shared across all plans)
+const rateLimit = ctx.getGlobalState("apiCallsToday") ?? 0;
+ctx.setGlobalState("apiCallsToday", rateLimit + 1);
+```
+
+**Action Helpers:**
+
+Convenience methods for common actions:
+
+```ts
+// Post a comment
+ctx.emitComment(event.replyTo, "Thanks for the feedback!");
+
+// Submit a review
+ctx.emitReview(event.replyTo, {
+  verdict: "approve",
+  summary: "LGTM",
+  comments: []
+});
+
+// Merge the PR
+ctx.emitMerge(event.replyTo, "squash");
+```
+
+**Read Events:**
+
+Query bus events without parsing files directly:
+
+```ts
+const { events, lastId } = await ctx.readEvents({
+  types: ["pr_comment", "pr_review"],
+  sinceId: ctx.getState("lastProcessedId"),
+  limit: 50
+});
+```
+
+### File Bus & GitHub Actions
+
+The File Bus handles communication with external systems. The built-in GitHub bridge supports several automated actions that plugins can emit:
+
+| Action | Payload Example |
+|--------|-----------------|
+| `comment` | `{ "type": "comment", "message": "Hello!" }` |
+| `review` | `{ "type": "review", "verdict": "approve", "summary": "LGTM", "comments": [] }` |
+| `request_reviewers` | `{ "type": "request_reviewers", "reviewers": ["octocat"] }` |
+| `merge` | `{ "type": "merge", "method": "squash" }` |
+| `close_pr` | `{ "type": "close_pr" }` |
+| `add_labels` | `{ "type": "add_labels", "labels": ["bug", "priority"] }` |
+| `remove_labels` | `{ "type": "remove_labels", "labels": ["stale"] }` |
+| `assign_users` | `{ "type": "assign_users", "users": ["coder"] }` |
+| `set_milestone` | `{ "type": "set_milestone", "milestone": "v1.0" }` |
 
 ## Configuration
 

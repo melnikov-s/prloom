@@ -141,15 +141,41 @@ The built-in GitHub bridge (`src/lib/bus/bridges/github.ts`):
 2. readBusEventsForTriage()
    └── Reads events.jsonl from offset → deduplicates by Event.id
 
-3. Triage processes events
+3. beforeTriage hooks (plugin interception)
+   └── Plugins can markEventHandled() or markEventDeferred()
+
+4. Triage processes remaining events
    └── Creates TODOs, decides responses
 
-4. appendBusAction()
+5. appendBusAction()
    └── Queues actions to actions.jsonl
 
-5. tickBusActions()
+6. tickBusActions()
    └── Reads actions.jsonl → routes to bridges by target
 ```
+
+### Event Interception (beforeTriage)
+
+Plugins can intercept events before triage using the `beforeTriage` hook:
+
+```typescript
+// In a plugin
+beforeTriage: async (plan, ctx) => {
+  for (const event of ctx.events) {
+    if (isHandledByPlugin(event)) {
+      ctx.markEventHandled(event.id);  // Never triaged
+    } else if (shouldWait(event)) {
+      ctx.markEventDeferred(event.id, "reason", 60000);  // Retry later
+    }
+  }
+  return plan;
+}
+```
+
+**Semantics:**
+- `markEventHandled(id)` → Event added to `processedEventIds`, skipped by triage
+- `markEventDeferred(id, reason?, retryAfterMs?)` → Event skipped until backoff elapses
+- Unmarked events → Flow into triage as normal
 
 ### Delivery Semantics
 
@@ -255,7 +281,13 @@ export default slackBridge;
 {
   "eventsOffset": 4523,
   "actionsOffset": 1234,
-  "processedEventIds": ["github-issue_comment-123", "github-review-456"]
+  "processedEventIds": ["github-issue_comment-123", "github-review-456"],
+  "deferredEvents": {
+    "github-review-789": {
+      "reason": "waiting for CI",
+      "deferredUntil": 1704826200000
+    }
+  }
 }
 ```
 

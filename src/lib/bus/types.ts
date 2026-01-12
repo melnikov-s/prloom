@@ -70,7 +70,14 @@ export type OutboundPayload =
       verdict: "approve" | "request_changes" | "comment";
       summary: string;
       comments: InlineComment[];
-    };
+    }
+  | { type: "request_reviewers"; reviewers: string[] }
+  | { type: "merge"; method?: "merge" | "squash" | "rebase" }
+  | { type: "close_pr" }
+  | { type: "add_labels"; labels: string[] }
+  | { type: "remove_labels"; labels: string[] }
+  | { type: "assign_users"; users: string[] }
+  | { type: "set_milestone"; milestone: string | number };
 
 export interface Action {
   id: string;

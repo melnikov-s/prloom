@@ -3,14 +3,35 @@
  *
  * Executes hooks at lifecycle points and builds HookContext.
  * See RFC: docs/rfc-lifecycle-hooks.md
+ * See RFC: docs/rfc-plugin-bridge-primitives.md
  */
 
-import { readFileSync, existsSync, mkdirSync } from "fs";
+import { readFileSync, existsSync, mkdirSync, writeFileSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
-import type { Action } from "../bus/types.js";
-import { appendAction, initBusDir } from "../bus/manager.js";
-import type { HookPoint, Hook, HookContext, HookRegistry } from "./types.js";
+import type { Action, Event, ReplyAddress, JsonValue } from "../bus/types.js";
+import {
+  appendAction,
+  initBusDir,
+  readAllEvents,
+  loadDispatcherState,
+  saveDispatcherState,
+} from "../bus/manager.js";
+import type {
+  HookPoint,
+  Hook,
+  HookContext,
+  HookRegistry,
+  BeforeTriageContext,
+  DeferredEventInfo,
+  ReviewSubmission,
+} from "./types.js";
+import {
+  loadPluginState,
+  savePluginState,
+  loadGlobalPluginState,
+  saveGlobalPluginState,
+} from "./state.js";
 import { loadConfig, getAgentConfig, type Config } from "../config.js";
 import { getAdapter } from "../adapters/index.js";
 import { waitForExitCodeFile, hasTmux } from "../adapters/tmux.js";
@@ -219,5 +240,260 @@ Do NOT include any other text or explanation, just the plan content.`;
       // Append action to the outbox
       appendAction(worktree, action);
     },
+  };
+}
+
+// =============================================================================
+// BeforeTriage Context Builder
+// =============================================================================
+
+export interface BuildBeforeTriageContextOptions {
+  repoRoot: string;
+  worktree: string;
+  planId: string;
+  events: Event[];
+  changeRequestRef?: string;
+  /** Plugin name for state storage - required for getState/setState */
+  pluginName?: string;
+  /** Optional config - will be loaded from repoRoot if not provided */
+  config?: Config;
+}
+
+/**
+ * Extended DispatcherBusState with deferred event tracking.
+ * See RFC: docs/rfc-plugin-bridge-primitives.md
+ */
+interface ExtendedDispatcherBusState {
+  eventsOffset: number;
+  actionsOffset: number;
+  processedEventIds: string[];
+  /** Mapping from event ID to deferral info */
+  deferredEventIds?: Record<string, DeferredEventInfo>;
+}
+
+/**
+ * Build a BeforeTriageContext for beforeTriage hook execution.
+ * Provides event interception, plugin state, and action helpers.
+ */
+export function buildBeforeTriageContext(
+  opts: BuildBeforeTriageContextOptions
+): BeforeTriageContext {
+  const { repoRoot, worktree, planId, events, changeRequestRef, pluginName } =
+    opts;
+
+  // Load config for agent resolution
+  const config = opts.config ?? loadConfig(repoRoot);
+
+  // Internal state for event interception
+  const handledEventIds = new Set<string>();
+  const deferredEvents = new Map<string, DeferredEventInfo>();
+
+  // Load existing dispatcher state to check for previously deferred events
+  const dispatcherState = loadDispatcherState(
+    worktree
+  ) as ExtendedDispatcherBusState;
+  const existingDeferred = dispatcherState.deferredEventIds ?? {};
+
+  // Helper to generate unique action IDs
+  const generateActionId = (prefix: string) =>
+    `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+  // Helper to emit an action
+  const emitActionHelper = (action: Action): void => {
+    initBusDir(worktree);
+    appendAction(worktree, action);
+  };
+
+  return {
+    repoRoot,
+    worktree,
+    planId,
+    hookPoint: "beforeTriage",
+    changeRequestRef,
+
+    // Event interception
+    events,
+
+    markEventHandled: (eventId: string): void => {
+      handledEventIds.add(eventId);
+    },
+
+    markEventDeferred: (
+      eventId: string,
+      reason?: string,
+      retryAfterMs?: number
+    ): void => {
+      const deferredUntil = retryAfterMs
+        ? Date.now() + retryAfterMs
+        : Date.now();
+      deferredEvents.set(eventId, { reason, deferredUntil });
+    },
+
+    getHandledEventIds: (): string[] => {
+      return Array.from(handledEventIds);
+    },
+
+    getDeferredEventIds: (): string[] => {
+      return Array.from(deferredEvents.keys());
+    },
+
+    getDeferredEventInfo: (eventId: string): DeferredEventInfo | undefined => {
+      return deferredEvents.get(eventId);
+    },
+
+    getEventsForTriage: (): Event[] => {
+      const now = Date.now();
+      return events.filter((e) => {
+        // Skip if handled
+        if (handledEventIds.has(e.id)) {
+          return false;
+        }
+
+        // Skip if deferred in this invocation
+        if (deferredEvents.has(e.id)) {
+          return false;
+        }
+
+        // Check if previously deferred and backoff hasn't elapsed
+        const existingDeferral = existingDeferred[e.id];
+        if (existingDeferral && existingDeferral.deferredUntil > now) {
+          return false;
+        }
+
+        return true;
+      });
+    },
+
+    saveInterceptionState: (): void => {
+      // Merge handled events into processedEventIds
+      const processedIds = new Set(dispatcherState.processedEventIds);
+      for (const id of handledEventIds) {
+        processedIds.add(id);
+      }
+
+      // Merge deferred events
+      const allDeferred = { ...existingDeferred };
+      for (const [id, info] of deferredEvents) {
+        allDeferred[id] = info;
+      }
+
+      // Prune old deferrals (backoff elapsed)
+      const now = Date.now();
+      for (const id of Object.keys(allDeferred)) {
+        if (allDeferred[id]!.deferredUntil <= now) {
+          delete allDeferred[id];
+        }
+      }
+
+      // Save updated state
+      const updatedState: ExtendedDispatcherBusState = {
+        ...dispatcherState,
+        processedEventIds: Array.from(processedIds),
+        deferredEventIds:
+          Object.keys(allDeferred).length > 0 ? allDeferred : undefined,
+      };
+
+      saveDispatcherState(worktree, updatedState);
+    },
+
+    // Plugin state (per-plan)
+    getState: pluginName
+      ? (key: string): JsonValue | undefined => {
+          return loadPluginState(worktree, pluginName, key);
+        }
+      : undefined,
+
+    setState: pluginName
+      ? (key: string, value: JsonValue): void => {
+          savePluginState(worktree, pluginName, key, value);
+        }
+      : undefined,
+
+    // Global plugin state
+    getGlobalState: pluginName
+      ? (key: string): JsonValue | undefined => {
+          return loadGlobalPluginState(repoRoot, pluginName, key);
+        }
+      : undefined,
+
+    setGlobalState: pluginName
+      ? (key: string, value: JsonValue): void => {
+          saveGlobalPluginState(repoRoot, pluginName, key, value);
+        }
+      : undefined,
+
+    // readEvents helper
+    readEvents: async (
+      options?: { types?: string[]; sinceId?: string; limit?: number }
+    ): Promise<{ events: Event[]; lastId?: string }> => {
+      let allEvents = readAllEvents(worktree);
+
+      // Filter by types
+      if (options?.types && options.types.length > 0) {
+        const typeSet = new Set(options.types);
+        allEvents = allEvents.filter((e) => typeSet.has(e.type));
+      }
+
+      // Filter by sinceId (events after the given ID)
+      if (options?.sinceId) {
+        const sinceIdx = allEvents.findIndex((e) => e.id === options.sinceId);
+        if (sinceIdx >= 0) {
+          allEvents = allEvents.slice(sinceIdx + 1);
+        }
+      }
+
+      // Apply limit
+      if (options?.limit && options.limit > 0) {
+        allEvents = allEvents.slice(0, options.limit);
+      }
+
+      const lastId =
+        allEvents.length > 0 ? allEvents[allEvents.length - 1]!.id : undefined;
+
+      return { events: allEvents, lastId };
+    },
+
+    // Action helpers
+    emitComment: (target: ReplyAddress, message: string): void => {
+      emitActionHelper({
+        id: generateActionId("action-comment"),
+        type: "respond",
+        target,
+        payload: { type: "comment", message },
+      });
+    },
+
+    emitReview: (target: ReplyAddress, review: ReviewSubmission): void => {
+      emitActionHelper({
+        id: generateActionId("action-review"),
+        type: "respond",
+        target,
+        payload: {
+          type: "review",
+          verdict: review.verdict,
+          summary: review.summary,
+          comments: review.comments,
+        },
+      });
+    },
+
+    emitMerge: (
+      target: ReplyAddress,
+      method?: "merge" | "squash" | "rebase"
+    ): void => {
+      emitActionHelper({
+        id: generateActionId("action-merge"),
+        type: "respond",
+        target,
+        payload: method ? { type: "merge", method } : { type: "merge" },
+      });
+    },
+
+    // Standard HookContext methods
+    runAgent: async (): Promise<string> => {
+      throw new Error("runAgent is not available in beforeTriage hooks");
+    },
+
+    emitAction: emitActionHelper,
   };
 }
