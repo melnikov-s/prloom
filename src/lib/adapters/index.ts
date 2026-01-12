@@ -3,7 +3,6 @@ import { codexAdapter } from "./codex.js";
 import { opencodeAdapter } from "./opencode.js";
 import { claudeAdapter } from "./claude.js";
 import { geminiAdapter } from "./gemini.js";
-import { manualAdapter } from "./manual.js";
 
 export type { AgentAdapter, AgentName, ExecutionResult } from "./types.js";
 export { isAgentName } from "./types.js";
@@ -13,7 +12,6 @@ const adapters: Record<AgentName, AgentAdapter> = {
   opencode: opencodeAdapter,
   claude: claudeAdapter,
   gemini: geminiAdapter,
-  manual: manualAdapter,
 };
 
 /**

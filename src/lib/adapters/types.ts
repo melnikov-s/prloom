@@ -1,6 +1,6 @@
 import { execa } from "execa";
 
-export type AgentName = "codex" | "opencode" | "claude" | "gemini" | "manual";
+export type AgentName = "codex" | "opencode" | "claude" | "gemini";
 
 export interface TmuxConfig {
   sessionName: string;
@@ -31,7 +31,7 @@ export interface AgentAdapter {
   }): Promise<ExecutionResult>;
 
   /**
-   * Launch interactive TUI session (for designer or manual takeover).
+   * Launch interactive TUI session (for designer).
    */
   interactive(opts: {
     cwd: string;
@@ -45,7 +45,6 @@ export function isAgentName(value: string): value is AgentName {
     value === "codex" ||
     value === "opencode" ||
     value === "claude" ||
-    value === "gemini" ||
-    value === "manual"
+    value === "gemini"
   );
 }

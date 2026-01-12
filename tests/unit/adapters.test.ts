@@ -9,7 +9,7 @@ test("isAgentName returns true for valid agent names", () => {
   expect(isAgentName("codex")).toBe(true);
   expect(isAgentName("opencode")).toBe(true);
   expect(isAgentName("claude")).toBe(true);
-  expect(isAgentName("manual")).toBe(true);
+  expect(isAgentName("gemini")).toBe(true);
 });
 
 test("isAgentName returns false for invalid names", () => {
@@ -35,9 +35,9 @@ test("getAdapter returns correct adapter for claude", () => {
   expect(adapter.name).toBe("claude");
 });
 
-test("getAdapter returns correct adapter for manual", () => {
-  const adapter = getAdapter("manual");
-  expect(adapter.name).toBe("manual");
+test("getAdapter returns correct adapter for gemini", () => {
+  const adapter = getAdapter("gemini");
+  expect(adapter.name).toBe("gemini");
 });
 
 test("getAdapter throws for unknown agent", () => {
@@ -50,6 +50,5 @@ test("getAgentNames returns all registered agents", () => {
   expect(names).toContain("opencode");
   expect(names).toContain("claude");
   expect(names).toContain("gemini");
-  expect(names).toContain("manual");
-  expect(names.length).toBe(5);
+  expect(names.length).toBe(4);
 });

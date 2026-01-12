@@ -1,12 +1,7 @@
 import { execa } from "execa";
 import { mkdirSync, existsSync, readFileSync, writeFileSync } from "fs";
-import { join, dirname } from "path";
-import { fileURLToPath } from "url";
+import { join } from "path";
 import { loadConfig } from "../lib/config.js";
-import { confirm } from "./prompt.js";
-
-const SWARM_START_TAG = "<!-- SWARM_INSTRUCTIONS_START -->";
-const SWARM_END_TAG = "<!-- SWARM_INSTRUCTIONS_END -->";
 
 export interface InitOptions {
   yes?: boolean;
@@ -68,97 +63,8 @@ export async function runInit(
   console.log("✅ prloom initialized");
   console.log(`Base branch: ${defaultBranch}`);
 
-  // Prompt for IDE instruction files (unless --yes skips prompts)
-  if (!opts.yes) {
-    await promptIdeInstructionFiles(repoRoot);
-  }
-
   console.log("");
   console.log("Next: run `prloom new <id>` then `prloom start`");
-}
-
-async function promptIdeInstructionFiles(repoRoot: string): Promise<void> {
-  const agentTemplate = loadAgentTemplate();
-  if (!agentTemplate) {
-    return;
-  }
-
-  console.log("");
-
-  const wantCursor = await confirm("Append prloom instructions to CURSOR.md?");
-  if (wantCursor) {
-    appendSwarmInstructions(repoRoot, "CURSOR.md", agentTemplate);
-  }
-
-  const wantAntigravity = await confirm(
-    "Append prloom instructions to ANTIGRAVITY.md?"
-  );
-  if (wantAntigravity) {
-    appendSwarmInstructions(repoRoot, "ANTIGRAVITY.md", agentTemplate);
-  }
-}
-
-function loadAgentTemplate(): string | null {
-  // Find _agent.md relative to the package root
-  try {
-    const __filename = fileURLToPath(import.meta.url);
-    const __dirname = dirname(__filename);
-    // From dist/cli/init.js -> package root is ../../
-    const packageRoot = join(__dirname, "..", "..");
-    const templatePath = join(packageRoot, "manual_agent.md");
-
-    if (existsSync(templatePath)) {
-      return readFileSync(templatePath, "utf-8");
-    }
-
-    // Also try from repo root during development
-    const devPath = join(__dirname, "..", "..", "..", "manual_agent.md");
-    if (existsSync(devPath)) {
-      return readFileSync(devPath, "utf-8");
-    }
-  } catch {
-    // ignore
-  }
-  return null;
-}
-
-function appendSwarmInstructions(
-  repoRoot: string,
-  filename: string,
-  template: string
-): void {
-  const filePath = join(repoRoot, filename);
-  const wrappedContent = `${SWARM_START_TAG}\n${template}\n${SWARM_END_TAG}`;
-
-  if (!existsSync(filePath)) {
-    // Create new file with wrapped content
-    writeFileSync(filePath, wrappedContent + "\n");
-    console.log(`Created ${filename} with prloom instructions`);
-    return;
-  }
-
-  const existing = readFileSync(filePath, "utf-8");
-
-  // Check if tags already exist - replace content between them
-  const tagPattern = new RegExp(
-    `${escapeRegex(SWARM_START_TAG)}[\\s\\S]*?${escapeRegex(SWARM_END_TAG)}`,
-    "g"
-  );
-
-  if (tagPattern.test(existing)) {
-    const updated = existing.replace(tagPattern, wrappedContent);
-    writeFileSync(filePath, updated);
-    console.log(`Updated prloom instructions in ${filename}`);
-  } else {
-    // Append to end of file
-    const updated = existing.trimEnd() + "\n\n" + wrappedContent + "\n";
-    writeFileSync(filePath, updated);
-    console.log(`Appended prloom instructions to ${filename}`);
-  }
-}
-
-function escapeRegex(str: string): string {
-  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 async function ensureGhInstalled(): Promise<void> {

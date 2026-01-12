@@ -65,7 +65,7 @@ export async function runStatus(repoRoot: string): Promise<void> {
   console.log("─".repeat(60));
   console.log("COMMANDS:");
   console.log(
-    "  prloom new <id> --agent manual --no-designer  Create a new plan"
+    "  prloom new <id> --no-designer                  Create a new plan"
   );
   console.log(
     "  prloom poll <id>                              View PR feedback"

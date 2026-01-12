@@ -575,9 +575,6 @@ export async function processActivePlans(
         continue;
       }
 
-      // Skip automated execution for manual agent plans
-      const isManualAgent = ps.agent === "manual";
-
       // =================================================================
       // Bus Tick: Poll all bridges for events and route pending actions
       // Bridges handle their own timing internally (self-throttle)
@@ -624,8 +621,8 @@ export async function processActivePlans(
               inReplyToId: e.context?.inReplyToId as number | undefined,
             }));
 
-          // Run triage for GitHub feedback (skip for manual agent plans)
-          if (!isManualAgent && newFeedback.length > 0 && ps.pr) {
+          // Run triage for GitHub feedback
+          if (newFeedback.length > 0 && ps.pr) {
             await runTriage(
               repoRoot,
               planConfig,
@@ -654,7 +651,6 @@ export async function processActivePlans(
       }
 
       // Execute next TODO (only if status is active)
-      // Skip automated TODO execution for manual agent plans
       const nextTodo = findNextUnchecked(plan);
 
       // If we find unchecked TODOs but status is review/done, flip back to active
@@ -666,7 +662,7 @@ export async function processActivePlans(
         ps.status = "active";
       }
 
-      if (!isManualAgent && ps.status === "active") {
+      if (ps.status === "active") {
         const todo = nextTodo;
 
         if (todo) {

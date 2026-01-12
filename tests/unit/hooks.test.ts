@@ -408,7 +408,7 @@ module.exports = function(config) {
   });
 
   const config: Config = {
-    agents: { default: "manual" },
+    agents: { default: "opencode" },
     github: { enabled: false },
     worktrees_dir: "prloom/.local/worktrees",
     github_poll_interval_ms: 60000,

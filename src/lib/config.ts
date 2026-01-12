@@ -110,7 +110,6 @@ export interface AgentsConfig {
   claude?: AgentModelConfig;
   codex?: AgentModelConfig;
   gemini?: AgentModelConfig;
-  manual?: AgentModelConfig;
 }
 
 /**
@@ -169,7 +168,6 @@ export function loadConfig(repoRoot: string): Config {
       claude: parseAgentModelConfig(parsed.agents?.claude),
       codex: parseAgentModelConfig(parsed.agents?.codex),
       gemini: parseAgentModelConfig(parsed.agents?.gemini),
-      manual: parseAgentModelConfig(parsed.agents?.manual),
     };
 
     // Parse github config
