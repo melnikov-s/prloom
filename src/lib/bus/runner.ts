@@ -12,6 +12,7 @@ import type {
   Event,
   Action,
   BridgeContext,
+  BridgeLogger,
   Bridge,
   JsonValue,
 } from "./types.js";
@@ -160,6 +161,13 @@ export async function tickBusEvents(
       // Get bridge-specific config
       const bridgeCfg = config.bridges[bridge.name];
 
+      // Create logger that prefixes with bridge name
+      const bridgeLog: BridgeLogger = {
+        info: (msg) => log.info(`[${bridge.name}] ${msg}`, ps.branch),
+        warn: (msg) => log.warn(`[${bridge.name}] ${msg}`, ps.branch),
+        error: (msg) => log.error(`[${bridge.name}] ${msg}`, ps.branch),
+      };
+
       // Build context with full bridge config (as JsonValue)
       const ctx: BridgeContext = {
         repoRoot,
@@ -167,6 +175,7 @@ export async function tickBusEvents(
         branch: ps.branch,
         changeRequestRef: ps.pr?.toString(),
         config: bridgeCfg as unknown as JsonValue,
+        log: bridgeLog,
       };
 
       // Load bridge state
@@ -235,16 +244,6 @@ export async function tickBusActions(
     return;
   }
 
-  // Build context with config for the target bridge
-  // Note: Actions are routed by target, so we look up bridge config by target's bridge
-  const ctx: BridgeContext = {
-    repoRoot,
-    worktree,
-    branch: ps.branch,
-    changeRequestRef: ps.pr?.toString(),
-    // Config will be set per-action based on target bridge
-  };
-
   // Load dispatcher state to get actions offset
   const dispatcherState = loadDispatcherState(worktree);
   const actionsOffset = dispatcherState.actionsOffset ?? 0;
@@ -280,10 +279,22 @@ export async function tickBusActions(
         ? config.bridges[targetBridge.name]
         : undefined;
 
-      // Build context with bridge-specific config
+      // Create logger that prefixes with bridge name (or "unknown" if no bridge found)
+      const bridgeName = targetBridge?.name ?? "unknown";
+      const bridgeLog: BridgeLogger = {
+        info: (msg) => log.info(`[${bridgeName}] ${msg}`, ps.branch),
+        warn: (msg) => log.warn(`[${bridgeName}] ${msg}`, ps.branch),
+        error: (msg) => log.error(`[${bridgeName}] ${msg}`, ps.branch),
+      };
+
+      // Build context with bridge-specific config and logger
       const actionCtx: BridgeContext = {
-        ...ctx,
+        repoRoot,
+        worktree,
+        branch: ps.branch,
+        changeRequestRef: ps.pr?.toString(),
         config: bridgeCfg as unknown as JsonValue,
+        log: bridgeLog,
       };
 
       const result = await routeAction(runner.registry, actionCtx, action);

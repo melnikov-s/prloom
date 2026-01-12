@@ -8,9 +8,17 @@ import { describe, test, expect, mock, beforeEach, afterEach } from "bun:test";
 import { githubBridge } from "../../src/lib/bus/bridges/github.js";
 import type {
   BridgeContext,
+  BridgeLogger,
   JsonValue,
   Action,
 } from "../../src/lib/bus/types.js";
+
+// Mock logger for tests
+const mockLog: BridgeLogger = {
+  info: () => {},
+  warn: () => {},
+  error: () => {},
+};
 
 // Mock the github module
 const mockGetPRComments = mock(() => Promise.resolve([]));
@@ -34,6 +42,7 @@ describe("GitHub Bridge", () => {
     worktree: "/test/worktree",
     branch: "test-branch",
     changeRequestRef: "123",
+    log: mockLog,
   };
 
   describe("events()", () => {
@@ -197,6 +206,7 @@ describe("GitHub Bridge Poll Timing", () => {
       branch: "test-branch",
       changeRequestRef: "123",
       config: { pollIntervalMs: 60000 },
+      log: mockLog,
     };
 
     // State with recent poll - should return early without calling GitHub
@@ -223,6 +233,7 @@ describe("GitHub Bridge Poll Timing", () => {
       branch: "test-branch",
       changeRequestRef: "123",
       config: { pollIntervalMs: 100 }, // Very short interval
+      log: mockLog,
     };
 
     // State with poll time 50ms ago (within 100ms interval)
@@ -246,6 +257,7 @@ describe("GitHub Bridge Poll Timing", () => {
       branch: "test-branch",
       changeRequestRef: "123",
       // No config - uses bridge's internal default
+      log: mockLog,
     };
 
     // State with poll time 45 seconds ago
@@ -311,6 +323,7 @@ describe("GitHub Bridge Action State", () => {
       worktree: "/test/worktree",
       branch: "test-branch",
       changeRequestRef: "123",
+      log: mockLog,
     };
 
     const actionWithoutPrNumber: Action = {
@@ -341,6 +354,7 @@ describe("GitHub Bridge Action State", () => {
       worktree: "/test/worktree",
       branch: "test-branch",
       changeRequestRef: "123",
+      log: mockLog,
     };
 
     const actionWithUndefinedToken: Action = {

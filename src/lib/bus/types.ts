@@ -81,6 +81,23 @@ export interface Action {
 }
 
 // =============================================================================
+// Bridge Logger
+// =============================================================================
+
+/**
+ * Logger interface for bridges to report activity.
+ * Logs appear in the dispatcher's activity stream (TUI or console).
+ */
+export interface BridgeLogger {
+  /** Informational message (e.g., "Polling GitHub API...") */
+  info: (msg: string) => void;
+  /** Warning (e.g., "Rate limit approaching") */
+  warn: (msg: string) => void;
+  /** Error (e.g., "GitHub API returned 500") */
+  error: (msg: string) => void;
+}
+
+// =============================================================================
 // Bridge Context
 // =============================================================================
 
@@ -91,6 +108,8 @@ export interface BridgeContext {
   changeRequestRef?: string;
   /** Bridge-specific config from prloom/config.json - fully freeform per bridge */
   config?: JsonValue;
+  /** Logger for bridge activity */
+  log: BridgeLogger;
 }
 
 // =============================================================================

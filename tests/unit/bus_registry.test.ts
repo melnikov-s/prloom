@@ -12,7 +12,15 @@ import type {
   FullBridge,
   Action,
   BridgeContext,
+  BridgeLogger,
 } from "../../src/lib/bus/types.js";
+
+// Mock logger for tests
+const mockLog: BridgeLogger = {
+  info: () => {},
+  warn: () => {},
+  error: () => {},
+};
 
 beforeEach(() => {
   resetDefaultRegistry();
@@ -189,6 +197,7 @@ test("routeAction routes to correct bridge", async () => {
   const ctx: BridgeContext = {
     repoRoot: "/test",
     worktree: "/test/worktree",
+    log: mockLog,
   };
 
   const action: Action = {
@@ -213,6 +222,7 @@ test("routeAction returns undefined for unclaimed target", async () => {
   const ctx: BridgeContext = {
     repoRoot: "/test",
     worktree: "/test/worktree",
+    log: mockLog,
   };
 
   const action: Action = {

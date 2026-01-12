@@ -154,6 +154,8 @@ export const githubBridge: FullBridge = {
       };
     }
 
+    ctx.log.info(`Polling PR #${prNumber} for feedback...`);
+
     // Get bot login for filtering (cached after first call)
     let botLogin = bridgeState.botLogin;
     if (!botLogin) {
@@ -191,6 +193,10 @@ export const githubBridge: FullBridge = {
         newCursors.lastReviewCommentId ?? cursors.lastReviewCommentId,
     };
 
+    if (events.length > 0) {
+      ctx.log.info(`Found ${events.length} new feedback items`);
+    }
+
     return {
       events,
       state: {
@@ -207,6 +213,7 @@ export const githubBridge: FullBridge = {
 
     if (actionState.deliveredActions[action.id]) {
       // Already delivered, skip
+      ctx.log.info(`Action ${action.id} already delivered, skipping`);
       return { success: true };
     }
 
@@ -215,6 +222,7 @@ export const githubBridge: FullBridge = {
     const prNumber = token?.prNumber;
 
     if (!prNumber) {
+      ctx.log.error(`Action ${action.id} has no PR number in token`);
       return {
         success: false,
         error: "No PR number in action target token",
@@ -227,6 +235,7 @@ export const githubBridge: FullBridge = {
       let externalId: { commentId?: number; reviewId?: number } = {};
 
       if (payload.type === "comment") {
+        ctx.log.info(`Posting comment to PR #${prNumber}`);
         const result = await postPRComment(
           ctx.repoRoot,
           prNumber,
@@ -234,6 +243,7 @@ export const githubBridge: FullBridge = {
         );
         externalId = { commentId: result.id };
       } else if (payload.type === "inline_comment") {
+        ctx.log.info(`Posting inline comment to PR #${prNumber} at ${payload.path}:${payload.line}`);
         // For inline comments, use a review with single comment
         const result = await submitPRReview(ctx.repoRoot, prNumber, {
           verdict: "comment",
@@ -248,6 +258,7 @@ export const githubBridge: FullBridge = {
         });
         externalId = { reviewId: result.id };
       } else if (payload.type === "review") {
+        ctx.log.info(`Submitting ${payload.verdict} review to PR #${prNumber}`);
         const result = await submitPRReview(ctx.repoRoot, prNumber, {
           verdict: payload.verdict,
           summary: payload.summary,
@@ -255,6 +266,7 @@ export const githubBridge: FullBridge = {
         });
         externalId = { reviewId: result.id };
       } else {
+        ctx.log.error(`Unknown payload type: ${(payload as { type: string }).type}`);
         return {
           success: false,
           error: `Unknown payload type: ${(payload as { type: string }).type}`,
@@ -279,6 +291,8 @@ export const githubBridge: FullBridge = {
         message.includes("rate limit") ||
         message.includes("ECONNREFUSED") ||
         message.includes("timeout");
+
+      ctx.log.error(`Action failed: ${message}${isRetryable ? " (will retry)" : ""}`);
 
       return {
         success: false,
