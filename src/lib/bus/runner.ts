@@ -520,30 +520,3 @@ export function createCommentAction(
     relatedEventId,
   };
 }
-
-/**
- * Create a respond action for submitting a review.
- */
-export function createReviewAction(
-  prNumber: number,
-  verdict: "approve" | "request_changes" | "comment",
-  summary: string,
-  comments: Array<{ path: string; line: number; body: string }>,
-  relatedEventId?: string
-): Action {
-  return {
-    id: `action-review-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-    type: "respond",
-    target: {
-      target: "github-pr",
-      token: { prNumber },
-    },
-    payload: {
-      type: "review",
-      verdict,
-      summary,
-      comments,
-    },
-    relatedEventId,
-  };
-}

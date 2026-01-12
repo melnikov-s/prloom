@@ -86,7 +86,7 @@ export interface PresetConfig {
   plugins?: Record<string, PluginOverride>;
 }
 
-export type AgentStage = "designer" | "worker" | "reviewer" | "triage";
+export type AgentStage = "designer" | "worker" | "triage";
 
 /**
  * Model configuration for a specific agent.
@@ -96,7 +96,6 @@ export interface AgentModelConfig {
   default?: string;
   designer?: string;
   worker?: string;
-  reviewer?: string;
   triage?: string;
 }
 
@@ -285,7 +284,6 @@ function parseAgentModelConfig(value: unknown): AgentModelConfig | undefined {
     if (typeof obj.default === "string") config.default = obj.default;
     if (typeof obj.designer === "string") config.designer = obj.designer;
     if (typeof obj.worker === "string") config.worker = obj.worker;
-    if (typeof obj.reviewer === "string") config.reviewer = obj.reviewer;
     if (typeof obj.triage === "string") config.triage = obj.triage;
 
     // Only return if at least one model is configured

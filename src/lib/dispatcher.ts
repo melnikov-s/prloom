@@ -58,8 +58,6 @@ import {
   renderWorkerPrompt,
   renderTriagePrompt,
   readTriageResultFile,
-  renderReviewPrompt,
-  readReviewResultFile,
 } from "./template.js";
 import { dispatcherEvents } from "./events.js";
 import {
@@ -70,7 +68,6 @@ import {
   feedbackToEvents,
   appendBusAction,
   createCommentAction,
-  createReviewAction,
 } from "./bus/index.js";
 import {
   loadPlugins,
@@ -110,7 +107,7 @@ export type ActivatedPlanState = PlanState & {
   branch: string;
   planRelpath: string;
   baseBranch: string;
-  status: "active" | "review" | "reviewing" | "triaging" | "done";
+  status: "active" | "review" | "triaging" | "done";
 };
 
 // Logger that routes to TUI events or console
@@ -572,32 +569,14 @@ export async function processActivePlans(
         }
       }
 
-      // Skip if plan is blocked, reviewing, or triaging
+      // Skip if plan is blocked or triaging
       let plan = parsePlan(planPath);
-      if (ps.blocked || ps.status === "reviewing" || ps.status === "triaging") {
+      if (ps.blocked || ps.status === "triaging") {
         continue;
       }
 
       // Skip automated execution for manual agent plans
       const isManualAgent = ps.agent === "manual";
-
-      // Handle pending review request (only valid when status is "review")
-      if (ps.pendingReview && ps.status === "review") {
-        ps.pendingReview = undefined;
-        await runReviewAgent(
-          repoRoot,
-          config,
-          ps as ActivatedPlanState,
-          planId,
-          plan,
-          options,
-          log
-        );
-        // Re-parse plan in case review agent modified it
-        plan = parsePlan(planPath);
-        // Skip the rest of processing for this iteration
-        continue;
-      }
 
       // =================================================================
       // Bus Tick: Poll all bridges for events and route pending actions
@@ -1330,126 +1309,6 @@ The plan is now **blocked** until conflicts are resolved.`;
   }
 }
 
-/**
- * Run the review agent to review the PR and post comments to GitHub.
- * The review agent examines the diff and posts a GitHub review with inline comments.
- * After posting, the triage flow will pick up the review comments as new feedback.
- */
-async function runReviewAgent(
-  repoRoot: string,
-  config: Config,
-  ps: ActivatedPlanState,
-  planId: string,
-  plan: ReturnType<typeof parsePlan>,
-  options: DispatcherOptions = {},
-  log: Logger
-): Promise<void> {
-  if (!ps.pr) {
-    log.error(`   Cannot review: no PR associated with plan`, planId);
-    return;
-  }
-
-  // Ensure .prloom directory exists in worktree
-  ensureWorktreePrloomDir(ps.worktree);
-
-  // Set status to reviewing
-  ps.status = "reviewing";
-  log.info(`🔍 Running review agent for ${planId}...`, planId);
-
-  const reviewerConfig = getAgentConfig(config, "reviewer");
-  const adapter = getAdapter(reviewerConfig.agent);
-  const prompt = renderReviewPrompt(
-    repoRoot,
-    plan,
-    ps.pr,
-    ps.branch,
-    ps.baseBranch
-  );
-
-  log.info(`   Using agent: ${reviewerConfig.agent}`, planId);
-
-  // Build tmux config if available and not explicitly disabled
-  const useTmux = options.tmux !== false && (await hasTmux());
-  const tmuxConfig = useTmux
-    ? { sessionName: `prloom-review-${planId}` }
-    : undefined;
-
-  if (tmuxConfig) {
-    log.info(`   Spawning in tmux session: ${tmuxConfig.sessionName}`, planId);
-  }
-
-  try {
-    const execResult = await adapter.execute({
-      cwd: ps.worktree,
-      prompt,
-      tmux: tmuxConfig,
-      model: reviewerConfig.model,
-    });
-
-    // Wait for tmux session or detached process to complete
-    if (execResult.tmuxSession) {
-      const waitResult = await waitForExitCodeFile(execResult.tmuxSession);
-      if (waitResult.timedOut || (waitResult.sessionDied && !waitResult.found)) {
-        log.error(`   ❌ Review session failed (timeout or session died)`, planId);
-        logFatalError(
-          ps.worktree,
-          "review",
-          `Review session failed: ${waitResult.timedOut ? 'timeout' : 'session died'}`,
-          undefined,
-          planId,
-          { tmuxSession: execResult.tmuxSession }
-        );
-        throw new Error(`Review session failed: ${waitResult.timedOut ? 'timeout' : 'session died without exit code'}`);
-      }
-    } else if (execResult.pid) {
-      await waitForProcess(execResult.pid);
-    }
-
-    log.info(`   Review agent completed`, planId);
-
-    // Read and process review result
-    const result = readReviewResultFile(ps.worktree);
-
-    log.info(
-      `   Verdict: ${result.verdict}, ${result.comments.length} inline comments`,
-      planId
-    );
-
-    // Submit review via bus action (routes through GitHub bridge)
-    log.info(`   Queueing review for PR #${ps.pr}`, planId);
-    appendBusAction(
-      ps.worktree,
-      createReviewAction(ps.pr, result.verdict, result.summary, result.comments)
-    );
-    log.success(`   Review action queued`, planId);
-
-    // Set status back to active - the triage flow will pick up the review
-    // comments on the next poll cycle
-    ps.status = "active";
-
-    // Force an immediate poll to pick up our own review comments
-    ps.pollOnce = true;
-    log.info(`   Scheduled poll to process review feedback`, planId);
-  } catch (error) {
-    log.error(`   Review failed: ${error}`, planId);
-    log.info(`   Blocking plan`, planId);
-    ps.blocked = true;
-    ps.lastError = `Review failed: ${error}`;
-
-    log.info(`   Posting review error comment to PR #${ps.pr}`, planId);
-    // Post via bus action
-    if (ps.worktree && ps.pr) {
-      appendBusAction(
-        ps.worktree,
-        createCommentAction(
-          ps.pr,
-          `⚠️ Review agent failed to produce a valid result file. Human attention needed.\n\nError: ${error}`
-        )
-      );
-    }
-  }
-}
-
 function handleCommand(state: State, cmd: IpcCommand, log: Logger): void {
   const ps = state.plans[cmd.plan_id];
   if (!ps) return;
@@ -1479,17 +1338,6 @@ function handleCommand(state: State, cmd: IpcCommand, log: Logger): void {
       `🔄 Launching immediate poll (reset schedule) for ${cmd.plan_id}`,
       cmd.plan_id
     );
-  } else if (cmd.type === "review") {
-    // Trigger a review agent run (only valid when status is "review")
-    if (ps.status !== "review") {
-      log.warn(
-        `⚠️ Cannot review ${cmd.plan_id}: status is "${ps.status}", expected "review"`,
-        cmd.plan_id
-      );
-      return;
-    }
-    ps.pendingReview = true;
-    log.info(`🔍 Review scheduled for ${cmd.plan_id}`, cmd.plan_id);
   }
 }
 

@@ -37,7 +37,6 @@ test("PlanState allows all valid status values including 'triaging'", () => {
     "queued",
     "active",
     "review",
-    "reviewing",
     "triaging",
     "done",
   ];

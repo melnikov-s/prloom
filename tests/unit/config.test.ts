@@ -133,7 +133,7 @@ test("loadConfig reads agent models from config file", () => {
         default: "opencode",
         opencode: {
           default: "gpt-4",
-          reviewer: "claude-sonnet-4-20250514",
+          triage: "claude-sonnet-4-20250514",
         },
       },
     })
@@ -143,7 +143,7 @@ test("loadConfig reads agent models from config file", () => {
 
   expect(config.agents.default).toBe("opencode");
   expect(config.agents.opencode?.default).toBe("gpt-4");
-  expect(config.agents.opencode?.reviewer).toBe("claude-sonnet-4-20250514");
+  expect(config.agents.opencode?.triage).toBe("claude-sonnet-4-20250514");
 });
 
 test("getAgentConfig returns stage-specific model or falls back to default", () => {
@@ -155,7 +155,7 @@ test("getAgentConfig returns stage-specific model or falls back to default", () 
         default: "opencode",
         opencode: {
           default: "gpt-4",
-          reviewer: "claude-sonnet-4-20250514",
+          triage: "claude-sonnet-4-20250514",
         },
       },
     })
@@ -163,10 +163,10 @@ test("getAgentConfig returns stage-specific model or falls back to default", () 
 
   const config = loadConfig(TEST_DIR);
 
-  // Reviewer has specific model
-  const reviewerConfig = getAgentConfig(config, "reviewer");
-  expect(reviewerConfig.agent).toBe("opencode");
-  expect(reviewerConfig.model).toBe("claude-sonnet-4-20250514");
+  // Triage has specific model
+  const triageConfig = getAgentConfig(config, "triage");
+  expect(triageConfig.agent).toBe("opencode");
+  expect(triageConfig.model).toBe("claude-sonnet-4-20250514");
 
   // Worker uses default model
   const workerConfig = getAgentConfig(config, "worker");

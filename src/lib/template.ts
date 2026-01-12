@@ -97,13 +97,12 @@ export function renderDesignerNewPrompt(
 export function renderDesignerEditPrompt(
   repoPath: string,
   planPath: string,
-  existingPlan: string
+  _existingPlan: string
 ): string {
   const template = BUILTIN_PROMPTS["designer_edit"];
   const compiled = Handlebars.compile(template);
   let prompt = compiled({
     plan_path: planPath,
-    existing_plan: existingPlan,
   });
 
   const context = loadAgentContext(repoPath, "planner");
@@ -176,87 +175,5 @@ export function readTriageResultFile(worktreePath: string): TriageResult {
   return {
     reply_markdown: result.reply_markdown,
     rebase_requested: result.rebase_requested,
-  };
-}
-
-// Review
-
-export interface ReviewComment {
-  path: string;
-  line: number;
-  body: string;
-}
-
-export interface ReviewResult {
-  verdict: "approve" | "request_changes" | "comment";
-  summary: string;
-  comments: ReviewComment[];
-}
-
-export function renderReviewPrompt(
-  repoRoot: string,
-  plan: Plan,
-  prNumber: number,
-  branch: string,
-  baseBranch: string
-): string {
-  const template = loadTemplate(repoRoot, "review");
-  const compiled = Handlebars.compile(template);
-
-  return compiled({
-    pr_number: prNumber,
-    plan_title: plan.title,
-    plan_objective: plan.objective,
-    plan_context: plan.context,
-    branch,
-    base_branch: baseBranch,
-  });
-}
-
-const REVIEW_RESULT_FILE = "prloom/.local/review-result.json";
-
-export function readReviewResultFile(worktreePath: string): ReviewResult {
-  const resultPath = join(worktreePath, REVIEW_RESULT_FILE);
-
-  if (!existsSync(resultPath)) {
-    throw new Error("Review result file not found");
-  }
-
-  const raw = readFileSync(resultPath, "utf-8");
-  const result = JSON.parse(raw);
-
-  // Validate required fields
-  if (!["approve", "request_changes", "comment"].includes(result.verdict)) {
-    throw new Error(
-      "Invalid review result: verdict must be 'approve', 'request_changes', or 'comment'"
-    );
-  }
-  if (typeof result.summary !== "string") {
-    throw new Error("Invalid review result: missing summary");
-  }
-  if (!Array.isArray(result.comments)) {
-    throw new Error("Invalid review result: comments must be an array");
-  }
-
-  // Validate each comment
-  for (const comment of result.comments) {
-    if (typeof comment.path !== "string") {
-      throw new Error("Invalid review comment: missing path");
-    }
-    if (typeof comment.line !== "number") {
-      throw new Error("Invalid review comment: line must be a number");
-    }
-    if (typeof comment.body !== "string") {
-      throw new Error("Invalid review comment: missing body");
-    }
-  }
-
-  // Delete the file after reading
-  unlinkSync(resultPath);
-
-  return {
-    verdict: result.verdict,
-    summary: result.summary,
-    comments: result.comments,
   };
 }

@@ -21,7 +21,6 @@ import {
   tickBusActions,
   appendBusAction,
   createCommentAction,
-  createReviewAction,
 } from "../../src/lib/bus/runner.js";
 import {
   initBusDir,
@@ -199,66 +198,6 @@ describe("Bus Runner", () => {
         message: "Hello world",
       });
       expect(action.relatedEventId).toBe("event-123");
-    });
-  });
-
-  describe("createReviewAction", () => {
-    test("creates correct action structure for review", () => {
-      const comments = [
-        { path: "src/index.ts", line: 10, body: "Consider renaming this" },
-        { path: "src/utils.ts", line: 25, body: "Add error handling" },
-      ];
-      const action = createReviewAction(
-        789,
-        "request_changes",
-        "Please address these issues",
-        comments,
-        "event-456"
-      );
-
-      expect(action.id).toMatch(/^action-review-/);
-      expect(action.type).toBe("respond");
-      expect(action.target.target).toBe("github-pr");
-      expect(action.target.token).toEqual({ prNumber: 789 });
-      expect(action.payload).toEqual({
-        type: "review",
-        verdict: "request_changes",
-        summary: "Please address these issues",
-        comments,
-      });
-      expect(action.relatedEventId).toBe("event-456");
-    });
-
-    test("creates review action with approve verdict", () => {
-      const action = createReviewAction(123, "approve", "LGTM!", []);
-
-      expect(action.payload).toEqual({
-        type: "review",
-        verdict: "approve",
-        summary: "LGTM!",
-        comments: [],
-      });
-    });
-
-    test("creates review action with comment verdict", () => {
-      const action = createReviewAction(
-        123,
-        "comment",
-        "Some observations",
-        [{ path: "README.md", line: 1, body: "Typo here" }]
-      );
-
-      expect(action.payload).toEqual({
-        type: "review",
-        verdict: "comment",
-        summary: "Some observations",
-        comments: [{ path: "README.md", line: 1, body: "Typo here" }],
-      });
-    });
-
-    test("creates review action without relatedEventId", () => {
-      const action = createReviewAction(456, "approve", "Good work", []);
-      expect(action.relatedEventId).toBeUndefined();
     });
   });
 

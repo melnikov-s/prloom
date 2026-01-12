@@ -327,4 +327,3 @@ async function runHooks(
 
 1. **File Bus first** — Implements outbox.jsonl and bridges for `emitAction()` to work
 2. **Hooks second** — Implements plugin system with full functionality
-3. **Migrate review** — Move review agent to a `beforeFinish` hook

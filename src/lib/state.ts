@@ -32,14 +32,7 @@ export interface PlanState {
   planRelpath?: string;
 
   /** Plan execution status */
-  status:
-    | "draft"
-    | "queued"
-    | "active"
-    | "review"
-    | "reviewing"
-    | "triaging"
-    | "done";
+  status: "draft" | "queued" | "active" | "review" | "triaging" | "done";
 
   /** Whether the plan is blocked */
   blocked?: boolean;
@@ -52,9 +45,6 @@ export interface PlanState {
 
   /** Force a one-time PR feedback poll */
   pollOnce?: boolean;
-
-  /** Flag to trigger a review agent run */
-  pendingReview?: boolean;
 
   // Cursors for incremental PR feedback polling
   lastIssueCommentId?: number;

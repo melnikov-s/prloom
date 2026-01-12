@@ -65,8 +65,6 @@ function getStatusColor(status: string, blocked?: boolean): string {
       return "yellowBright";
     case "review":
       return "cyan";
-    case "reviewing":
-      return "magenta";
     case "done":
       return "gray";
     default:
@@ -85,8 +83,6 @@ function getStatusEmoji(status: string, blocked?: boolean): string {
       return "📝";
     case "review":
       return "👀";
-    case "reviewing":
-      return "🔍";
     case "done":
       return "✅";
     default:
@@ -227,7 +223,7 @@ function PlanHeader(): React.ReactElement {
 interface ActionDef {
   label: string;
   key: string;
-  ipcType?: "stop" | "unpause" | "poll" | "launch_poll" | "review" | "activate";
+  ipcType?: "stop" | "unpause" | "poll" | "launch_poll" | "activate";
   command?: string;
   showFor?: (status: string, blocked?: boolean) => boolean;
 }
@@ -252,7 +248,6 @@ const ACTIONS: ActionDef[] = [
     showFor: (status, blocked) =>
       !blocked &&
       status !== "done" &&
-      status !== "reviewing" &&
       status !== "draft" &&
       status !== "queued",
   },
@@ -263,17 +258,10 @@ const ACTIONS: ActionDef[] = [
     showFor: (status, blocked) => blocked === true,
   },
   {
-    label: "Review",
-    key: "review",
-    ipcType: "review",
-    showFor: (status, blocked) => status === "review" && !blocked,
-  },
-  {
     label: "Refresh PR",
     key: "poll",
     ipcType: "poll",
-    showFor: (status, blocked) =>
-      status !== "reviewing" && status !== "draft" && status !== "queued",
+    showFor: (status, blocked) => status !== "draft" && status !== "queued",
   },
 ];
 
