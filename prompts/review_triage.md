@@ -49,7 +49,8 @@ Example question: "Why did you use a polling approach instead of webhooks?"
 For explicit requests to modify code:
 
 - Edit the plan file at {{plan_path}} directly to add actionable TODOs
-- Add them at the end of the ## TODO section
+- **CRITICAL**: Add them to the existing `## TODO` section at the end of the list
+- Do NOT create new sections like `## TODO (Review Feedback)` - use the existing `## TODO` section
 - Use the format: `- [ ] Specific actionable task`
 - Do NOT create vague tasks like "Address review comments"
 - **CRITICAL: Include full context using indented lines** - the worker agent cannot see the original comment
