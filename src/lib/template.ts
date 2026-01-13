@@ -39,6 +39,7 @@ function formatPlanTodos(todos: TodoItem[]): string {
 
 export function renderWorkerPrompt(
   repoRoot: string,
+  planPath: string,
   plan: Plan,
   todo: TodoItem
 ): string {
@@ -54,13 +55,13 @@ export function renderWorkerPrompt(
   }
 
   let prompt = compiled({
+    plan_path: planPath,
     plan_title: plan.title,
     plan_objective: plan.objective,
     plan_context: plan.context,
     plan_todos: planTodos,
     plan_progress_log: plan.progressLog,
     current_todo: currentTodo,
-    plan: plan.raw,
   });
 
   const context = loadAgentContext(repoRoot, "worker");

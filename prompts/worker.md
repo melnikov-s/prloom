@@ -6,6 +6,12 @@ You are implementing exactly ONE TODO item from this plan.
 >
 > The dispatcher detects completion by reading the checkbox. If you don't mark `[x]`, the system will retry indefinitely.
 
+## Plan Location
+
+The full plan is at: **{{plan_path}}**
+
+Read this file for complete context. You MUST edit this file to mark your TODO complete.
+
 ## Title
 
 {{plan_title}}
@@ -32,8 +38,8 @@ You are implementing exactly ONE TODO item from this plan.
 
 ## Rules
 
-1. **Update the plan file** (REQUIRED before exiting):
-   - Open the plan file and change your TODO from `[ ]` to `[x]`
+1. **Update the plan file at {{plan_path}}** (REQUIRED before exiting):
+   - Open {{plan_path}} and change your TODO from `[ ]` to `[x]`
    - If blocked, mark as `[b]` instead
    - Append ONE bullet to `## Progress Log` summarizing what you did
 2. Implement only the specified TODO item
@@ -54,9 +60,3 @@ If tests, linting, or formatting fail:
 - Do NOT work on other TODOs, only the one specified above
 - If tests are specified, they must pass before marking complete
 - **If you complete the work but forget to mark `[x]`, the task will be retried**
-
----
-
-## Full Plan
-
-{{plan}}

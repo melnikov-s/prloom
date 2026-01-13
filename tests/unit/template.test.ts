@@ -31,12 +31,12 @@ test("renderWorkerPrompt uses built-in template", () => {
   const plan = parsePlan(FIXTURE_PATH);
   const todo = { index: 0, text: "First task", done: false, blocked: false };
 
-  const prompt = renderWorkerPrompt("/does-not-matter", plan, todo);
+  const prompt = renderWorkerPrompt("/does-not-matter", "prloom/.local/plan.md", plan, todo);
 
   expect(prompt).toContain("TODO #1: First task");
   expect(prompt).toContain("## Title");
   expect(prompt).toContain("Sample plan fixture");
-  // Full plan is embedded under the plan's own headings.
+  expect(prompt).toContain("prloom/.local/plan.md");
   expect(prompt).toContain("## TODO");
   expect(prompt).toContain("sample");
 });
@@ -123,7 +123,7 @@ test("renderWorkerPrompt appends context when worker.md exists", () => {
   const plan = parsePlan(FIXTURE_PATH);
   const todo = { index: 0, text: "Test task", done: false, blocked: false };
 
-  const prompt = renderWorkerPrompt(TEMP_REPO, plan, todo);
+  const prompt = renderWorkerPrompt(TEMP_REPO, "prloom/.local/plan.md", plan, todo);
   expect(prompt).toContain("TODO #1: Test task");
   expect(prompt).toContain("# Repository Context");
   expect(prompt).toContain("# Custom Worker Instructions");

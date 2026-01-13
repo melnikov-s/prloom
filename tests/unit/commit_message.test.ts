@@ -26,9 +26,9 @@ test("TODO indexing is 1-based (first todo is #1, not #0)", () => {
     blocked: false,
   };
 
-  const prompt1 = renderWorkerPrompt("/repo", plan, firstTodo);
-  const prompt2 = renderWorkerPrompt("/repo", plan, secondTodo);
-  const prompt3 = renderWorkerPrompt("/repo", plan, thirdTodo);
+  const prompt1 = renderWorkerPrompt("/repo", "prloom/.local/plan.md", plan, firstTodo);
+  const prompt2 = renderWorkerPrompt("/repo", "prloom/.local/plan.md", plan, secondTodo);
+  const prompt3 = renderWorkerPrompt("/repo", "prloom/.local/plan.md", plan, thirdTodo);
 
   // Internal index 0 → display as TODO #1
   expect(prompt1).toContain("TODO #1: First task");

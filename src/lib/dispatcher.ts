@@ -800,7 +800,7 @@ export async function processActivePlans(
             log
           );
 
-          const prompt = renderWorkerPrompt(repoRoot, plan, todo);
+          const prompt = renderWorkerPrompt(repoRoot, ps.planRelpath, plan, todo);
           const workerConfig = getAgentConfig(config, "worker", ps.agent);
           const adapter = getAdapter(workerConfig.agent);
 
