@@ -3,7 +3,8 @@ import { Box, Text, useInput } from "ink";
 import { existsSync, readFileSync } from "fs";
 import { join } from "path";
 import type { DispatcherUIState, DispatcherEvent } from "../lib/events.js";
-import type { PlanState } from "../lib/state.js";
+import { formatEventPlanRef } from "../lib/events.js";
+import type { PlanState, State } from "../lib/state.js";
 
 interface HeaderProps {
   startedAt: Date;
@@ -560,6 +561,7 @@ export function InteractivePlanPanel({
 
 interface ActivityPanelProps {
   events: DispatcherEvent[];
+  state: State;
 }
 
 function getEventPrefix(type: DispatcherEvent["type"]): string {
@@ -590,6 +592,7 @@ function getEventColor(type: DispatcherEvent["type"]): string {
 
 export function ActivityPanel({
   events,
+  state,
 }: ActivityPanelProps): React.ReactElement {
   // Show all events with newest at bottom
   const displayEvents = [...events].reverse();
@@ -614,6 +617,7 @@ export function ActivityPanel({
             });
             const prefix = getEventPrefix(event.type);
             const color = getEventColor(event.type);
+            const planRef = formatEventPlanRef(state, event.planId);
 
             return (
               <Box key={idx}>
@@ -621,6 +625,9 @@ export function ActivityPanel({
                 <Text> </Text>
                 <Text color={color}>{prefix}</Text>
                 <Text> {event.message}</Text>
+                {planRef && (
+                  <Text dimColor> [{planRef}]</Text>
+                )}
               </Box>
             );
           })
@@ -677,7 +684,7 @@ export function App({
           />
         ) : (
           <>
-            <ActivityPanel events={uiState.events} />
+            <ActivityPanel events={uiState.events} state={uiState.state} />
             <InteractivePlanPanel
               uiState={uiState}
               planTodos={planTodos}

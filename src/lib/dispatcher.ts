@@ -546,7 +546,7 @@ export async function processActivePlans(
         try {
           hookRegistry = await loadPlugins(planConfig, repoRoot);
         } catch (error) {
-          log.error(`Failed to load plugins for ${planId}: ${error}`, planId);
+          log.error(`Failed to load plugins: ${error}`, planId);
           hookRegistry = {};
         }
       }
@@ -563,7 +563,7 @@ export async function processActivePlans(
         const prState = await getPRState(repoRoot, ps.pr);
         if (prState === "merged" || prState === "closed") {
           log.info(
-            `PR #${ps.pr} ${prState}, removing ${planId} from active`,
+            `PR #${ps.pr} ${prState}, removing from active`,
             planId
           );
           delete state.plans[planId];
@@ -602,7 +602,7 @@ export async function processActivePlans(
 
         // Process any new events
         if (newEvents.length > 0) {
-          log.info(`💬 ${newEvents.length} new events for ${planId}`, planId);
+          log.info(`💬 ${newEvents.length} new events`, planId);
 
           // =============================================================
           // Run beforeTriage hooks for event interception
@@ -782,7 +782,7 @@ export async function processActivePlans(
           }
 
           log.info(
-            `🔧 Running TODO #${todo.index + 1} for ${planId}: ${todo.text}`,
+            `🔧 Running TODO #${todo.index + 1}: ${todo.text}`,
             planId
           );
 
@@ -1026,7 +1026,7 @@ export async function processActivePlans(
           if (!remainingTodo) {
             if (updated.todos.length === 0) {
               log.error(
-                `❌ Plan ${planId} has zero TODO items, blocking it.`,
+                `❌ Plan has zero TODO items, blocking it.`,
                 planId
               );
               ps.blocked = true;
@@ -1034,7 +1034,7 @@ export async function processActivePlans(
               continue;
             }
 
-            log.success(`🎉 All TODOs complete for ${planId}`, planId);
+            log.success(`🎉 All TODOs complete`, planId);
 
             // Run beforeFinish hooks
             let finishPlan = parsePlan(planPath);
@@ -1068,11 +1068,11 @@ export async function processActivePlans(
               log.info(`   Marking PR #${ps.pr} as ready for review`, planId);
               await markPRReady(repoRoot, ps.pr);
               log.success(
-                `✅ Plan ${planId} complete, PR marked ready`,
+                `✅ Plan complete, PR marked ready`,
                 planId
               );
             } else {
-              log.success(`✅ Plan ${planId} complete`, planId);
+              log.success(`✅ Plan complete`, planId);
             }
 
             // Run afterFinish hooks
@@ -1101,7 +1101,7 @@ export async function processActivePlans(
             continue;
           }
 
-          log.success(`🎉 All TODOs complete for ${planId}`, planId);
+          log.success(`🎉 All TODOs complete`, planId);
 
           // Run beforeFinish hooks
           let finishPlan2 = parsePlan(planPath);
@@ -1134,9 +1134,9 @@ export async function processActivePlans(
           if (githubEnabled && ps.pr) {
             log.info(`   Marking PR #${ps.pr} as ready for review`, planId);
             await markPRReady(repoRoot, ps.pr);
-            log.success(`✅ Plan ${planId} complete, PR marked ready`, planId);
+            log.success(`✅ Plan complete, PR marked ready`, planId);
           } else {
-            log.success(`✅ Plan ${planId} complete`, planId);
+            log.success(`✅ Plan complete`, planId);
           }
 
           // Run afterFinish hooks
@@ -1155,7 +1155,7 @@ export async function processActivePlans(
         }
       }
     } catch (error) {
-      log.error(`Error processing ${planId}: ${error}`, planId);
+      log.error(`Error processing plan: ${error}`, planId);
       ps.lastError = String(error);
       // Per RFC: "If a hook throws, abort." Block the plan to prevent retry loops.
       ps.blocked = true;
@@ -1194,7 +1194,7 @@ async function runTriage(
   const adapter = getAdapter(triageConfig.agent);
   const prompt = renderTriagePrompt(repoRoot, ps.worktree, ps.planRelpath, plan, feedback);
 
-  log.info(`🔍 Running triage for ${planId}...`, planId);
+  log.info(`🔍 Running triage...`, planId);
   log.info(`   Using agent: ${triageConfig.agent}`, planId);
 
   // Build tmux config if available and not explicitly disabled
@@ -1315,7 +1315,7 @@ The plan is now **blocked** until conflicts are resolved.`;
     log.success(`   Queued triage reply for delivery`, planId);
 
     // Commit any changes from triage
-    log.info(`   Committing: [prloom] ${planId}: triage`, planId);
+    log.info(`   Committing: [prloom] triage`, planId);
     const committed = await commitAll(
       ps.worktree,
       `[prloom] ${planId}: triage`

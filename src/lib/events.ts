@@ -87,3 +87,21 @@ class DispatcherEvents extends EventEmitter {
 }
 
 export const dispatcherEvents = new DispatcherEvents();
+
+/**
+ * Format a plan reference for display in the activity log.
+ * Uses branch name with plan ID in brackets, e.g. "fix-bug-123 (abc12)"
+ * Falls back to just the plan ID if branch is not available.
+ */
+export function formatEventPlanRef(state: State, planId?: string): string {
+  if (!planId) return "";
+  
+  const ps = state.plans[planId];
+  if (!ps) return "";
+  
+  if (ps.branch) {
+    return `${ps.branch} (${planId})`;
+  }
+  
+  return planId;
+}
