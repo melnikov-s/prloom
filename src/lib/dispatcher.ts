@@ -1192,7 +1192,7 @@ async function runTriage(
 
   const triageConfig = getAgentConfig(config, "triage");
   const adapter = getAdapter(triageConfig.agent);
-  const prompt = renderTriagePrompt(repoRoot, ps.worktree, plan, feedback);
+  const prompt = renderTriagePrompt(repoRoot, ps.worktree, ps.planRelpath, plan, feedback);
 
   log.info(`🔍 Running triage for ${planId}...`, planId);
   log.info(`   Using agent: ${triageConfig.agent}`, planId);

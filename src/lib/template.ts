@@ -123,6 +123,7 @@ export interface TriageResult {
 export function renderTriagePrompt(
   repoRoot: string,
   worktreePath: string,
+  planPath: string,
   plan: Plan,
   feedback: PRFeedback[]
 ): string {
@@ -145,7 +146,7 @@ export function renderTriagePrompt(
   const compiled = Handlebars.compile(template);
   return compiled({
     feedback: feedbackText,
-    plan: plan.raw,
+    plan_path: planPath,
     result_path: resultPath,
   });
 }

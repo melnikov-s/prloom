@@ -7,13 +7,15 @@ You are processing PR feedback for an active plan. Your job is to:
 3. **Update** the plan if changes are needed
 4. Detect if a rebase was requested
 
+## Plan Location
+
+The plan file is at: **{{plan_path}}**
+
+Read this file to see the current plan. If you need to add TODOs based on change requests, edit this file directly.
+
 ## Feedback to Process
 
 {{feedback}}
-
-## Current Plan
-
-{{plan}}
 
 ---
 
@@ -46,7 +48,7 @@ Example question: "Why did you use a polling approach instead of webhooks?"
 
 For explicit requests to modify code:
 
-- Edit the plan file directly to add actionable TODOs
+- Edit the plan file at {{plan_path}} directly to add actionable TODOs
 - Add them at the end of the ## TODO section
 - Use the format: `- [ ] Specific actionable task`
 - Do NOT create vague tasks like "Address review comments"
