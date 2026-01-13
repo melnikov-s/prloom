@@ -65,6 +65,8 @@ function getStatusColor(status: string, blocked?: boolean): string {
       return "yellowBright";
     case "review":
       return "cyan";
+    case "triaging":
+      return "magenta";
     case "done":
       return "gray";
     default:
@@ -83,12 +85,17 @@ function getStatusEmoji(status: string, blocked?: boolean): string {
       return "📝";
     case "review":
       return "👀";
+    case "triaging":
+      return "🔍";
     case "done":
       return "✅";
     default:
       return "⚪";
   }
 }
+
+// Export for testing
+export { getStatusColor, getStatusEmoji };
 
 function ProgressBar({
   done,
