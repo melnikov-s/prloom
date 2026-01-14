@@ -9,6 +9,23 @@ import {
 } from "fs";
 import type { AgentName } from "./adapters/index.js";
 
+// =============================================================================
+// PlanSource - External Identity Tracking
+// =============================================================================
+
+/**
+ * Tracks the external origin of a plan.
+ * Used for syncing with external systems like GitHub, Jira, Linear.
+ */
+export interface PlanSource {
+  /** External system identifier (e.g., "github", "jira", "linear") */
+  system: string;
+  /** Type of entity (e.g., "issue", "ticket", "card") */
+  kind: string;
+  /** External ID (e.g., "123", "PROJ-456") */
+  id: string;
+}
+
 export interface PlanState {
   /** Agent to use for this plan */
   agent?: AgentName;
@@ -56,6 +73,22 @@ export interface PlanState {
   // Retry tracking
   lastTodoIndex?: number;
   todoRetryCount?: number;
+
+  // ==========================================================================
+  // RFC: Global Bridges & Core Bridge extensions
+  // ==========================================================================
+
+  /**
+   * If true, dispatcher ignores this plan during activation.
+   * Plan is tracked but not executed until explicitly un-hidden.
+   */
+  hidden?: boolean;
+
+  /**
+   * External system identity for this plan.
+   * Used by prloom-core for upsert_plan resolution.
+   */
+  source?: PlanSource;
 }
 
 export interface State {
@@ -277,4 +310,34 @@ export function deletePlanMeta(repoRoot: string, planId: string): void {
   const state = loadState(repoRoot);
   delete state.plans[planId];
   saveState(repoRoot, state);
+}
+
+// =============================================================================
+// Source-based Plan Lookup
+// =============================================================================
+
+/**
+ * Find a plan by its external source identity.
+ * Searches both inbox and worktree plans.
+ *
+ * @returns The plan ID and state if found, undefined otherwise.
+ */
+export function findPlanBySource(
+  repoRoot: string,
+  source: PlanSource
+): { planId: string; state: PlanState } | undefined {
+  const state = loadState(repoRoot);
+
+  for (const [planId, planState] of Object.entries(state.plans)) {
+    if (
+      planState.source &&
+      planState.source.system === source.system &&
+      planState.source.kind === source.kind &&
+      planState.source.id === source.id
+    ) {
+      return { planId, state: planState };
+    }
+  }
+
+  return undefined;
 }

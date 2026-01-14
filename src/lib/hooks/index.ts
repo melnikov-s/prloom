@@ -17,6 +17,13 @@ export type {
   BeforeTriageContext,
   DeferredEventInfo,
   ReviewSubmission,
+  // RFC: Global Bridges & Core Bridge
+  EventHook,
+  OnEventContext,
+  GlobalEventContext,
+  PlanFilter,
+  PlanSummary,
+  PlanStatus,
 } from "./types.js";
 
 // Loader

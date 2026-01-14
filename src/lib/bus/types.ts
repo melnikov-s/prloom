@@ -77,7 +77,36 @@ export type OutboundPayload =
   | { type: "add_labels"; labels: string[] }
   | { type: "remove_labels"; labels: string[] }
   | { type: "assign_users"; users: string[] }
-  | { type: "set_milestone"; milestone: string | number };
+  | { type: "set_milestone"; milestone: string | number }
+  // RFC: Global Bridges & Core Bridge
+  | {
+      type: "upsert_plan";
+      /** Source identity for plan resolution */
+      source: UpsertPlanSource;
+      /** Plan title (used for plan ID generation if creating new) */
+      title?: string;
+      /** Plan markdown content */
+      planMarkdown?: string;
+      /** Freeform metadata */
+      metadata?: Record<string, unknown>;
+      /** Initial status for new plans (default: "draft") */
+      status?: "draft" | "queued";
+      /** If true, plan is tracked but ignored by dispatcher */
+      hidden?: boolean;
+    };
+
+/**
+ * Source identity for upsert_plan action.
+ * Used to resolve whether to create or update a plan.
+ */
+export interface UpsertPlanSource {
+  /** External system identifier (e.g., "github", "jira", "linear") */
+  system: string;
+  /** Type of entity (e.g., "issue", "ticket", "card") */
+  kind: string;
+  /** External ID (e.g., "123", "PROJ-456") */
+  id: string;
+}
 
 export interface Action {
   id: string;
@@ -216,4 +245,37 @@ export interface DispatcherBusState {
 export interface BridgeActionState {
   /** Mapping from Action.id to delivery metadata */
   deliveredActions: Record<string, JsonValue>;
+}
+
+// =============================================================================
+// Global Dispatcher State (RFC: Global Bridges & Core Bridge)
+// =============================================================================
+
+/**
+ * Information about a deferred event.
+ */
+export interface DeferredEventInfo {
+  /** Reason for deferral */
+  reason?: string;
+  /** ISO timestamp when the event can be retried */
+  deferredUntil: string;
+}
+
+/**
+ * Global dispatcher state for the repo-level bus.
+ * Extended version of DispatcherBusState with global-specific fields.
+ */
+export interface GlobalDispatcherState {
+  /** Byte offset into global events.jsonl */
+  eventsOffset: number;
+  /** Byte offset into global actions.jsonl */
+  actionsOffset: number;
+  /** Set of processed event IDs */
+  processedEventIds: string[];
+  /** Set of processed action IDs (for beforeRoute interception) */
+  processedActionIds: string[];
+  /** Plan ID → SHA256 hash (for edit detection) */
+  planHashes: Record<string, string>;
+  /** Event ID → deferral info (for onGlobalEvent deferral) */
+  deferredEventIds: Record<string, DeferredEventInfo>;
 }

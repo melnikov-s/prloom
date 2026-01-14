@@ -133,6 +133,15 @@ export interface Config {
   plugins?: Record<string, PluginConfig>;
   /** Order in which plugins are loaded (determines hook execution order) */
   pluginOrder?: string[];
+
+  // ==========================================================================
+  // RFC: Global Bridges & Core Bridge
+  // ==========================================================================
+
+  /** Global bridges configured at repo level */
+  globalBridges?: Record<string, BridgeConfig>;
+  /** Global plugins that run at repo level (cannot be overridden by presets) */
+  globalPlugins?: Record<string, PluginConfig>;
 }
 
 const DEFAULTS: Config = {
@@ -202,6 +211,27 @@ export function loadConfig(repoRoot: string): Config {
     const plugins = parsePlugins(parsed.plugins);
     const pluginOrder = parsePluginOrder(parsed.pluginOrder);
 
+    // Parse global bridges config (RFC: Global Bridges & Core Bridge)
+    let globalBridges: Record<string, BridgeConfig> | undefined;
+    if (
+      typeof parsed.globalBridges === "object" &&
+      parsed.globalBridges !== null
+    ) {
+      globalBridges = {};
+      for (const [name, cfg] of Object.entries(parsed.globalBridges)) {
+        if (typeof cfg === "object" && cfg !== null) {
+          const cfgObj = cfg as Record<string, unknown>;
+          globalBridges[name] = {
+            ...cfgObj,
+            enabled: cfgObj.enabled !== false,
+          } as BridgeConfig;
+        }
+      }
+    }
+
+    // Parse global plugins config (RFC: Global Bridges & Core Bridge)
+    const globalPlugins = parsePlugins(parsed.globalPlugins);
+
     return {
       agents,
       github,
@@ -217,6 +247,8 @@ export function loadConfig(repoRoot: string): Config {
       bridges,
       plugins,
       pluginOrder,
+      globalBridges,
+      globalPlugins,
     };
   } catch {
     return { ...DEFAULTS };
@@ -413,7 +445,7 @@ export function writeWorktreeConfig(
 
 /**
  * Merge plugin configurations with overrides from presets or worktree config.
- * 
+ *
  * @param basePlugins - Original plugins from global config
  * @param overrides - Plugin overrides from preset or worktree config
  * @returns Merged plugins config
@@ -426,7 +458,7 @@ function mergePluginConfigs(
   if (!overrides) return basePlugins;
 
   const result: Record<string, PluginConfig> = {};
-  
+
   for (const [name, plugin] of Object.entries(basePlugins)) {
     const override = overrides[name];
     if (!override) {
@@ -438,13 +470,21 @@ function mergePluginConfigs(
     result[name] = {
       ...plugin,
       // Override enabled if specified
-      enabled: override.enabled !== undefined ? override.enabled : plugin.enabled,
+      enabled:
+        override.enabled !== undefined ? override.enabled : plugin.enabled,
       // Deep merge config if specified
-      config: override.config !== undefined
-        ? typeof plugin.config === "object" && plugin.config !== null && typeof override.config === "object" && override.config !== null
-          ? { ...plugin.config as Record<string, unknown>, ...override.config as Record<string, unknown> }
-          : override.config
-        : plugin.config,
+      config:
+        override.config !== undefined
+          ? typeof plugin.config === "object" &&
+            plugin.config !== null &&
+            typeof override.config === "object" &&
+            override.config !== null
+            ? {
+                ...(plugin.config as Record<string, unknown>),
+                ...(override.config as Record<string, unknown>),
+              }
+            : override.config
+          : plugin.config,
     };
   }
 

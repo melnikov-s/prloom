@@ -171,16 +171,66 @@ export async function hasSession(sessionName: string): Promise<boolean> {
 }
 
 /**
+ * Kill a tmux session if it exists.
+ */
+export async function killSession(sessionName: string): Promise<boolean> {
+  const { exitCode } = await execa(
+    "tmux",
+    ["kill-session", "-t", sessionName],
+    { reject: false }
+  );
+  return exitCode === 0;
+}
+
+/**
  * Send keys to an existing tmux session.
+ * Special handling for control characters (e.g., "C-c" for Ctrl+C).
  */
 export async function sendKeys(
   sessionName: string,
   command: string
 ): Promise<boolean> {
-  const { exitCode } = await execa(
+  // If the command is a control character (like "C-c"), don't append Enter
+  const args = command.startsWith("C-")
+    ? ["send-keys", "-t", sessionName, command]
+    : ["send-keys", "-t", sessionName, command, "Enter"];
+  
+  const { exitCode } = await execa("tmux", args, { reject: false });
+  return exitCode === 0;
+}
+
+/**
+ * Execute a command in a tmux session.
+ * Kills any existing session with the same name to ensure clean state.
+ */
+export async function executeInTmux(
+  sessionName: string,
+  command: string,
+  cwd: string
+): Promise<ExecutionResult> {
+  // Always kill existing session to ensure clean state
+  await killSession(sessionName);
+
+  // Create new session with the command
+  const tmuxResult = await execa(
     "tmux",
-    ["send-keys", "-t", sessionName, command, "Enter"],
+    [
+      "new-session",
+      "-d",
+      "-s",
+      sessionName,
+      "-c",
+      cwd,
+      "bash",
+      "-c",
+      command,
+    ],
     { reject: false }
   );
-  return exitCode === 0;
+
+  if (tmuxResult.exitCode !== 0) {
+    return { exitCode: tmuxResult.exitCode ?? 1 };
+  }
+
+  return { tmuxSession: sessionName };
 }

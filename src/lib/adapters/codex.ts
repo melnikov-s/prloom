@@ -2,8 +2,7 @@ import { execa } from "execa";
 import type { AgentAdapter, ExecutionResult, TmuxConfig } from "./types.js";
 import {
   prepareLogFiles,
-  hasSession,
-  sendKeys,
+  executeInTmux,
 } from "./tmux.js";
 import { spawnDetached } from "./process.js";
 
@@ -25,39 +24,7 @@ export const codexAdapter: AgentAdapter = {
 
       const wrappedCmd = `cd ${cwd} && codex exec "$(cat ${promptFile})" ${modelArg} --full-auto 2>&1 | tee ${logFile}; echo $? > ${exitCodeFile}`;
 
-      // Check if session already exists
-      const sessionExists = await hasSession(tmux.sessionName);
-
-      if (sessionExists) {
-        // Send command to existing session
-        const sent = await sendKeys(tmux.sessionName, wrappedCmd);
-        if (!sent) {
-          return { exitCode: 1 };
-        }
-      } else {
-        // Create new session
-        const tmuxResult = await execa(
-          "tmux",
-          [
-            "new-session",
-            "-d",
-            "-s",
-            tmux.sessionName,
-            "-c",
-            cwd,
-            "bash",
-            "-c",
-            wrappedCmd,
-          ],
-          { reject: false }
-        );
-
-        if (tmuxResult.exitCode !== 0) {
-          return { exitCode: tmuxResult.exitCode ?? 1 };
-        }
-      }
-
-      return { tmuxSession: tmux.sessionName };
+      return executeInTmux(tmux.sessionName, wrappedCmd, cwd);
     }
 
     // Async execution without tmux

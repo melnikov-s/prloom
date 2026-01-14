@@ -13,13 +13,7 @@
  */
 
 import { test, expect, beforeEach, afterEach, describe } from "bun:test";
-import {
-  mkdirSync,
-  rmSync,
-  writeFileSync,
-  readFileSync,
-  existsSync,
-} from "fs";
+import { mkdirSync, rmSync, writeFileSync, readFileSync, existsSync } from "fs";
 import { join } from "path";
 
 import type {
@@ -30,7 +24,11 @@ import type {
   BeforeTriageContext,
 } from "../../src/lib/hooks/types.js";
 import { loadPlugins } from "../../src/lib/hooks/loader.js";
-import { runHooks, buildHookContext, buildBeforeTriageContext } from "../../src/lib/hooks/runner.js";
+import {
+  runHooks,
+  buildHookContext,
+  buildBeforeTriageContext,
+} from "../../src/lib/hooks/runner.js";
 import {
   loadPluginState,
   savePluginState,
@@ -214,13 +212,14 @@ describe("event interception", () => {
       events,
     });
 
-    const now = Date.now();
+    const expectedMinTime = new Date(Date.now() + 60000).toISOString();
     ctx.markEventDeferred!("event-1", "rate-limit", 60000);
 
     const deferredInfo = ctx.getDeferredEventInfo!("event-1");
     expect(deferredInfo).toBeDefined();
     expect(deferredInfo!.reason).toBe("rate-limit");
-    expect(deferredInfo!.deferredUntil).toBeGreaterThanOrEqual(now + 60000);
+    // ISO timestamps compare lexicographically for date ordering
+    expect(deferredInfo!.deferredUntil >= expectedMinTime).toBe(true);
   });
 
   test("unmarked events are passed to triage", async () => {
@@ -633,11 +632,20 @@ describe("action helpers", () => {
       pluginName: "test-plugin",
     });
 
-    const target: ReplyAddress = { target: "github-pr", token: { prNumber: 123 } };
+    const target: ReplyAddress = {
+      target: "github-pr",
+      token: { prNumber: 123 },
+    };
     ctx.emitComment!(target, "Hello from plugin!");
 
     // Verify action was written
-    const actionsPath = join(worktree, "prloom", ".local", "bus", "actions.jsonl");
+    const actionsPath = join(
+      worktree,
+      "prloom",
+      ".local",
+      "bus",
+      "actions.jsonl"
+    );
     expect(existsSync(actionsPath)).toBe(true);
 
     const content = readFileSync(actionsPath, "utf-8");
@@ -657,14 +665,23 @@ describe("action helpers", () => {
       pluginName: "test-plugin",
     });
 
-    const target: ReplyAddress = { target: "github-pr", token: { prNumber: 456 } };
+    const target: ReplyAddress = {
+      target: "github-pr",
+      token: { prNumber: 456 },
+    };
     ctx.emitReview!(target, {
       verdict: "approve",
       summary: "LGTM!",
       comments: [],
     });
 
-    const actionsPath = join(worktree, "prloom", ".local", "bus", "actions.jsonl");
+    const actionsPath = join(
+      worktree,
+      "prloom",
+      ".local",
+      "bus",
+      "actions.jsonl"
+    );
     const content = readFileSync(actionsPath, "utf-8");
     expect(content).toContain('"type":"review"');
     expect(content).toContain('"verdict":"approve"');
@@ -683,10 +700,19 @@ describe("action helpers", () => {
       pluginName: "test-plugin",
     });
 
-    const target: ReplyAddress = { target: "github-pr", token: { prNumber: 789 } };
+    const target: ReplyAddress = {
+      target: "github-pr",
+      token: { prNumber: 789 },
+    };
     ctx.emitMerge!(target);
 
-    const actionsPath = join(worktree, "prloom", ".local", "bus", "actions.jsonl");
+    const actionsPath = join(
+      worktree,
+      "prloom",
+      ".local",
+      "bus",
+      "actions.jsonl"
+    );
     const content = readFileSync(actionsPath, "utf-8");
     expect(content).toContain('"type":"merge"');
   });
@@ -703,10 +729,19 @@ describe("action helpers", () => {
       pluginName: "test-plugin",
     });
 
-    const target: ReplyAddress = { target: "github-pr", token: { prNumber: 789 } };
+    const target: ReplyAddress = {
+      target: "github-pr",
+      token: { prNumber: 789 },
+    };
     ctx.emitMerge!(target, "squash");
 
-    const actionsPath = join(worktree, "prloom", ".local", "bus", "actions.jsonl");
+    const actionsPath = join(
+      worktree,
+      "prloom",
+      ".local",
+      "bus",
+      "actions.jsonl"
+    );
     const content = readFileSync(actionsPath, "utf-8");
     expect(content).toContain('"method":"squash"');
   });
@@ -723,11 +758,20 @@ describe("action helpers", () => {
       pluginName: "test-plugin",
     });
 
-    const target: ReplyAddress = { target: "github-pr", token: { prNumber: 123 } };
+    const target: ReplyAddress = {
+      target: "github-pr",
+      token: { prNumber: 123 },
+    };
     ctx.emitComment!(target, "First");
     ctx.emitComment!(target, "Second");
 
-    const actionsPath = join(worktree, "prloom", ".local", "bus", "actions.jsonl");
+    const actionsPath = join(
+      worktree,
+      "prloom",
+      ".local",
+      "bus",
+      "actions.jsonl"
+    );
     const lines = readFileSync(actionsPath, "utf-8").trim().split("\n");
     const ids = lines.map((l) => JSON.parse(l).data.id);
 
@@ -910,7 +954,11 @@ module.exports = function(config) {
     await runHooks("beforeTriage", "# Plan", ctx2, registry);
 
     // Check total count
-    const count = loadPluginState(worktree, "stateful-plugin", "processedCount");
+    const count = loadPluginState(
+      worktree,
+      "stateful-plugin",
+      "processedCount"
+    );
     expect(count).toBe(3);
   });
 });
@@ -937,10 +985,10 @@ describe("dispatcher state with deferred events", () => {
 
     // Verify deferred state is persisted
     const statePath = join(busDir, "dispatcher.json");
-    
+
     // The context should save the deferred state
     ctx.saveInterceptionState!();
-    
+
     expect(existsSync(statePath)).toBe(true);
     const state = JSON.parse(readFileSync(statePath, "utf-8"));
     expect(state.deferredEventIds).toBeDefined();
@@ -952,8 +1000,8 @@ describe("dispatcher state with deferred events", () => {
     const busDir = join(worktree, "prloom", ".local", "bus", "state");
     mkdirSync(busDir, { recursive: true });
 
-    // Set up deferred event with past deferredUntil time
-    const pastTime = Date.now() - 1000; // 1 second ago
+    // Set up deferred event with past deferredUntil time (ISO timestamp)
+    const pastTime = new Date(Date.now() - 1000).toISOString(); // 1 second ago
     writeFileSync(
       join(busDir, "dispatcher.json"),
       JSON.stringify({
@@ -985,8 +1033,8 @@ describe("dispatcher state with deferred events", () => {
     const busDir = join(worktree, "prloom", ".local", "bus", "state");
     mkdirSync(busDir, { recursive: true });
 
-    // Set up deferred event with future deferredUntil time
-    const futureTime = Date.now() + 60000; // 1 minute from now
+    // Set up deferred event with future deferredUntil time (ISO timestamp)
+    const futureTime = new Date(Date.now() + 60000).toISOString(); // 1 minute from now
     writeFileSync(
       join(busDir, "dispatcher.json"),
       JSON.stringify({

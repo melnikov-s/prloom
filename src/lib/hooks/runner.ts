@@ -212,8 +212,15 @@ Do NOT include any other text or explanation, just the plan content.`;
       // Wait for completion
       if (execResult.tmuxSession) {
         const waitResult = await waitForExitCodeFile(execResult.tmuxSession);
-        if (waitResult.timedOut || (waitResult.sessionDied && !waitResult.found)) {
-          throw new Error(`Hook agent session failed: ${waitResult.timedOut ? 'timeout' : 'session died without exit code'}`);
+        if (
+          waitResult.timedOut ||
+          (waitResult.sessionDied && !waitResult.found)
+        ) {
+          throw new Error(
+            `Hook agent session failed: ${
+              waitResult.timedOut ? "timeout" : "session died without exit code"
+            }`
+          );
         }
       } else if (execResult.pid) {
         await waitForProcess(execResult.pid);
@@ -308,7 +315,7 @@ export function buildBeforeTriageContext(
     repoRoot,
     worktree,
     planId,
-    hookPoint: "beforeTriage",
+    hookPoint: "onEvent",
     changeRequestRef,
 
     // Event interception
@@ -324,8 +331,8 @@ export function buildBeforeTriageContext(
       retryAfterMs?: number
     ): void => {
       const deferredUntil = retryAfterMs
-        ? Date.now() + retryAfterMs
-        : Date.now();
+        ? new Date(Date.now() + retryAfterMs).toISOString()
+        : new Date().toISOString();
       deferredEvents.set(eventId, { reason, deferredUntil });
     },
 
@@ -342,7 +349,7 @@ export function buildBeforeTriageContext(
     },
 
     getEventsForTriage: (): Event[] => {
-      const now = Date.now();
+      const nowIso = new Date().toISOString();
       return events.filter((e) => {
         // Skip if handled
         if (handledEventIds.has(e.id)) {
@@ -356,7 +363,7 @@ export function buildBeforeTriageContext(
 
         // Check if previously deferred and backoff hasn't elapsed
         const existingDeferral = existingDeferred[e.id];
-        if (existingDeferral && existingDeferral.deferredUntil > now) {
+        if (existingDeferral && existingDeferral.deferredUntil > nowIso) {
           return false;
         }
 
@@ -378,9 +385,9 @@ export function buildBeforeTriageContext(
       }
 
       // Prune old deferrals (backoff elapsed)
-      const now = Date.now();
+      const nowIso = new Date().toISOString();
       for (const id of Object.keys(allDeferred)) {
-        if (allDeferred[id]!.deferredUntil <= now) {
+        if (allDeferred[id]!.deferredUntil <= nowIso) {
           delete allDeferred[id];
         }
       }
@@ -423,9 +430,11 @@ export function buildBeforeTriageContext(
       : undefined,
 
     // readEvents helper
-    readEvents: async (
-      options?: { types?: string[]; sinceId?: string; limit?: number }
-    ): Promise<{ events: Event[]; lastId?: string }> => {
+    readEvents: async (options?: {
+      types?: string[];
+      sinceId?: string;
+      limit?: number;
+    }): Promise<{ events: Event[]; lastId?: string }> => {
       let allEvents = readAllEvents(worktree);
 
       // Filter by types

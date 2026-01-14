@@ -5,7 +5,13 @@
  * See RFC: docs/rfc-lifecycle-hooks.md
  */
 
-import type { Action, Event, ReplyAddress, InlineComment, JsonValue } from "../bus/types.js";
+import type {
+  Action,
+  Event,
+  ReplyAddress,
+  InlineComment,
+  JsonValue,
+} from "../bus/types.js";
 
 // =============================================================================
 // Hook Points
@@ -21,7 +27,7 @@ export type HookPoint =
   | "afterTodo"
   | "beforeFinish"
   | "afterFinish"
-  | "beforeTriage";
+  | "onEvent"; // RFC: Global Bridges & Core Bridge - event interception hook
 
 // =============================================================================
 // Hook Context
@@ -100,12 +106,20 @@ export interface PluginConfig {
   config?: unknown;
 }
 
-/**
- * A plugin is a function that receives config and returns hooks.
- */
 export type PluginFactory = (
   config: unknown
-) => Partial<Record<HookPoint, Hook>>;
+) => Partial<Record<HookPoint, Hook>> & { onEvent?: EventHook };
+
+// =============================================================================
+// Event Hook (RFC: Global Bridges & Core Bridge)
+// =============================================================================
+
+/**
+ * Event hook function signature.
+ * Called once per event (not once per batch like beforeTriage).
+ * Returns void - no plan transformation.
+ */
+export type EventHook = (event: Event, ctx: OnEventContext) => Promise<void>;
 
 // =============================================================================
 // Deferred Event Info
@@ -117,8 +131,8 @@ export type PluginFactory = (
 export interface DeferredEventInfo {
   /** Reason for deferral */
   reason?: string;
-  /** Timestamp when the event can be retried */
-  deferredUntil: number;
+  /** ISO timestamp when the event can be retried */
+  deferredUntil: string;
 }
 
 // =============================================================================
@@ -261,3 +275,198 @@ export interface BeforeTriageContext extends HookContext {
     method?: "merge" | "squash" | "rebase"
   ) => void;
 }
+
+// =============================================================================
+// OnEventContext (RFC: Global Bridges & Core Bridge)
+// =============================================================================
+
+/**
+ * Context passed to onEvent hooks.
+ * Replaces BeforeTriageContext with single-event semantics.
+ * See RFC: docs/rfc-global-bridge-and-core.md
+ */
+export interface OnEventContext {
+  // =========================================================================
+  // Identifiers
+  // =========================================================================
+
+  /** Repository root path */
+  repoRoot: string;
+
+  /** Worktree path for this plan */
+  worktree: string;
+
+  /** Plan ID */
+  planId: string;
+
+  // =========================================================================
+  // Event Handling
+  // =========================================================================
+
+  /**
+   * Mark the current event as handled.
+   * Event is added to processed IDs and won't flow to triage.
+   */
+  markEventHandled: (eventId: string) => void;
+
+  /**
+   * Mark the current event as deferred.
+   * Event is skipped for triage and retried later.
+   */
+  markEventDeferred: (
+    eventId: string,
+    reason?: string,
+    retryAfterMs?: number
+  ) => void;
+
+  // =========================================================================
+  // Action Emission
+  // =========================================================================
+
+  /** Emit an action to the bus */
+  emitAction: (action: Action) => void;
+
+  /** Emit a comment action */
+  emitComment: (target: ReplyAddress, message: string) => void;
+
+  /** Emit a merge action */
+  emitMerge: (
+    target: ReplyAddress,
+    method?: "merge" | "squash" | "rebase"
+  ) => void;
+
+  // =========================================================================
+  // Plugin State
+  // =========================================================================
+
+  /** Get a value from plugin state */
+  getState: (key: string) => JsonValue | undefined;
+
+  /** Set a value in plugin state */
+  setState: (key: string, value: JsonValue) => void;
+
+  /** Get a value from global plugin state */
+  getGlobalState: (key: string) => JsonValue | undefined;
+
+  /** Set a value in global plugin state */
+  setGlobalState: (key: string, value: JsonValue) => void;
+
+  // =========================================================================
+  // Plan Access
+  // =========================================================================
+
+  /**
+   * Read plan content.
+   * If planId is omitted, reads the current plan.
+   */
+  readPlan: (planId?: string) => Promise<
+    | {
+        content: string;
+        progress: { total: number; completed: number };
+      }
+    | undefined
+  >;
+
+  /**
+   * Read events from the bus.
+   */
+  readEvents: (options?: {
+    types?: string[];
+    sinceId?: string;
+    limit?: number;
+  }) => Promise<{ events: Event[]; lastId?: string }>;
+}
+
+// =============================================================================
+// GlobalEventContext (RFC: Global Bridges & Core Bridge)
+// =============================================================================
+
+/**
+ * Context passed to onGlobalEvent hooks.
+ * Similar to OnEventContext but operates at global scope.
+ */
+export interface GlobalEventContext {
+  /** Repository root path */
+  repoRoot: string;
+
+  /** Worktree is undefined for global scope */
+  worktree: undefined;
+
+  /** Plan ID is undefined for global scope */
+  planId: undefined;
+
+  /** Mark event as handled */
+  markEventHandled: (eventId: string) => void;
+
+  /** Mark event as deferred */
+  markEventDeferred: (
+    eventId: string,
+    reason?: string,
+    retryAfterMs?: number
+  ) => void;
+
+  /** Emit action to global bus */
+  emitAction: (action: Action) => void;
+
+  /** Emit comment action */
+  emitComment: (target: ReplyAddress, message: string) => void;
+
+  /** Get global plugin state */
+  getGlobalState: (key: string) => JsonValue | undefined;
+
+  /** Set global plugin state */
+  setGlobalState: (key: string, value: JsonValue) => void;
+
+  /**
+   * Read plan content (planId required in global context).
+   */
+  readPlan: (planId: string) => Promise<
+    | {
+        content: string;
+        progress: { total: number; completed: number };
+      }
+    | undefined
+  >;
+
+  /**
+   * List plans matching filter criteria.
+   */
+  listPlans: (filter?: PlanFilter) => Promise<PlanSummary[]>;
+}
+
+/**
+ * Filter for querying plans.
+ */
+export interface PlanFilter {
+  status?: PlanStatus | PlanStatus[];
+  hidden?: boolean;
+  source?: {
+    system?: string;
+    kind?: string;
+    id?: string;
+  };
+  location?: "inbox" | "worktree";
+}
+
+/**
+ * Summary of a plan for listing.
+ */
+export interface PlanSummary {
+  planId: string;
+  title: string;
+  status: PlanStatus;
+  hidden: boolean;
+  location: "inbox" | "worktree";
+  source?: { system: string; kind: string; id: string };
+  progress: { total: number; completed: number };
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type PlanStatus =
+  | "draft"
+  | "queued"
+  | "active"
+  | "triaging"
+  | "review"
+  | "done";

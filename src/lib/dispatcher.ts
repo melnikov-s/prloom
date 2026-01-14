@@ -68,6 +68,7 @@ import {
   feedbackToEvents,
   appendBusAction,
   createCommentAction,
+  loadDispatcherState,
 } from "./bus/index.js";
 import {
   loadPlugins,
@@ -146,6 +147,225 @@ function createLogger(useTUI: boolean) {
   };
 }
 
+// =============================================================================
+// Global Tick (RFC: Global Bridges & Core Bridge)
+// =============================================================================
+
+import {
+  initGlobalBus,
+  appendGlobalEvent,
+  readGlobalEvents,
+  readGlobalActions,
+  loadGlobalDispatcherState,
+  saveGlobalDispatcherState,
+  loadGlobalBridgeState,
+  saveGlobalBridgeState,
+} from "./bus/index.js";
+import { coreBridge } from "./bus/bridges/core.js";
+import type { Action, BridgeContext, JsonValue } from "./bus/types.js";
+
+/**
+ * Run a single global tick.
+ * Polls global bridges for actions and routes them to prloom-core.
+ * Emits plan lifecycle events when plans are created.
+ *
+ * See RFC: docs/rfc-global-bridge-and-core.md
+ */
+export async function runGlobalTick(
+  repoRoot: string,
+  config: Config,
+  log: Logger
+): Promise<void> {
+  // Skip if no global bridges configured
+  if (!config.globalBridges || Object.keys(config.globalBridges).length === 0) {
+    return;
+  }
+
+  log.info("🌐 Running global tick");
+
+  // Initialize global bus if needed
+  initGlobalBus(repoRoot);
+
+  // Load global dispatcher state
+  const globalState = loadGlobalDispatcherState(repoRoot);
+
+  // Create bridge context
+  const bridgeCtx: BridgeContext = {
+    repoRoot,
+    worktree: repoRoot, // Global tick uses repo root
+    log: {
+      info: (msg: string) => log.info(`[global] ${msg}`),
+      warn: (msg: string) => log.warn(`[global] ${msg}`),
+      error: (msg: string) => log.error(`[global] ${msg}`),
+    },
+    config: {},
+  };
+
+  // Poll each global bridge
+  for (const [bridgeName, bridgeConfig] of Object.entries(
+    config.globalBridges
+  )) {
+    if (!bridgeConfig.enabled) continue;
+    if (!bridgeConfig.module) continue;
+
+    try {
+      // Load bridge module
+      const bridgeModule = await import(bridgeConfig.module);
+      const bridgeFactory = bridgeModule.default || bridgeModule;
+      const bridge = bridgeFactory(bridgeConfig.config || {});
+
+      // Load bridge state
+      const bridgeState = loadGlobalBridgeState(repoRoot, bridgeName) ?? {};
+
+      // Create bridge-specific context
+      const ctx: BridgeContext = {
+        ...bridgeCtx,
+        config: (bridgeConfig.config ?? {}) as JsonValue,
+      };
+
+      // Call bridge events() to poll for new events/actions
+      if (typeof bridge.events === "function") {
+        const result = await bridge.events(ctx, bridgeState);
+
+        // Save updated bridge state
+        if (result.state !== undefined) {
+          saveGlobalBridgeState(
+            repoRoot,
+            bridgeName,
+            result.state as JsonValue
+          );
+        }
+
+        // Process actions from the bridge
+        if (result.actions && Array.isArray(result.actions)) {
+          for (const action of result.actions as Action[]) {
+            log.info(
+              `  📤 Processing action: ${action.payload?.type || action.type}`
+            );
+
+            // Route to prloom-core for upsert_plan
+            const targetStr =
+              typeof action.target === "string"
+                ? action.target
+                : action.target?.target;
+            if (
+              targetStr === "prloom-core" &&
+              action.payload?.type === "upsert_plan"
+            ) {
+              const actionResult = await coreBridge.actions(ctx, action);
+
+              if (actionResult.success) {
+                log.success(`  ✅ Plan created/updated`);
+
+                // Emit plan_created lifecycle event to global bus
+                const payload = action.payload as Record<string, unknown>;
+                const source = payload.source as
+                  | Record<string, unknown>
+                  | undefined;
+                const planCreatedEvent = {
+                  id: `event-plan-created-${Date.now()}`,
+                  source: "prloom-core",
+                  type: "plan_created",
+                  severity: "info" as const,
+                  title: "Plan created",
+                  body: `Plan created from ${source?.system}:${source?.id}`,
+                  replyTo: { target: "prloom-core", token: {} },
+                  context: {
+                    source: source as JsonValue,
+                    planTitle: payload.title as string | undefined,
+                  } as Record<string, JsonValue>,
+                };
+                appendGlobalEvent(repoRoot, planCreatedEvent);
+              } else {
+                log.error(`  ❌ Failed: ${actionResult.error}`);
+              }
+            }
+          }
+        }
+      }
+    } catch (error) {
+      log.error(`Global bridge ${bridgeName} error: ${error}`);
+      // Continue with other bridges
+    }
+  }
+
+  // Process global events with onGlobalEvent hooks from global plugins
+  if (config.globalPlugins && Object.keys(config.globalPlugins).length > 0) {
+    await processGlobalEvents(repoRoot, config, globalState, log);
+  }
+
+  log.info("🌐 Global tick complete");
+}
+
+/**
+ * Process global events with onGlobalEvent hooks from global plugins.
+ */
+async function processGlobalEvents(
+  repoRoot: string,
+  config: Config,
+  globalState: ReturnType<typeof loadGlobalDispatcherState>,
+  log: Logger
+): Promise<void> {
+  const { events, newOffset } = readGlobalEvents(
+    repoRoot,
+    globalState.eventsOffset
+  );
+
+  if (events.length === 0) {
+    return;
+  }
+
+  log.info(`  📥 Processing ${events.length} global events`);
+
+  // Filter out already processed events
+  const processedIds = new Set(globalState.processedEventIds);
+  const newEvents = events.filter((e) => !processedIds.has(e.id));
+
+  if (newEvents.length === 0) {
+    globalState.eventsOffset = newOffset;
+    saveGlobalDispatcherState(repoRoot, globalState);
+    return;
+  }
+
+  // Load and run global plugins with onGlobalEvent hooks
+  for (const [pluginName, pluginConfig] of Object.entries(
+    config.globalPlugins!
+  )) {
+    if (!pluginConfig.module) continue;
+
+    try {
+      const pluginModule = await import(pluginConfig.module);
+      const pluginFactory = pluginModule.default || pluginModule;
+      const plugin = pluginFactory(pluginConfig.config || {});
+
+      if (typeof plugin.onGlobalEvent === "function") {
+        for (const event of newEvents) {
+          try {
+            // Create context for onGlobalEvent
+            const ctx = {
+              repoRoot,
+              markEventHandled: (eventId: string) => {
+                processedIds.add(eventId);
+              },
+            };
+
+            await plugin.onGlobalEvent(event, ctx);
+          } catch (error) {
+            log.error(`onGlobalEvent error for ${pluginName}: ${error}`);
+          }
+        }
+      }
+    } catch (error) {
+      log.error(`Global plugin ${pluginName} error: ${error}`);
+    }
+  }
+
+  // Update global state
+  globalState.eventsOffset = newOffset;
+  globalState.processedEventIds = Array.from(processedIds);
+  saveGlobalDispatcherState(repoRoot, globalState);
+}
+
 export async function runDispatcher(
   repoRoot: string,
   options: DispatcherOptions = {}
@@ -191,7 +411,6 @@ export async function runDispatcher(
   await initBusRunner(repoRoot, config);
   log.info("Bus initialized with bridges");
 
-
   while (true) {
     try {
       // Reload state from disk to pick up external changes (e.g., UI changing plan status)
@@ -229,14 +448,7 @@ export async function runDispatcher(
       );
 
       // 3. Process active plans from state
-      await processActivePlans(
-        repoRoot,
-        config,
-        state,
-        botLogin,
-        options,
-        log
-      );
+      await processActivePlans(repoRoot, config, state, botLogin, options, log);
 
       saveState(repoRoot, state);
 
@@ -461,7 +673,12 @@ export function getFeedbackPollDecision(opts: {
  * @returns The updated plan (re-parsed if modified)
  */
 async function runPlanHooks(
-  hookPoint: "afterDesign" | "beforeTodo" | "afterTodo" | "beforeFinish" | "afterFinish",
+  hookPoint:
+    | "afterDesign"
+    | "beforeTodo"
+    | "afterTodo"
+    | "beforeFinish"
+    | "afterFinish",
   plan: ReturnType<typeof parsePlan>,
   planPath: string,
   repoRoot: string,
@@ -562,10 +779,7 @@ export async function processActivePlans(
       if (githubEnabled && ps.pr) {
         const prState = await getPRState(repoRoot, ps.pr);
         if (prState === "merged" || prState === "closed") {
-          log.info(
-            `PR #${ps.pr} ${prState}, removing from active`,
-            planId
-          );
+          log.info(`PR #${ps.pr} ${prState}, removing from active`, planId);
           delete state.plans[planId];
           continue;
         }
@@ -605,48 +819,61 @@ export async function processActivePlans(
           log.info(`💬 ${newEvents.length} new events`, planId);
 
           // =============================================================
-          // Run beforeTriage hooks for event interception
+          // Run onEvent and beforeTriage hooks for event interception
           // See RFC: docs/rfc-plugin-bridge-primitives.md
+          // See RFC: docs/rfc-global-bridge-and-core.md
           // =============================================================
           let eventsForTriage = newEvents;
 
-          if (hookRegistry.beforeTriage && hookRegistry.beforeTriage.length > 0) {
-            // Run beforeTriage hooks for each plugin
-            for (const pluginName of Object.keys(planConfig.plugins ?? {})) {
-              const pluginHooks = hookRegistry.beforeTriage;
-              if (!pluginHooks || pluginHooks.length === 0) continue;
+          // First, run onEvent hooks (once per event per plugin) - RFC: Global Bridges & Core Bridge
+          if (hookRegistry.onEvent && hookRegistry.onEvent.length > 0) {
+            for (const event of [...eventsForTriage]) {
+              for (const hook of hookRegistry.onEvent) {
+                // Build onEvent context
+                const onEventCtx = buildBeforeTriageContext({
+                  repoRoot,
+                  worktree: ps.worktree,
+                  planId,
+                  events: [event],
+                  changeRequestRef: ps.pr?.toString(),
+                  pluginName: "onEvent",
+                  config: planConfig,
+                });
 
-              const beforeTriageCtx = buildBeforeTriageContext({
-                repoRoot,
-                worktree: ps.worktree,
-                planId,
-                events: eventsForTriage,
-                changeRequestRef: ps.pr?.toString(),
-                pluginName,
-                config: planConfig,
-              });
+                try {
+                  // onEvent hooks receive (event, ctx) per RFC: EventHook signature
+                  // The ctx provides the same capabilities as BeforeTriageContext
+                  await (
+                    hook as unknown as (
+                      evt: typeof event,
+                      ctx: typeof onEventCtx
+                    ) => Promise<void>
+                  )(event, onEventCtx);
 
-              // Run all beforeTriage hooks
-              try {
-                await runHooks("beforeTriage", plan.raw, beforeTriageCtx, hookRegistry);
-
-                // Save interception state (handled/deferred events)
-                beforeTriageCtx.saveInterceptionState?.();
-
-                // Get events that should continue to triage
-                eventsForTriage = beforeTriageCtx.getEventsForTriage?.() ?? eventsForTriage;
-              } catch (error) {
-                log.error(
-                  `beforeTriage hook error: ${error}`,
-                  planId
-                );
-                // Continue with remaining events on hook error
+                  // Save interception state after each hook
+                  onEventCtx.saveInterceptionState?.();
+                } catch (error) {
+                  log.error(
+                    `onEvent hook error for event ${event.id}: ${error}`,
+                    planId
+                  );
+                  // Continue with other events/hooks on error
+                }
               }
             }
 
+            // Filter out events that have been marked handled by onEvent hooks
+            // The dispatcher state's processedEventIds is updated by saveInterceptionState
+            eventsForTriage = eventsForTriage.filter((e) => {
+              const dispState = loadDispatcherState(ps.worktree!);
+              return !dispState.processedEventIds.includes(e.id);
+            });
             if (eventsForTriage.length < newEvents.length) {
               const handled = newEvents.length - eventsForTriage.length;
-              log.info(`🎯 ${handled} events handled/deferred by plugins`, planId);
+              log.info(
+                `🎯 ${handled} events handled/deferred by plugins`,
+                planId
+              );
             }
           }
 
@@ -781,10 +1008,7 @@ export async function processActivePlans(
             ps.todoRetryCount = 0;
           }
 
-          log.info(
-            `🔧 Running TODO #${todo.index + 1}: ${todo.text}`,
-            planId
-          );
+          log.info(`🔧 Running TODO #${todo.index + 1}: ${todo.text}`, planId);
 
           // Run beforeTodo hooks
           plan = await runPlanHooks(
@@ -800,7 +1024,12 @@ export async function processActivePlans(
             log
           );
 
-          const prompt = renderWorkerPrompt(repoRoot, ps.planRelpath, plan, todo);
+          const prompt = renderWorkerPrompt(
+            repoRoot,
+            ps.planRelpath,
+            plan,
+            todo
+          );
           const workerConfig = getAgentConfig(config, "worker", ps.agent);
           const adapter = getAdapter(workerConfig.agent);
 
@@ -830,7 +1059,10 @@ export async function processActivePlans(
               `   [spawned detached process: ${execResult.pid}]`,
               planId
             );
-          } else if (execResult.exitCode !== undefined && execResult.exitCode !== 0) {
+          } else if (
+            execResult.exitCode !== undefined &&
+            execResult.exitCode !== 0
+          ) {
             // Adapter failed to spawn - log and continue to retry logic
             log.warn(
               `   ⚠️ Adapter failed to spawn worker (exitCode: ${execResult.exitCode})`,
@@ -841,7 +1073,11 @@ export async function processActivePlans(
               `Adapter failed to spawn worker for TODO #${todo.index + 1}`,
               undefined,
               planId,
-              { exitCode: execResult.exitCode, agent: workerConfig.agent, todoText: todo.text }
+              {
+                exitCode: execResult.exitCode,
+                agent: workerConfig.agent,
+                todoText: todo.text,
+              }
             );
             continue;
           } else if (!execResult.tmuxSession && !execResult.pid) {
@@ -862,8 +1098,10 @@ export async function processActivePlans(
 
           // Poll for completion
           if (execResult.tmuxSession) {
-            const waitResult = await waitForExitCodeFile(execResult.tmuxSession);
-            
+            const waitResult = await waitForExitCodeFile(
+              execResult.tmuxSession
+            );
+
             if (waitResult.timedOut) {
               log.error(
                 `   ❌ Worker timed out for TODO #${todo.index + 1}`,
@@ -879,10 +1117,12 @@ export async function processActivePlans(
               );
               continue;
             }
-            
+
             if (waitResult.sessionDied && !waitResult.found) {
               log.error(
-                `   ❌ Tmux session died without creating exit code file for TODO #${todo.index + 1}`,
+                `   ❌ Tmux session died without creating exit code file for TODO #${
+                  todo.index + 1
+                }`,
                 planId
               );
               logFatalError(
@@ -895,7 +1135,7 @@ export async function processActivePlans(
               );
               continue;
             }
-            
+
             const tmuxResult = readExecutionResult(execResult.tmuxSession);
             if (tmuxResult.exitCode !== 0) {
               log.warn(
@@ -907,7 +1147,10 @@ export async function processActivePlans(
                 `Worker exited with non-zero code for TODO #${todo.index + 1}`,
                 undefined,
                 planId,
-                { exitCode: tmuxResult.exitCode, tmuxSession: execResult.tmuxSession }
+                {
+                  exitCode: tmuxResult.exitCode,
+                  tmuxSession: execResult.tmuxSession,
+                }
               );
             }
           } else if (execResult.pid) {
@@ -924,7 +1167,9 @@ export async function processActivePlans(
             );
             logAdapterError(
               ps.worktree,
-              `Worker exited with code ${execResult.exitCode} for TODO #${todo.index + 1}`,
+              `Worker exited with code ${execResult.exitCode} for TODO #${
+                todo.index + 1
+              }`,
               undefined,
               planId,
               { exitCode: execResult.exitCode }
@@ -966,11 +1211,11 @@ export async function processActivePlans(
               "adapter",
               `TODO #${todo.index + 1} not marked complete by worker`,
               planId,
-              { 
-                exitCode: execResult.exitCode, 
+              {
+                exitCode: execResult.exitCode,
                 todoText: todo.text,
                 logPath,
-                retryCount: ps.todoRetryCount ?? 0
+                retryCount: ps.todoRetryCount ?? 0,
               }
             );
 
@@ -1025,10 +1270,7 @@ export async function processActivePlans(
           const remainingTodo = findNextUnchecked(updated);
           if (!remainingTodo) {
             if (updated.todos.length === 0) {
-              log.error(
-                `❌ Plan has zero TODO items, blocking it.`,
-                planId
-              );
+              log.error(`❌ Plan has zero TODO items, blocking it.`, planId);
               ps.blocked = true;
               ps.lastError = "Plan has zero TODO items. Please add tasks.";
               continue;
@@ -1067,10 +1309,7 @@ export async function processActivePlans(
             if (githubEnabled && ps.pr) {
               log.info(`   Marking PR #${ps.pr} as ready for review`, planId);
               await markPRReady(repoRoot, ps.pr);
-              log.success(
-                `✅ Plan complete, PR marked ready`,
-                planId
-              );
+              log.success(`✅ Plan complete, PR marked ready`, planId);
             } else {
               log.success(`✅ Plan complete`, planId);
             }
@@ -1192,7 +1431,13 @@ async function runTriage(
 
   const triageConfig = getAgentConfig(config, "triage");
   const adapter = getAdapter(triageConfig.agent);
-  const prompt = renderTriagePrompt(repoRoot, ps.worktree, ps.planRelpath, plan, feedback);
+  const prompt = renderTriagePrompt(
+    repoRoot,
+    ps.worktree,
+    ps.planRelpath,
+    plan,
+    feedback
+  );
 
   log.info(`🔍 Running triage...`, planId);
   log.info(`   Using agent: ${triageConfig.agent}`, planId);
@@ -1218,17 +1463,24 @@ async function runTriage(
   if (execResult.tmuxSession) {
     const waitResult = await waitForExitCodeFile(execResult.tmuxSession);
     if (waitResult.timedOut || (waitResult.sessionDied && !waitResult.found)) {
-      log.error(`   ❌ Triage session failed (timeout or session died)`, planId);
+      log.error(
+        `   ❌ Triage session failed (timeout or session died)`,
+        planId
+      );
       logFatalError(
         ps.worktree,
         "triage",
-        `Triage session failed: ${waitResult.timedOut ? 'timeout' : 'session died'}`,
+        `Triage session failed: ${
+          waitResult.timedOut ? "timeout" : "session died"
+        }`,
         undefined,
         planId,
         { tmuxSession: execResult.tmuxSession }
       );
       ps.blocked = true;
-      ps.lastError = `Triage failed: ${waitResult.timedOut ? 'timeout' : 'session died without exit code'}`;
+      ps.lastError = `Triage failed: ${
+        waitResult.timedOut ? "timeout" : "session died without exit code"
+      }`;
       return;
     }
   } else if (execResult.pid) {

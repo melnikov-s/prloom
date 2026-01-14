@@ -21,6 +21,7 @@ import type {
   DispatcherBusState,
   BridgeActionState,
   JsonValue,
+  GlobalDispatcherState,
 } from "./types.js";
 
 // =============================================================================
@@ -420,4 +421,272 @@ export function pruneProcessedIds(
     return ids;
   }
   return ids.slice(ids.length - maxSize);
+}
+
+// =============================================================================
+// Global Bus (RFC: Global Bridges & Core Bridge)
+// =============================================================================
+
+/**
+ * Get the global bus directory path at repo root.
+ */
+export function getGlobalBusDir(repoRoot: string): string {
+  return join(repoRoot, BUS_DIR);
+}
+
+/**
+ * Initialize the global bus directory structure at repo root.
+ * Creates prloom/.local/bus/, state/, events.jsonl, and actions.jsonl.
+ */
+export function initGlobalBus(repoRoot: string): void {
+  const busDir = getGlobalBusDir(repoRoot);
+  const stateDir = join(busDir, STATE_DIR);
+
+  if (!existsSync(busDir)) {
+    mkdirSync(busDir, { recursive: true });
+  }
+  if (!existsSync(stateDir)) {
+    mkdirSync(stateDir, { recursive: true });
+  }
+
+  // Create empty JSONL files if they don't exist
+  const eventsPath = join(busDir, EVENTS_FILE);
+  const actionsPath = join(busDir, ACTIONS_FILE);
+
+  if (!existsSync(eventsPath)) {
+    writeFileSync(eventsPath, "");
+  }
+  if (!existsSync(actionsPath)) {
+    writeFileSync(actionsPath, "");
+  }
+}
+
+/**
+ * Check if a global bus directory exists.
+ */
+export function hasGlobalBus(repoRoot: string): boolean {
+  return existsSync(getGlobalBusDir(repoRoot));
+}
+
+/**
+ * Append an event to the global events.jsonl.
+ */
+export function appendGlobalEvent(repoRoot: string, event: Event): void {
+  const record: BusRecord = {
+    ts: new Date().toISOString(),
+    kind: "event",
+    schemaVersion: 1,
+    data: event,
+  };
+
+  const eventsPath = join(getGlobalBusDir(repoRoot), EVENTS_FILE);
+  appendFileSync(eventsPath, JSON.stringify(record) + "\n");
+}
+
+/**
+ * Read events from global events.jsonl, starting from byte offset.
+ */
+export function readGlobalEvents(
+  repoRoot: string,
+  sinceOffset: number = 0
+): { events: Event[]; newOffset: number } {
+  const eventsPath = join(getGlobalBusDir(repoRoot), EVENTS_FILE);
+
+  if (!existsSync(eventsPath)) {
+    return { events: [], newOffset: 0 };
+  }
+
+  const buffer = readFileSync(eventsPath);
+  if (sinceOffset >= buffer.length) {
+    return { events: [], newOffset: sinceOffset };
+  }
+
+  const contentFromOffset = buffer.subarray(sinceOffset).toString("utf-8");
+  const lastNewlineIdx = contentFromOffset.lastIndexOf("\n");
+
+  if (lastNewlineIdx === -1) {
+    return { events: [], newOffset: sinceOffset };
+  }
+
+  const completeContent = contentFromOffset.slice(0, lastNewlineIdx + 1);
+  const lines = completeContent.split("\n").filter((line) => line.trim());
+
+  const events: Event[] = [];
+  for (const line of lines) {
+    try {
+      const record: BusRecord = JSON.parse(line);
+      if (record.kind === "event") {
+        events.push(record.data as Event);
+      }
+    } catch {
+      // Skip malformed lines
+    }
+  }
+
+  const completeContentBytes = Buffer.from(completeContent, "utf-8").length;
+  return { events, newOffset: sinceOffset + completeContentBytes };
+}
+
+/**
+ * Append an action to the global actions.jsonl.
+ */
+export function appendGlobalAction(repoRoot: string, action: Action): void {
+  const record: BusRecord = {
+    ts: new Date().toISOString(),
+    kind: "action",
+    schemaVersion: 1,
+    data: action,
+  };
+
+  const actionsPath = join(getGlobalBusDir(repoRoot), ACTIONS_FILE);
+  appendFileSync(actionsPath, JSON.stringify(record) + "\n");
+}
+
+/**
+ * Read actions from global actions.jsonl, starting from byte offset.
+ */
+export function readGlobalActions(
+  repoRoot: string,
+  sinceOffset: number = 0
+): { actions: Action[]; newOffset: number } {
+  const actionsPath = join(getGlobalBusDir(repoRoot), ACTIONS_FILE);
+
+  if (!existsSync(actionsPath)) {
+    return { actions: [], newOffset: 0 };
+  }
+
+  const buffer = readFileSync(actionsPath);
+  if (sinceOffset >= buffer.length) {
+    return { actions: [], newOffset: sinceOffset };
+  }
+
+  const contentFromOffset = buffer.subarray(sinceOffset).toString("utf-8");
+  const lastNewlineIdx = contentFromOffset.lastIndexOf("\n");
+
+  if (lastNewlineIdx === -1) {
+    return { actions: [], newOffset: sinceOffset };
+  }
+
+  const completeContent = contentFromOffset.slice(0, lastNewlineIdx + 1);
+  const lines = completeContent.split("\n").filter((line) => line.trim());
+
+  const actions: Action[] = [];
+  for (const line of lines) {
+    try {
+      const record: BusRecord = JSON.parse(line);
+      if (record.kind === "action") {
+        actions.push(record.data as Action);
+      }
+    } catch {
+      // Skip malformed lines
+    }
+  }
+
+  const completeContentBytes = Buffer.from(completeContent, "utf-8").length;
+  return { actions, newOffset: sinceOffset + completeContentBytes };
+}
+
+/**
+ * Load global dispatcher state from repo root.
+ */
+export function loadGlobalDispatcherState(
+  repoRoot: string
+): GlobalDispatcherState {
+  const statePath = join(
+    getGlobalBusDir(repoRoot),
+    STATE_DIR,
+    DISPATCHER_STATE_FILE
+  );
+
+  if (!existsSync(statePath)) {
+    return {
+      eventsOffset: 0,
+      actionsOffset: 0,
+      processedEventIds: [],
+      processedActionIds: [],
+      planHashes: {},
+      deferredEventIds: {},
+    };
+  }
+
+  try {
+    const content = readFileSync(statePath, "utf-8");
+    const parsed = JSON.parse(content);
+    // Ensure all fields exist (migration support)
+    return {
+      eventsOffset: parsed.eventsOffset ?? 0,
+      actionsOffset: parsed.actionsOffset ?? 0,
+      processedEventIds: parsed.processedEventIds ?? [],
+      processedActionIds: parsed.processedActionIds ?? [],
+      planHashes: parsed.planHashes ?? {},
+      deferredEventIds: parsed.deferredEventIds ?? {},
+    };
+  } catch {
+    return {
+      eventsOffset: 0,
+      actionsOffset: 0,
+      processedEventIds: [],
+      processedActionIds: [],
+      planHashes: {},
+      deferredEventIds: {},
+    };
+  }
+}
+
+/**
+ * Save global dispatcher state to repo root.
+ */
+export function saveGlobalDispatcherState(
+  repoRoot: string,
+  state: GlobalDispatcherState
+): void {
+  const stateDir = join(getGlobalBusDir(repoRoot), STATE_DIR);
+  if (!existsSync(stateDir)) {
+    mkdirSync(stateDir, { recursive: true });
+  }
+
+  const statePath = join(stateDir, DISPATCHER_STATE_FILE);
+  writeFileSync(statePath, JSON.stringify(state, null, 2));
+}
+
+/**
+ * Load global bridge-specific state.
+ */
+export function loadGlobalBridgeState(
+  repoRoot: string,
+  bridgeName: string
+): JsonValue | undefined {
+  const statePath = join(
+    getGlobalBusDir(repoRoot),
+    STATE_DIR,
+    `bridge.${bridgeName}.json`
+  );
+
+  if (!existsSync(statePath)) {
+    return undefined;
+  }
+
+  try {
+    const content = readFileSync(statePath, "utf-8");
+    return JSON.parse(content) as JsonValue;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Save global bridge-specific state.
+ */
+export function saveGlobalBridgeState(
+  repoRoot: string,
+  bridgeName: string,
+  state: JsonValue
+): void {
+  const stateDir = join(getGlobalBusDir(repoRoot), STATE_DIR);
+  if (!existsSync(stateDir)) {
+    mkdirSync(stateDir, { recursive: true });
+  }
+
+  const statePath = join(stateDir, `bridge.${bridgeName}.json`);
+  writeFileSync(statePath, JSON.stringify(state, null, 2));
 }

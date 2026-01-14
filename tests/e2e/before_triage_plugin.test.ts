@@ -21,7 +21,10 @@ import {
   type TempRepoResult,
 } from "./harness.js";
 
-import { ingestInboxPlans, processActivePlans } from "../../src/lib/dispatcher.js";
+import {
+  ingestInboxPlans,
+  processActivePlans,
+} from "../../src/lib/dispatcher.js";
 import { loadState } from "../../src/lib/state.js";
 import { loadConfig, resolveWorktreesDir } from "../../src/lib/config.js";
 import { appendEvent, initBusDir } from "../../src/lib/bus/manager.js";
@@ -61,7 +64,7 @@ function createTestEvent(overrides: Partial<Event> = {}): Event {
   };
 }
 
-// Helper to create a beforeTriage plugin that intercepts events with a marker
+// Helper to create an onEvent plugin that intercepts events with a marker
 function createInterceptPlugin(pluginsDir: string): string {
   const pluginContent = `
 const fs = require("fs");
@@ -77,22 +80,16 @@ module.exports = function plugin(config) {
   };
 
   return {
-    beforeTriage: async (plan, ctx) => {
-      appendLog(ctx.worktree, { hook: "beforeTriage", eventCount: ctx.events?.length || 0 });
+    onEvent: async (event, ctx) => {
+      appendLog(ctx.worktree, { hook: "onEvent", eventId: event.id });
 
-      if (!ctx.events) return plan;
+      if (event.body.includes(MARKER)) {
+        appendLog(ctx.worktree, { action: "intercept", eventId: event.id, marker: MARKER });
+        ctx.markEventHandled(event.id);
 
-      for (const event of ctx.events) {
-        if (event.body.includes(MARKER)) {
-          appendLog(ctx.worktree, { action: "intercept", eventId: event.id, marker: MARKER });
-          ctx.markEventHandled(event.id);
-
-          // Emit a response comment
-          ctx.emitComment(event.replyTo, "Event intercepted by plugin!");
-        }
+        // Emit a response comment
+        ctx.emitComment(event.replyTo, "Event intercepted by plugin!");
       }
-
-      return plan;
     },
   };
 };
@@ -112,16 +109,16 @@ const path = require("path");
 
 module.exports = function plugin(config) {
   return {
-    beforeTriage: async (plan, ctx) => {
+    onEvent: async (event, ctx) => {
       // Get current count from state
       const count = ctx.getState ? ctx.getState("processedCount") || 0 : 0;
 
-      // Count events
-      const eventCount = ctx.events?.length || 0;
+      // Increment count for this event
+      const newCount = count + 1;
 
       // Save updated count
       if (ctx.setState) {
-        ctx.setState("processedCount", count + eventCount);
+        ctx.setState("processedCount", newCount);
       }
 
       // Log for verification
@@ -129,12 +126,10 @@ module.exports = function plugin(config) {
       fs.mkdirSync(path.dirname(logPath), { recursive: true });
       fs.appendFileSync(logPath, JSON.stringify({
         previousCount: count,
-        eventCount,
-        newCount: count + eventCount,
+        eventId: event.id,
+        newCount,
         ts: new Date().toISOString()
       }) + "\\n");
-
-      return plan;
     },
   };
 };
@@ -147,7 +142,9 @@ module.exports = function plugin(config) {
 }
 
 // Helper to read intercept log
-function readInterceptLog(worktreePath: string): Array<Record<string, unknown>> {
+function readInterceptLog(
+  worktreePath: string
+): Array<Record<string, unknown>> {
   const logPath = join(worktreePath, "prloom", ".local", "intercept-log.jsonl");
   if (!existsSync(logPath)) {
     return [];
@@ -172,7 +169,7 @@ function readStatefulLog(worktreePath: string): Array<Record<string, unknown>> {
     .map((line) => JSON.parse(line));
 }
 
-test("beforeTriage: plugin can intercept events with marker", async () => {
+test("onEvent: plugin can intercept events with marker", async () => {
   const { repoRoot, logsDir } = tempRepo;
 
   // Create intercept plugin
@@ -213,7 +210,9 @@ Test event interception.
   const { logger } = createTestLogger(join(logsDir, "e2e.log"));
 
   // Ingest plan
-  await ingestInboxPlans(repoRoot, worktreesDir, config, state, logger, { tmux: false });
+  await ingestInboxPlans(repoRoot, worktreesDir, config, state, logger, {
+    tmux: false,
+  });
 
   const worktreePath = state.plans[planId]!.worktree!;
 
@@ -221,39 +220,63 @@ Test event interception.
   initBusDir(worktreePath);
 
   // Add events - one with marker, one without
-  appendEvent(worktreePath, createTestEvent({
-    id: "event-1",
-    body: "Normal comment without marker",
-  }));
-  appendEvent(worktreePath, createTestEvent({
-    id: "event-2",
-    body: "Special comment with !memory update",
-  }));
-  appendEvent(worktreePath, createTestEvent({
-    id: "event-3",
-    body: "Another normal comment",
-  }));
+  appendEvent(
+    worktreePath,
+    createTestEvent({
+      id: "event-1",
+      body: "Normal comment without marker",
+    })
+  );
+  appendEvent(
+    worktreePath,
+    createTestEvent({
+      id: "event-2",
+      body: "Special comment with !memory update",
+    })
+  );
+  appendEvent(
+    worktreePath,
+    createTestEvent({
+      id: "event-3",
+      body: "Another normal comment",
+    })
+  );
 
-  // Process - this should run beforeTriage hooks
-  await processActivePlans(repoRoot, config, state, "test-bot", { tmux: false }, logger);
+  // Process - this should run onEvent hooks
+  await processActivePlans(
+    repoRoot,
+    config,
+    state,
+    "test-bot",
+    { tmux: false },
+    logger
+  );
 
   // Read intercept log
   const logs = readInterceptLog(worktreePath);
 
-  // Verify beforeTriage was called
-  expect(logs.some((l) => l.hook === "beforeTriage")).toBe(true);
+  // Verify onEvent was called
+  expect(logs.some((l) => l.hook === "onEvent")).toBe(true);
 
   // Verify event-2 was intercepted
-  expect(logs.some((l) => l.action === "intercept" && l.eventId === "event-2")).toBe(true);
+  expect(
+    logs.some((l) => l.action === "intercept" && l.eventId === "event-2")
+  ).toBe(true);
 
   // Verify an action was emitted for the intercepted event
-  const actionsPath = join(worktreePath, "prloom", ".local", "bus", "actions.jsonl");
+  const actionsPath = join(
+    worktreePath,
+    "prloom",
+    ".local",
+    "bus",
+    "actions.jsonl"
+  );
   expect(existsSync(actionsPath)).toBe(true);
   const actionsContent = readFileSync(actionsPath, "utf-8");
   expect(actionsContent).toContain("Event intercepted by plugin!");
 });
 
-test("beforeTriage: plugin state persists across invocations", async () => {
+test("onEvent: plugin state persists across invocations", async () => {
   const { repoRoot, logsDir } = tempRepo;
 
   // Create stateful plugin
@@ -292,7 +315,9 @@ Test state persistence.
   const { logger } = createTestLogger(join(logsDir, "e2e.log"));
 
   // Ingest plan
-  await ingestInboxPlans(repoRoot, worktreesDir, config, state, logger, { tmux: false });
+  await ingestInboxPlans(repoRoot, worktreesDir, config, state, logger, {
+    tmux: false,
+  });
 
   const worktreePath = state.plans[planId]!.worktree!;
 
@@ -302,21 +327,36 @@ Test state persistence.
   appendEvent(worktreePath, createTestEvent({ id: "event-2" }));
 
   // First process
-  await processActivePlans(repoRoot, config, state, "test-bot", { tmux: false }, logger);
+  await processActivePlans(
+    repoRoot,
+    config,
+    state,
+    "test-bot",
+    { tmux: false },
+    logger
+  );
 
   // Add second batch of events
   appendEvent(worktreePath, createTestEvent({ id: "event-3" }));
 
   // Second process
-  await processActivePlans(repoRoot, config, state, "test-bot", { tmux: false }, logger);
+  await processActivePlans(
+    repoRoot,
+    config,
+    state,
+    "test-bot",
+    { tmux: false },
+    logger
+  );
 
   // Read stateful log
   const logs = readStatefulLog(worktreePath);
 
   // Verify state was persisted across invocations
-  // First invocation: previousCount=0, eventCount=2, newCount=2
-  // Second invocation: previousCount=2, eventCount=1, newCount=3
-  expect(logs.length).toBeGreaterThanOrEqual(2);
+  // With onEvent, each event increments count by 1
+  // First invocation: 2 events (count goes 0→1→2)
+  // Second invocation: 1 event (count goes 2→3)
+  expect(logs.length).toBeGreaterThanOrEqual(3); // One log entry per event
 
   // Find the second invocation log entry
   const secondInvocation = logs.find((l) => l.previousCount === 2);
@@ -324,7 +364,7 @@ Test state persistence.
   expect(secondInvocation!.newCount).toBe(3);
 });
 
-test("beforeTriage: handled events are added to processedEventIds", async () => {
+test("onEvent: handled events are added to processedEventIds", async () => {
   const { repoRoot, logsDir } = tempRepo;
 
   // Create intercept plugin
@@ -363,23 +403,44 @@ Test processed event tracking.
 
   const { logger } = createTestLogger(join(logsDir, "e2e.log"));
 
-  await ingestInboxPlans(repoRoot, worktreesDir, config, state, logger, { tmux: false });
+  await ingestInboxPlans(repoRoot, worktreesDir, config, state, logger, {
+    tmux: false,
+  });
 
   const worktreePath = state.plans[planId]!.worktree!;
 
   initBusDir(worktreePath);
-  appendEvent(worktreePath, createTestEvent({
-    id: "intercept-event-1",
-    body: "This has !intercept marker",
-  }));
+  appendEvent(
+    worktreePath,
+    createTestEvent({
+      id: "intercept-event-1",
+      body: "This has !intercept marker",
+    })
+  );
 
-  await processActivePlans(repoRoot, config, state, "test-bot", { tmux: false }, logger);
+  await processActivePlans(
+    repoRoot,
+    config,
+    state,
+    "test-bot",
+    { tmux: false },
+    logger
+  );
 
   // Read dispatcher state
-  const dispatcherStatePath = join(worktreePath, "prloom", ".local", "bus", "state", "dispatcher.json");
+  const dispatcherStatePath = join(
+    worktreePath,
+    "prloom",
+    ".local",
+    "bus",
+    "state",
+    "dispatcher.json"
+  );
   expect(existsSync(dispatcherStatePath)).toBe(true);
 
-  const dispatcherState = JSON.parse(readFileSync(dispatcherStatePath, "utf-8"));
+  const dispatcherState = JSON.parse(
+    readFileSync(dispatcherStatePath, "utf-8")
+  );
 
   // The handled event should be in processedEventIds
   expect(dispatcherState.processedEventIds).toContain("intercept-event-1");

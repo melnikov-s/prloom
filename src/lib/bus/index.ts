@@ -44,6 +44,18 @@ export {
   saveBridgeActionState,
   deduplicateEvents,
   pruneProcessedIds,
+  // Global bus (RFC: Global Bridges & Core Bridge)
+  initGlobalBus,
+  hasGlobalBus,
+  getGlobalBusDir,
+  appendGlobalEvent,
+  readGlobalEvents,
+  appendGlobalAction,
+  readGlobalActions,
+  loadGlobalDispatcherState,
+  saveGlobalDispatcherState,
+  loadGlobalBridgeState,
+  saveGlobalBridgeState,
 } from "./manager.js";
 
 // Registry
