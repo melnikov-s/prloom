@@ -10,7 +10,6 @@ Adapters are the interface between prloom and coding agents. Each adapter wraps 
 | `claude` | `claude` | `src/lib/adapters/claude.ts` |
 | `codex` | `codex` | `src/lib/adapters/codex.ts` |
 | `gemini` | `gemini` | `src/lib/adapters/gemini.ts` |
-| `manual` | (none) | `src/lib/adapters/manual.ts` |
 
 ## Interface
 
@@ -18,20 +17,26 @@ All adapters implement `AgentAdapter` from `src/lib/adapters/types.ts`:
 
 ```typescript
 interface AgentAdapter {
-  execute(options: ExecutionOptions): Promise<ExecutionResult>;
-}
+  name: AgentName;
 
-interface ExecutionOptions {
-  cwd: string;           // Working directory (worktree)
-  prompt: string;        // The prompt to send
-  model?: string;        // Model override
-  tmux?: { sessionName: string };  // Run in tmux session
+  execute(opts: {
+    cwd: string;            // Working directory (worktree)
+    prompt: string;         // Prompt to send
+    tmux?: { sessionName: string }; // Optional tmux session
+    model?: string;         // Model override
+  }): Promise<ExecutionResult>;
+
+  interactive(opts: {
+    cwd: string;            // Working directory
+    prompt?: string;        // Optional prompt
+    model?: string;         // Model override
+  }): Promise<void>;
 }
 
 interface ExecutionResult {
-  exitCode?: number;
-  pid?: number;          // For detached processes
-  tmuxSession?: string;  // For tmux sessions
+  exitCode?: number;        // Set when process completes
+  pid?: number;             // Detached process PID
+  tmuxSession?: string;     // tmux session name
 }
 ```
 
@@ -39,9 +44,9 @@ interface ExecutionResult {
 
 Adapters can run in two modes:
 
-1. **Tmux mode** - Spawns in a named tmux session. Allows observation. Exit code written to `/tmp/prloom-<session>/exit_code`.
+1. **Tmux mode** - Spawns a named tmux session for observation. Logs and exit codes land in `/tmp/<session>/worker.log` and `/tmp/<session>/worker.exitcode` (prompt at `/tmp/<session>/worker.prompt`).
 
-2. **Detached mode** - Spawns a background process. Tracked by PID.
+2. **Detached mode** - Spawns a background process, tracked by PID. Adapters still write the prompt to `/tmp/<session>/worker.prompt`, but logging is adapter-specific.
 
 The dispatcher waits for completion before proceeding.
 
@@ -51,7 +56,4 @@ The dispatcher waits for completion before proceeding.
 2. Implement `AgentAdapter` interface
 3. Add to `adapters` map in `src/lib/adapters/index.ts`
 4. Add type to `AgentName` union in `src/lib/adapters/types.ts`
-
-## Manual Adapter
-
-The `manual` adapter is special - it does nothing. Used when a human handles the work. Plans with `agent: manual` skip automated TODO execution.
+5. Register model config in `src/lib/config.ts` (`AgentsConfig`)

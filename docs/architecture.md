@@ -10,21 +10,21 @@ prloom is a dispatcher-based system that manages coding work through **plans**.
 │  (src/lib/dispatcher.ts)                                    │
 │                                                             │
 │  Main loop that:                                            │
-│  - Ingests plans from inbox → creates worktrees + PRs       │
+│  - Ingests plans from inbox → creates worktrees + PRs        │
 │  - Executes TODOs via adapters                              │
-│  - Polls for feedback via bus bridges                       │
-│  - Runs triage/review agents                                │
+│  - Polls bus bridges + routes actions                       │
+│  - Runs triage + plugin hooks                               │
+│  - (Optional) runs global tick                              │
 └─────────────────────────────────────────────────────────────┘
           │                    │                    │
           ▼                    ▼                    ▼
    ┌────────────┐      ┌────────────┐      ┌────────────┐
    │  Adapters  │      │    Bus     │      │   State    │
    │            │      │            │      │            │
-   │ claude     │      │ bridges    │      │ state.json │
-   │ opencode   │      │ (github)   │      │ config.json│
-   │ codex      │      │ events.jsonl      │            │
-   │ gemini     │      │ actions.jsonl     │            │
-   │ manual     │      │            │      │            │
+   │ claude     │      │ prloom/.local/bus │ worktree state.json │
+   │ opencode   │      │ (events/actions) │ inbox metadata.json  │
+   │ codex      │      │ global bus (opt) │ prloom/config.json   │
+   │ gemini     │      │ bridges/plugins  │                     │
    └────────────┘      └────────────┘      └────────────┘
 ```
 
@@ -32,7 +32,7 @@ prloom is a dispatcher-based system that manages coding work through **plans**.
 
 ### Plans
 
-A plan is a markdown file with sections: Title, Objective, Context, TODO, Progress Log. Plans live in `prloom/.local/inbox/` before dispatch, then move to a dedicated git worktree.
+A plan is a markdown file with sections: Title, Objective, Context, TODO, Progress Log. Inbox plans live at `prloom/.local/inbox/<id>.md` with metadata in `prloom/.local/inbox/<id>.json`. When activated, the plan is copied to `<worktree>/prloom/.local/plan.md` (still gitignored).
 
 ### Worktrees
 
@@ -40,10 +40,11 @@ Each plan gets its own git worktree. This isolates work and allows parallel exec
 
 ### State
 
-Runtime state lives in `prloom/.local/state.json`. Tracks:
-- Plan status (draft, queued, active, review, triaging, done)
-- Worktree paths, branches, PR numbers
-- Cursor positions for IPC and feedback polling
+Runtime state is stored per plan and rebuilt on startup:
+- Inbox metadata in `prloom/.local/inbox/<id>.json`
+- Active plan state in `<worktree>/prloom/.local/state.json`
+
+It tracks plan status (draft, queued, active, review, triaging, done), worktree paths/branches, PR numbers, cursors, and flags like `blocked` or `hidden`.
 
 ### Adapters
 
@@ -51,7 +52,7 @@ Adapters execute prompts via different coding agents. Each adapter implements th
 
 ### Bus
 
-The bus system handles external events (PR comments, CI results) and outbound actions (posting comments). Bridges poll sources and route actions.
+The bus system handles external events (PR comments, CI results) and outbound actions (posting comments). Each worktree has `prloom/.local/bus/` for events/actions, and optional global bridges can use a repo-level bus for `upsert_plan` actions and global plugins.
 
 ### Plugin State
 
@@ -62,11 +63,10 @@ Plugins can persist state across dispatcher restarts:
 
 ## Data Flow
 
-1. **Plan created** → `prloom/.local/inbox/<id>.md`
-2. **Dispatcher ingests** → creates worktree, branch, draft PR
-3. **Worker executes TODO** → adapter runs agent, marks checkbox
-4. **Commit & push** → PR updated
-5. **Feedback arrives** → bus bridge polls, creates events
-6. **beforeTriage hooks** → plugins can intercept/claim events
-7. **Triage runs** → adds new TODOs from remaining events
-8. **All TODOs done** → PR marked ready for review
+1. **Plan created** → `prloom/.local/inbox/<id>.md` + metadata json
+2. **Dispatcher ingests** → creates worktree/branch, copies plan to `<worktree>/prloom/.local/plan.md`, opens draft PR (if enabled)
+3. **Worker executes TODO** → adapter runs agent, marks checkbox, commits/pushes
+4. **Bus ticks** → bridges append events + route actions, plugins can intercept
+5. **Triage runs** → adds TODOs and responses from remaining events
+6. **All TODOs done** → status set to review, PR marked ready
+7. **PR merged/closed** → plan removed from state

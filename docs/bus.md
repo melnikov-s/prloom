@@ -6,10 +6,10 @@ See also: [RFC: File Bus Architecture](./rfc-file-bus.md)
 
 ## Directory Layout
 
-Each worktree has a `prloom/.bus/` directory:
+Each worktree has a `prloom/.local/bus/` directory:
 
 ```
-<worktree>/prloom/.bus/
+<worktree>/prloom/.local/bus/
 ├── events.jsonl                    # Inbound events
 ├── actions.jsonl                   # Outbound actions
 └── state/
@@ -17,6 +17,8 @@ Each worktree has a `prloom/.bus/` directory:
     ├── bridge.<name>.json          # Per-bridge inbound state (poll cursors)
     └── bridge.<name>.actions.json  # Per-bridge outbound state (delivery tracking)
 ```
+
+Global bridges use the same layout at repo root: `<repoRoot>/prloom/.local/bus/`.
 
 ## Core Types
 
@@ -72,7 +74,29 @@ type OutboundPayload =
       verdict: "approve" | "request_changes" | "comment";
       summary: string;
       comments: InlineComment[];
+    }
+  | { type: "request_reviewers"; reviewers: string[] }
+  | { type: "merge"; method?: "merge" | "squash" | "rebase" }
+  | { type: "close_pr" }
+  | { type: "add_labels"; labels: string[] }
+  | { type: "remove_labels"; labels: string[] }
+  | { type: "assign_users"; users: string[] }
+  | { type: "set_milestone"; milestone: string | number }
+  | {
+      type: "upsert_plan";
+      source: UpsertPlanSource;
+      title?: string;
+      planMarkdown?: string;
+      metadata?: Record<string, unknown>;
+      status?: "draft" | "queued";
+      hidden?: boolean;
     };
+
+interface UpsertPlanSource {
+  system: string;
+  kind: string;
+  id: string;
+}
 ```
 
 ## Bridges
@@ -96,6 +120,11 @@ interface BridgeContext {
   branch?: string;
   changeRequestRef?: string;   // PR number as string
   config?: JsonValue;          // Bridge config from prloom/config.json
+  log: {                       // Logger surfaced in dispatcher activity
+    info: (msg: string) => void;
+    warn: (msg: string) => void;
+    error: (msg: string) => void;
+  };
 }
 
 type ActionResult =
@@ -109,6 +138,13 @@ interface InboundBridge {
     events: Event[];
     state: JsonValue;
   }>;
+}
+
+// Outbound-only (rare)
+interface OutboundBridge {
+  name: string;
+  targets: string[];           // Targets this bridge handles
+  actions(ctx: BridgeContext, action: Action): Promise<ActionResult>;
 }
 
 // Full bridge (most common)
@@ -132,6 +168,10 @@ The built-in GitHub bridge (`src/lib/bus/bridges/github.ts`):
 - **Actions**: Posts comments, submits reviews
 - **Idempotency**: Tracks delivered actions in `bridge.github.actions.json`
 
+### Global Bridges + Core Bridge
+
+Global bridges run at repo root and write to the repo-level bus. They typically emit `upsert_plan` actions targeted at `prloom-core`, which creates or updates inbox plans and persists `source`/`hidden` metadata. Global plugins can react to these events via `onGlobalEvent` hooks.
+
 ## Flow
 
 ```
@@ -141,7 +181,7 @@ The built-in GitHub bridge (`src/lib/bus/bridges/github.ts`):
 2. readBusEventsForTriage()
    └── Reads events.jsonl from offset → deduplicates by Event.id
 
-3. beforeTriage hooks (plugin interception)
+3. onEvent/beforeTriage hooks (plugin interception)
    └── Plugins can markEventHandled() or markEventDeferred()
 
 4. Triage processes remaining events
@@ -211,6 +251,17 @@ Each target must be claimed by exactly one bridge:
       "pollIntervalMs": 120000,
       "module": "./bridges/buildkite.ts"
     }
+  },
+  "globalBridges": {
+    "linear": {
+      "enabled": true,
+      "module": "./bridges/linear.ts"
+    }
+  },
+  "globalPlugins": {
+    "lifecycle": {
+      "module": "./plugins/lifecycle.ts"
+    }
   }
 }
 ```
@@ -219,6 +270,8 @@ Each target must be claimed by exactly one bridge:
 - `bridges.<name>.enabled`: Enable/disable the bridge
 - `bridges.<name>.pollIntervalMs`: Bridge-specific poll interval (bridges self-throttle)
 - `bridges.<name>.module`: Path to custom bridge module (relative to repo root)
+- `globalBridges.<name>`: Global bridge config (repo-level polling)
+- `globalPlugins.<name>`: Global plugin config for `onGlobalEvent` hooks
 
 ## Adding a Custom Bridge
 
@@ -282,10 +335,10 @@ export default slackBridge;
   "eventsOffset": 4523,
   "actionsOffset": 1234,
   "processedEventIds": ["github-issue_comment-123", "github-review-456"],
-  "deferredEvents": {
+  "deferredEventIds": {
     "github-review-789": {
       "reason": "waiting for CI",
-      "deferredUntil": 1704826200000
+      "deferredUntil": "2024-01-10T00:10:00.000Z"
     }
   }
 }

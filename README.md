@@ -2,7 +2,9 @@
 
 `prloom` is a terminal-first “agentic PR factory” for developers.
 
-You write a plan (a Markdown checklist), `prloom` turns it into a dedicated git worktree + branch, opens a draft PR, and then iterates one TODO at a time using a configurable coding agent. Review happens in GitHub: comments and review submissions are triaged into new TODOs and pushed back onto the same PR.
+It is intentionally flexible and AI-engineered: the core is a dispatcher + plan lifecycle + bus/hooks system you can build on top of with your own agent-driven workflow. You tell your agent how you want plans, presets, bridges, and hooks to behave, and it can assemble the workflow for you on top of the documented primitives.
+
+You write a plan (a Markdown checklist), `prloom` turns it into a dedicated git worktree + branch, opens a draft PR (GitHub mode), and then iterates one TODO at a time using a configurable coding agent. Review happens in GitHub by default, but you can swap or extend that flow via bridges and plugins.
 
 `prloom` is designed to be safe to run from multiple clones: all runtime state lives in `prloom/.local/` (gitignored), so each developer can run their own dispatcher against the PRs they create/track in their local state.
 
@@ -10,11 +12,35 @@ You write a plan (a Markdown checklist), `prloom` turns it into a dedicated git 
 
 - Plans start locally in `prloom/.local/inbox/` (gitignored; clean `git status`).
 - The dispatcher ingests a plan into a new branch/worktree and opens a draft PR.
-- The plan file stays in `prloom/.local/plan.md` (never committed) — the PR description contains the Objective, Context, and Progress Log.
+- The plan file stays in `<worktree>/prloom/.local/plan.md` (never committed) — the PR description contains the Objective, Context, and Progress Log.
 - The worker agent executes exactly one TODO per iteration and updates the local plan file.
 - PR comments/reviews trigger a triage agent which updates the plan with new TODOs and posts a reply.
 - When all TODOs are complete, the PR is marked ready; you merge when satisfied.
 - On squash merge, the plan content is preserved in the commit message.
+
+## Core Loop
+
+`prloom` is plan-first. The plan is the shared, durable context: each agent run gets a fresh context, and the plan captures the intent, constraints, and TODOs. That keeps context small while ensuring everything important is in the plan. Hooks, bridges, and plugins exist to evolve the plan as it moves through the loop until the plan fully describes what’s being built.
+
+This is built for manual design and code review by default. A human designs the plan and reviews the output; the AI handles the work between those checkpoints. You can automate reviews too (e.g., review every commit with a different model), but the default workflow assumes a human is accountable for the final review.
+
+## Build Your Own Workflow
+
+`prloom` is designed to be extended by agents using the docs in `docs/`. The core primitives are:
+- Plans (markdown + metadata in `prloom/.local/`)
+- Dispatcher lifecycle (queue → active → review)
+- Bus bridges (events/actions)
+- Plugins/hooks (before/after TODOs, triage interception)
+- Presets and per-worktree config overrides
+
+Use an agent to define your workflow and generate the config, presets, bridges, and plugins you want. Examples of prompts you can give your agent:
+
+- “Create a local-only workflow: disable GitHub, run all work in a worktree, and add a preset named `local-only`.”
+- “Add a Linear bridge that converts new tickets into inbox plans via `upsert_plan`, and register a global plugin that tags created plans.”
+- “Build a review workflow that auto-requests reviewers and posts a summary comment after each TODO.”
+- “Set up a fast prototype preset that uses gemini-2.5-pro for design and opencode for worker/triage.”
+
+The default workflow uses GitHub, but you can swap in whatever workflow you want by pointing your agent at `docs/architecture.md`, `docs/workflows.md`, `docs/adapters.md`, and `docs/bus.md`.
 
 ## Requirements
 
