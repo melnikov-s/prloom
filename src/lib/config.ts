@@ -135,6 +135,8 @@ export interface Config {
   pluginOrder?: string[];
   /** Files to copy from repo root to worktree after creation (e.g., [".env", ".env.local"]) */
   copyFiles?: string[];
+  /** Shell commands to run in worktree after creation (e.g., ["npm install"]) */
+  initCommands?: string[];
 
   // ==========================================================================
   // RFC: Global Bridges & Core Bridge
@@ -252,6 +254,7 @@ export function loadConfig(repoRoot: string): Config {
       globalBridges,
       globalPlugins,
       copyFiles: Array.isArray(parsed.copyFiles) ? parsed.copyFiles : undefined,
+      initCommands: Array.isArray(parsed.initCommands) ? parsed.initCommands : undefined,
     };
   } catch {
     return { ...DEFAULTS };

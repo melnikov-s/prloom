@@ -345,3 +345,75 @@ test("loadConfig defaults bridges.github to enabled with 60s poll interval", () 
   expect(github!.enabled).toBe(true);
   expect(github!.pollIntervalMs).toBe(60000);
 });
+
+// =============================================================================
+// copyFiles and initCommands Configuration Tests
+// =============================================================================
+
+test("loadConfig reads copyFiles array", () => {
+  mkdirSync(join(TEST_DIR, "prloom"), { recursive: true });
+  writeFileSync(
+    join(TEST_DIR, "prloom", "config.json"),
+    JSON.stringify({
+      copyFiles: [".env", ".env.local", "secrets/dev.key"],
+    })
+  );
+
+  const config = loadConfig(TEST_DIR);
+
+  expect(config.copyFiles).toEqual([".env", ".env.local", "secrets/dev.key"]);
+});
+
+test("loadConfig reads initCommands array", () => {
+  mkdirSync(join(TEST_DIR, "prloom"), { recursive: true });
+  writeFileSync(
+    join(TEST_DIR, "prloom", "config.json"),
+    JSON.stringify({
+      initCommands: ["npm install", "npm run build"],
+    })
+  );
+
+  const config = loadConfig(TEST_DIR);
+
+  expect(config.initCommands).toEqual(["npm install", "npm run build"]);
+});
+
+test("loadConfig returns undefined for copyFiles when not specified", () => {
+  const config = loadConfig(TEST_DIR);
+
+  expect(config.copyFiles).toBeUndefined();
+});
+
+test("loadConfig returns undefined for initCommands when not specified", () => {
+  const config = loadConfig(TEST_DIR);
+
+  expect(config.initCommands).toBeUndefined();
+});
+
+test("loadConfig ignores non-array copyFiles", () => {
+  mkdirSync(join(TEST_DIR, "prloom"), { recursive: true });
+  writeFileSync(
+    join(TEST_DIR, "prloom", "config.json"),
+    JSON.stringify({
+      copyFiles: ".env",
+    })
+  );
+
+  const config = loadConfig(TEST_DIR);
+
+  expect(config.copyFiles).toBeUndefined();
+});
+
+test("loadConfig ignores non-array initCommands", () => {
+  mkdirSync(join(TEST_DIR, "prloom"), { recursive: true });
+  writeFileSync(
+    join(TEST_DIR, "prloom", "config.json"),
+    JSON.stringify({
+      initCommands: "npm install",
+    })
+  );
+
+  const config = loadConfig(TEST_DIR);
+
+  expect(config.initCommands).toBeUndefined();
+});

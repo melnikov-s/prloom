@@ -1,5 +1,6 @@
 import { join } from "path";
 import { existsSync, statSync, readFileSync } from "fs";
+import { execa } from "execa";
 import {
   loadConfig,
   resolveWorktreesDir,
@@ -561,6 +562,18 @@ export async function ingestInboxPlans(
           if (existsSync(srcPath)) {
             copyFileToWorktree(srcPath, worktreePath, file);
             log.info(`   Copied ${file} to worktree`);
+          }
+        }
+      }
+
+      // Run init commands in worktree (e.g., npm install)
+      if (config.initCommands?.length) {
+        for (const cmd of config.initCommands) {
+          log.info(`   Running: ${cmd}`);
+          try {
+            await execa(cmd, { cwd: worktreePath, shell: true });
+          } catch (err) {
+            log.error(`   Failed: ${cmd} - ${err}`);
           }
         }
       }
