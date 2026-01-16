@@ -66,7 +66,12 @@ The plan file already has a template with these sections. Fill them in:
 
 - **Title**: Short PR title (e.g., "Fix PDF viewer pagination")
 - **Objective**: What will be built (1-2 sentences)
-- **Context**: Files to modify, constraints, any notes the Worker needs
+- **Scope (In/Out)**: What's included vs explicitly excluded
+- **Constraints**: Non-obvious constraints (policy, perf, licensing)
+- **Architecture Notes**: Components, invariants, data flow
+- **Decision Log**: Decision + rationale + rejected options
+- **Implementation Notes**: Gotchas, file paths, test commands
+- **Open Questions**: Unknowns to resolve
 - **TODO (Commits)**: Each item is ONE commit the Worker will make
 
 ### TODO Rules
@@ -85,7 +90,7 @@ Each TODO item represents a **single commit**. Think of them as the git log you 
 - `Trace the code to understand X` — this is research, not a commit
 - `Validate acceptance criteria` — this is testing, not a commit
 
-If there are tests or type-checks to run, specify them in the Context section (e.g., `npm test`, `npm run typecheck`). The Worker will only run what you specify.
+If there are tests or type-checks to run, specify them in the Implementation Notes section (e.g., `npm test`, `npm run typecheck`). The Worker will only run what you specify.
 
 ## Important
 

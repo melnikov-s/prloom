@@ -36,7 +36,7 @@ Ask the user: **What would you like to change about this plan?**
 
 Then:
 
-1. Understand what they want to modify (Objective, Context, TODOs, or all)
+1. Understand what they want to modify (Objective, Scope, Constraints, Architecture Notes, Decision Log, Implementation Notes, Open Questions, TODOs, or all)
 2. Explore the codebase if needed to inform the changes
 3. Apply the changes when the user confirms
 
@@ -46,26 +46,19 @@ The plan has these sections that you may modify:
 
 - **Title**: Short PR title (e.g., "Fix PDF viewer pagination")
 - **Objective**: What will be built (1-2 sentences)
-- **Context**: Files to modify, constraints, any notes the Worker needs
+- **Scope (In/Out)**: What's included vs explicitly excluded
+- **Constraints**: Non-obvious constraints (policy, perf, licensing)
+- **Architecture Notes**: Components, invariants, data flow
+- **Decision Log**: Decision + rationale + rejected options
+- **Implementation Notes**: Gotchas, file paths, test commands
+- **Open Questions**: Unknowns to resolve
 - **TODO (Commits)**: Each item is ONE commit the Worker will make
 
 ### TODO Rules
 
-Each TODO item represents a **single commit**. Think of them as the git log you want to see:
+Each TODO item represents a **single commit**. Keep them specific and actionable; avoid research or test-only tasks.
 
-✅ Good TODOs (commits):
-
-- `Fix PDF viewer to load beyond 10 pages`
-- `Add horizontal resize handle to Learn panel`
-- `Update LearnStore to trigger page prefetch`
-
-❌ Bad TODOs (not commits):
-
-- `Run npm test` — this is verification, not a commit
-- `Trace the code to understand X` — this is research, not a commit
-- `Validate acceptance criteria` — this is testing, not a commit
-
-If there are tests or type-checks to run, specify them in the Context section (e.g., `npm test`, `npm run typecheck`). The Worker will only run what you specify.
+If there are tests or type-checks to run, specify them in the Implementation Notes section (e.g., `npm test`, `npm run typecheck`). The Worker will only run what you specify.
 
 ## Important
 

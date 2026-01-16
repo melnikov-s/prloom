@@ -42,9 +42,11 @@ Read this file for complete context. You MUST edit this file to mark your TODO c
    - Open {{plan_path}} and change your TODO from `[ ]` to `[x]`
    - If blocked, mark as `[b]` instead
    - Append ONE bullet to `## Progress Log` summarizing what you did
+   - Add at least ONE new entry to `## Constraints`, `## Decision Log`, or `## Implementation Notes`
+   - Add any new items to `## Open Questions` that you uncovered
 2. Implement only the specified TODO item
 3. Do NOT create commits yourself — the dispatcher commits after detecting `[x]`
-4. Run tests/linting if specified in the Context section
+4. Run tests/linting if specified in the Implementation Notes section
 5. Exit when done. The system detects completion from the checkbox.
 
 ## Handling Lint/Format/Test Failures

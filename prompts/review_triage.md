@@ -49,11 +49,13 @@ Example question: "Why did you use a polling approach instead of webhooks?"
 For explicit requests to modify code:
 
 - Edit the plan file at {{plan_path}} directly to add actionable TODOs
+- You may also update other plan sections if feedback adds new information (Scope, Constraints, Architecture Notes, Decision Log, Implementation Notes, Open Questions)
 - **CRITICAL**: Add them to the existing `## TODO` section at the end of the list
 - Do NOT create new sections like `## TODO (Review Feedback)` - use the existing `## TODO` section
 - Use the format: `- [ ] Specific actionable task`
 - Do NOT create vague tasks like "Address review comments"
 - **CRITICAL: Include full context using indented lines** - the worker agent cannot see the original comment
+- Include acceptance criteria in the indented context lines so completion is unambiguous
 - For inline code comments, use this format:
   ```
   - [ ] Brief description of what to do
@@ -73,6 +75,7 @@ For explicit requests to modify code:
   - The diff hunk showing the relevant code
 - Create SPECIFIC tasks - the task title should describe the action, context goes below
 - Group related requests into single tasks when logical
+- If feedback reveals new constraints or rationale, update `## Constraints` or `## Decision Log` in the plan
 - If the plan status is `done` and you add TODOs, change status to `active`
 
 ### Approval/Praise → Acknowledge
