@@ -554,6 +554,17 @@ export async function ingestInboxPlans(
       }
       log.info(`   Created worktree: ${worktreePath}`);
 
+      // Copy configured files to worktree (e.g., .env)
+      if (config.copyFiles?.length) {
+        for (const file of config.copyFiles) {
+          const srcPath = join(repoRoot, file);
+          if (existsSync(srcPath)) {
+            copyFileToWorktree(srcPath, worktreePath, file);
+            log.info(`   Copied ${file} to worktree`);
+          }
+        }
+      }
+
       // Write worktree config if preset was selected
       if (planMeta.preset && config.presets?.[planMeta.preset]) {
         const presetConfig = config.presets[planMeta.preset];

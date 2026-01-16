@@ -133,6 +133,8 @@ export interface Config {
   plugins?: Record<string, PluginConfig>;
   /** Order in which plugins are loaded (determines hook execution order) */
   pluginOrder?: string[];
+  /** Files to copy from repo root to worktree after creation (e.g., [".env", ".env.local"]) */
+  copyFiles?: string[];
 
   // ==========================================================================
   // RFC: Global Bridges & Core Bridge
@@ -249,6 +251,7 @@ export function loadConfig(repoRoot: string): Config {
       pluginOrder,
       globalBridges,
       globalPlugins,
+      copyFiles: Array.isArray(parsed.copyFiles) ? parsed.copyFiles : undefined,
     };
   } catch {
     return { ...DEFAULTS };
