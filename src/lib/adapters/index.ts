@@ -6,6 +6,7 @@ import { geminiAdapter } from "./gemini.js";
 
 export type { AgentAdapter, AgentName, ExecutionResult } from "./types.js";
 export { isAgentName } from "./types.js";
+export { callAgent, type CallAgentOptions, type CallAgentResult } from "./call.js";
 
 const adapters: Record<AgentName, AgentAdapter> = {
   codex: codexAdapter,
