@@ -47,7 +47,14 @@ export async function loadPlugins(
     try {
       // Dynamic import the plugin module
       const pluginModule = await import(modulePath);
-      const factory: PluginFactory = pluginModule.default ?? pluginModule;
+
+      // Get factory: named export (using plugin name) > default export > module itself
+      let factory: PluginFactory;
+      if (pluginModule[name]) {
+        factory = pluginModule[name];
+      } else {
+        factory = pluginModule.default ?? pluginModule;
+      }
 
       // Call factory with plugin config to get hooks
       const hooks = factory(pluginDef.config);
