@@ -36,6 +36,14 @@ import {
 import { BridgeRegistry, routeAction } from "./registry.js";
 import { githubBridge } from "./bridges/github.js";
 import { logBusError, logBridgeError, logWarning } from "../errors.js";
+import { deriveGitHubEnabled } from "../review/index.js";
+import {
+  getActiveReviewProvider,
+  createReviewProviderRegistry,
+  reviewItemToEvent,
+  type ReviewProviderContext,
+  type ReviewProvider,
+} from "../review/index.js";
 
 // =============================================================================
 // Bus Runner State
@@ -70,8 +78,10 @@ export async function initBusRunner(
   const registry = new BridgeRegistry();
 
   // Register built-in GitHub bridge if enabled (and no custom module specified)
+  // Per RFC: derive github.enabled from review.provider when review config is present
   const githubConfig = config.bridges.github;
-  if (githubConfig?.enabled !== false && !githubConfig?.module) {
+  const githubEnabled = deriveGitHubEnabled(config);
+  if (githubEnabled && !githubConfig?.module) {
     registry.register(githubBridge);
   }
 
@@ -216,6 +226,88 @@ export async function tickBusEvents(
     }
   }
 
+  // =============================================================================
+  // Poll Review Provider (if not GitHub - GitHub is handled by the bridge)
+  // Per RFC: review.provider controls which source is active
+  // =============================================================================
+  const activeProviderName = getActiveReviewProvider(config);
+  if (activeProviderName !== "github") {
+    try {
+      // Get or create review provider registry
+      const registry = await createReviewProviderRegistry(config, repoRoot);
+      const provider = registry.getActive(config);
+
+      if (provider) {
+        // Create provider context
+        const providerLog: BridgeLogger = {
+          info: (msg) =>
+            log.info(`[review:${provider.name}] ${msg}`, ps.branch),
+          warn: (msg) =>
+            log.warn(`[review:${provider.name}] ${msg}`, ps.branch),
+          error: (msg) =>
+            log.error(`[review:${provider.name}] ${msg}`, ps.branch),
+        };
+
+        const providerCtx: ReviewProviderContext = {
+          repoRoot,
+          worktree,
+          planId: ps.branch ?? "unknown",
+          config:
+            config.review?.[activeProviderName as keyof typeof config.review],
+          log: providerLog,
+        };
+
+        // Load provider state from bridge state file (same pattern as bridges)
+        const providerState = loadBridgeState(
+          worktree,
+          `review-${provider.name}`
+        );
+
+        // Poll the provider
+        const result = await provider.poll(
+          providerCtx,
+          providerState as Record<string, unknown> | undefined
+        );
+
+        // Save updated state
+        if (result.state !== undefined) {
+          saveBridgeState(
+            worktree,
+            `review-${provider.name}`,
+            result.state as JsonValue
+          );
+        }
+
+        // Convert items to events and append to bus
+        for (const item of result.items) {
+          const event = reviewItemToEvent(item, provider.name);
+          appendEvent(worktree, event);
+          allNewEvents.push(event);
+        }
+
+        if (result.items.length > 0) {
+          log.info(
+            `📬 ${result.items.length} new events from review:${provider.name}`,
+            ps.branch
+          );
+        }
+      }
+    } catch (error) {
+      log.warn(
+        `Review provider ${activeProviderName} poll failed: ${error}`,
+        ps.branch
+      );
+      logBridgeError(
+        worktree,
+        `review-${activeProviderName}`,
+        `Review provider poll failed: ${error}`,
+        error,
+        undefined,
+        { branch: ps.branch }
+      );
+    }
+  }
+
   return allNewEvents;
 }
 
@@ -274,7 +366,9 @@ export async function tickBusActions(
 
     try {
       // Look up the bridge for this action's target to get the right config
-      const targetBridge = runner.registry.getTargetBridge(action.target.target);
+      const targetBridge = runner.registry.getTargetBridge(
+        action.target.target
+      );
       const bridgeCfg = targetBridge
         ? config.bridges[targetBridge.name]
         : undefined;
@@ -333,7 +427,11 @@ export async function tickBusActions(
             `Action failed (retryable): ${result.result.error}`,
             undefined,
             undefined,
-            { actionId: action.id, bridgeName: result.bridgeName, retryable: true }
+            {
+              actionId: action.id,
+              bridgeName: result.bridgeName,
+              retryable: true,
+            }
           );
           // Don't advance offset - this and all remaining actions will be retried
           hitRetryableFailure = true;
@@ -347,7 +445,11 @@ export async function tickBusActions(
             `Action failed (not retryable): ${result.result.error}`,
             undefined,
             undefined,
-            { actionId: action.id, bridgeName: result.bridgeName, retryable: false }
+            {
+              actionId: action.id,
+              bridgeName: result.bridgeName,
+              retryable: false,
+            }
           );
           // Non-retryable failure - continue processing remaining actions
         }

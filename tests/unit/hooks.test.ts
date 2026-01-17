@@ -119,7 +119,7 @@ test("loadPlugins respects enabled: false", async () => {
   expect(registry.afterDesign).toBeUndefined();
 });
 
-test("loadPlugins respects pluginOrder", async () => {
+test("loadPlugins uses object key order", async () => {
   const plugin1Path = writeTestPlugin("plugin-first", {
     afterDesign: 'return plan + "[first]";',
   });
@@ -129,15 +129,14 @@ test("loadPlugins respects pluginOrder", async () => {
 
   const config = createConfig({
     plugins: {
-      "plugin-first": { module: plugin1Path },
       "plugin-second": { module: plugin2Path },
+      "plugin-first": { module: plugin1Path },
     },
-    pluginOrder: ["plugin-second", "plugin-first"],
   });
 
   const registry = await loadPlugins(config, TEST_DIR);
 
-  // Hooks should be ordered: plugin-second first, then plugin-first
+  // Hooks should be in object key order: plugin-second first, then plugin-first
   expect(registry.afterDesign!.length).toBe(2);
 
   // Verify order by running hooks

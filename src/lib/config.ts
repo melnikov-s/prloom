@@ -1,6 +1,7 @@
 import { join, resolve } from "path";
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "fs";
 import { type AgentName, isAgentName } from "./adapters/index.js";
+import { parseReviewConfig, type ReviewConfig } from "./review/index.js";
 
 // ============================================================================
 // GitHub Configuration
@@ -129,10 +130,8 @@ export interface Config {
   base_branch: string;
   bus: BusConfig;
   bridges: Record<string, BridgeConfig>;
-  /** Plugin configurations */
+  /** Plugin configurations (order of keys determines hook execution order) */
   plugins?: Record<string, PluginConfig>;
-  /** Order in which plugins are loaded (determines hook execution order) */
-  pluginOrder?: string[];
   /** Files to copy from repo root to worktree after creation (e.g., [".env", ".env.local"]) */
   copyFiles?: string[];
   /** Shell commands to run in worktree after creation (e.g., ["npm install"]) */
@@ -146,6 +145,13 @@ export interface Config {
   globalBridges?: Record<string, BridgeConfig>;
   /** Global plugins that run at repo level (cannot be overridden by presets) */
   globalPlugins?: Record<string, PluginConfig>;
+
+  // ==========================================================================
+  // RFC: Review Providers
+  // ==========================================================================
+
+  /** Review provider configuration (replaces bridges.github for review feedback) */
+  review?: ReviewConfig;
 }
 
 const DEFAULTS: Config = {
@@ -213,7 +219,6 @@ export function loadConfig(repoRoot: string): Config {
 
     // Parse plugins config
     const plugins = parsePlugins(parsed.plugins);
-    const pluginOrder = parsePluginOrder(parsed.pluginOrder);
 
     // Parse global bridges config (RFC: Global Bridges & Core Bridge)
     let globalBridges: Record<string, BridgeConfig> | undefined;
@@ -236,6 +241,9 @@ export function loadConfig(repoRoot: string): Config {
     // Parse global plugins config (RFC: Global Bridges & Core Bridge)
     const globalPlugins = parsePlugins(parsed.globalPlugins);
 
+    // Parse review config (RFC: Review Providers)
+    const review = parseReviewConfig(parsed.review);
+
     return {
       agents,
       github,
@@ -250,11 +258,13 @@ export function loadConfig(repoRoot: string): Config {
       bus,
       bridges,
       plugins,
-      pluginOrder,
       globalBridges,
       globalPlugins,
       copyFiles: Array.isArray(parsed.copyFiles) ? parsed.copyFiles : undefined,
-      initCommands: Array.isArray(parsed.initCommands) ? parsed.initCommands : undefined,
+      initCommands: Array.isArray(parsed.initCommands)
+        ? parsed.initCommands
+        : undefined,
+      review,
     };
   } catch {
     return { ...DEFAULTS };
@@ -301,15 +311,6 @@ function parsePlugins(
   }
 
   return Object.keys(result).length > 0 ? result : undefined;
-}
-
-function parsePluginOrder(value: unknown): string[] | undefined {
-  if (!Array.isArray(value)) {
-    return undefined;
-  }
-
-  const result = value.filter((v): v is string => typeof v === "string");
-  return result.length > 0 ? result : undefined;
 }
 
 function parseAgentModelConfig(value: unknown): AgentModelConfig | undefined {
@@ -552,7 +553,8 @@ export function resolveConfig(
     bus: mergedBus ?? DEFAULTS.bus,
     bridges: mergedBridges ?? DEFAULTS.bridges,
     plugins: mergedPlugins,
-    pluginOrder: globalConfig.pluginOrder,
+    // RFC: Review Providers - carry through from global config (not merged from presets)
+    review: globalConfig.review,
   };
 }
 

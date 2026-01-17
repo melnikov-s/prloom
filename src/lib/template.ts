@@ -134,9 +134,19 @@ export function renderTriagePrompt(
     .map((f) => {
       let entry = `### ${f.type} by @${f.author}\n\n${f.body}`;
       if (f.path) entry += `\n\n*File: ${f.path}${f.line ? `:${f.line}` : ""}*`;
-      if (f.diffHunk) entry += `\n\n**Code context:**\n\`\`\`diff\n${f.diffHunk}\n\`\`\``;
+      if (f.diffHunk)
+        entry += `\n\n**Code context:**\n\`\`\`diff\n${f.diffHunk}\n\`\`\``;
       if (f.reviewState) entry += `\n\n*Review: ${f.reviewState}*`;
       if (f.inReplyToId) entry += `\n\n*In reply to comment #${f.inReplyToId}*`;
+      // RFC: Review Providers - include context for resolution loop
+      if (f.reviewProvider) {
+        entry += `\n\n**Source metadata (include in TODO context for resolution):**`;
+        entry += `\n- review_provider: ${f.reviewProvider}`;
+        if (f.path) entry += `\n- file: ${f.path}`;
+        if (f.line) entry += `\n- line: ${f.line}`;
+        if (f.reviewSide) entry += `\n- side: ${f.reviewSide}`;
+        entry += `\n- originalText: ${f.body}`;
+      }
       return entry;
     })
     .join("\n\n---\n\n");

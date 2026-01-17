@@ -87,6 +87,7 @@ import {
   logWarning,
   flushErrorBuffer,
 } from "./errors.js";
+import { deriveGitHubEnabled, updateReviewMdCheckbox } from "./review/index.js";
 
 export interface DispatcherOptions {
   /** Run workers in tmux sessions for observation */
@@ -519,7 +520,8 @@ export async function ingestInboxPlans(
 
       // Resolve per-plan config (global + preset, worktree config applied later)
       const planConfig = resolveConfig(config, planMeta.preset);
-      const githubEnabled = planConfig.github.enabled;
+      // Per RFC: derive github.enabled from review.provider when review config is present
+      const githubEnabled = deriveGitHubEnabled(planConfig);
 
       log.info(`📥 Ingesting inbox plan: ${actualId} (from ${planId}.md)`);
       if (planMeta.preset) {
@@ -780,7 +782,8 @@ export async function processActivePlans(
       // Resolve per-plan config (global + preset + worktree overrides)
       const worktreeConfig = loadWorktreeConfig(ps.worktree);
       const planConfig = resolveConfig(config, ps.preset, worktreeConfig);
-      const githubEnabled = planConfig.github.enabled;
+      // Per RFC: derive github.enabled from review.provider when review config is present
+      const githubEnabled = deriveGitHubEnabled(planConfig);
 
       let hookRegistry: HookRegistry = {};
       if (planConfig.plugins) {
@@ -920,15 +923,40 @@ export async function processActivePlans(
               inReplyToId: e.context?.inReplyToId as number | undefined,
             }));
 
-          // Run triage for GitHub feedback
-          if (newFeedback.length > 0 && ps.pr) {
+          // Convert review provider events to PRFeedback format
+          // Per RFC: review providers emit review_feedback events that should trigger triage
+          const reviewFeedback: PRFeedback[] = eventsForTriage
+            .filter((e) => e.source.startsWith("review:"))
+            .map((e) => ({
+              id: 0, // Local items don't have numeric IDs
+              type: "review_comment" as PRFeedback["type"],
+              author: (e.context?.author as string) ?? "local",
+              body: e.body,
+              path: e.context?.path as string | undefined,
+              line: e.context?.line as number | undefined,
+              diffHunk: e.context?.diffHunk as string | undefined,
+              reviewState: e.context?.reviewState as string | undefined,
+              createdAt:
+                (e.context?.createdAt as string) ?? new Date().toISOString(),
+              inReplyToId: undefined,
+              // Store review provider context for resolution loop
+              // These fields are added to PRFeedback but may need interface update
+              reviewProvider: e.context?.provider as string | undefined,
+              reviewSide: e.context?.side as string | undefined,
+            }));
+
+          const allFeedback = [...newFeedback, ...reviewFeedback];
+
+          // Run triage for feedback (allow without PR for local mode)
+          // Per RFC: triage should run even when there is no PR
+          if (allFeedback.length > 0) {
             await runTriage(
               repoRoot,
               planConfig,
               ps as ActivatedPlanState,
               planId,
               plan,
-              newFeedback,
+              allFeedback,
               options,
               log
             );
@@ -936,16 +964,16 @@ export async function processActivePlans(
             // Re-parse plan after triage may have modified it
             plan = parsePlan(planPath);
 
-            // Update cursors from processed feedback
-            const maxIds = getMaxFeedbackIds(newFeedback);
-            if (maxIds.lastIssueCommentId)
-              ps.lastIssueCommentId = maxIds.lastIssueCommentId;
-            if (maxIds.lastReviewId) ps.lastReviewId = maxIds.lastReviewId;
-            if (maxIds.lastReviewCommentId)
-              ps.lastReviewCommentId = maxIds.lastReviewCommentId;
+            // Update cursors from processed GitHub feedback only
+            if (newFeedback.length > 0) {
+              const maxIds = getMaxFeedbackIds(newFeedback);
+              if (maxIds.lastIssueCommentId)
+                ps.lastIssueCommentId = maxIds.lastIssueCommentId;
+              if (maxIds.lastReviewId) ps.lastReviewId = maxIds.lastReviewId;
+              if (maxIds.lastReviewCommentId)
+                ps.lastReviewCommentId = maxIds.lastReviewCommentId;
+            }
           }
-
-          // TODO: Handle non-GitHub events (e.g., Buildkite) here
         }
       }
 
@@ -1251,6 +1279,27 @@ export async function processActivePlans(
           ps.lastTodoIndex = undefined;
           ps.todoRetryCount = undefined;
           log.success(`   ✓ TODO #${todo.index + 1} marked complete`, planId);
+
+          // Resolution loop: Update review.md checkbox if TODO came from local review
+          // Per RFC: Extract review_provider/file/line/side from TODO context and update checkbox
+          if (todo.context) {
+            const reviewContext = parseReviewContext(todo.context);
+            if (
+              reviewContext?.review_provider === "local" &&
+              reviewContext.file &&
+              reviewContext.line
+            ) {
+              const updated = updateReviewMdCheckbox(ps.worktree, {
+                text: reviewContext.originalText ?? todo.text,
+                file: reviewContext.file,
+                line: reviewContext.line,
+                side: (reviewContext.side as "left" | "right") ?? "right",
+              });
+              if (updated) {
+                log.info(`   ✓ Marked review.md item as done`, planId);
+              }
+            }
+          }
 
           // Run afterTodo hooks
           const todoText = todo.text;
@@ -1689,4 +1738,42 @@ async function sleepUntilIpcOrTimeout(
     const remaining = timeoutMs - elapsed;
     await sleep(Math.min(250, remaining));
   }
+}
+
+/**
+ * Parse review context from TODO's indented context lines.
+ * Per RFC: TODOs from review feedback include review_provider, file, line, side metadata.
+ */
+function parseReviewContext(context: string):
+  | {
+      review_provider?: string;
+      file?: string;
+      line?: number;
+      side?: string;
+      originalText?: string;
+    }
+  | undefined {
+  const lines = context.split("\n");
+  const result: Record<string, string | number> = {};
+
+  for (const line of lines) {
+    const match = line.match(
+      /^\s*(review_provider|file|line|side|originalText):\s*(.+)/
+    );
+    if (match && match[1] && match[2]) {
+      const key = match[1];
+      const value = match[2].trim();
+      result[key] = key === "line" ? parseInt(value, 10) : value;
+    }
+  }
+
+  return Object.keys(result).length > 0
+    ? (result as {
+        review_provider?: string;
+        file?: string;
+        line?: number;
+        side?: string;
+        originalText?: string;
+      })
+    : undefined;
 }

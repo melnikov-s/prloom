@@ -55,24 +55,6 @@ test("loadConfig parses plugins from config file", () => {
   });
 });
 
-test("loadConfig parses pluginOrder", () => {
-  mkdirSync(join(TEST_DIR, "prloom"), { recursive: true });
-  writeFileSync(
-    join(TEST_DIR, "prloom", "config.json"),
-    JSON.stringify({
-      plugins: {
-        "plugin-a": { module: "./a" },
-        "plugin-b": { module: "./b" },
-      },
-      pluginOrder: ["plugin-b", "plugin-a"],
-    })
-  );
-
-  const config = loadConfig(TEST_DIR);
-
-  expect(config.pluginOrder).toEqual(["plugin-b", "plugin-a"]);
-});
-
 test("loadConfig handles missing plugins section", () => {
   mkdirSync(join(TEST_DIR, "prloom"), { recursive: true });
   writeFileSync(
@@ -85,7 +67,6 @@ test("loadConfig handles missing plugins section", () => {
   const config = loadConfig(TEST_DIR);
 
   expect(config.plugins).toBeUndefined();
-  expect(config.pluginOrder).toBeUndefined();
 });
 
 test("loadConfig parses plugin enabled field", () => {
@@ -242,32 +223,7 @@ test("resolveConfig chains preset and worktree overrides", () => {
   expect(resolved.plugins!["quality-gates"]!.enabled).toBe(false);
 });
 
-test("resolveConfig preserves pluginOrder from global config", () => {
-  mkdirSync(join(TEST_DIR, "prloom"), { recursive: true });
-  writeFileSync(
-    join(TEST_DIR, "prloom", "config.json"),
-    JSON.stringify({
-      plugins: {
-        "plugin-a": { module: "./a" },
-        "plugin-b": { module: "./b" },
-      },
-      pluginOrder: ["plugin-b", "plugin-a"],
-      presets: {
-        quick: {
-          plugins: {
-            "plugin-a": { enabled: false },
-          },
-        },
-      },
-    })
-  );
 
-  const config = loadConfig(TEST_DIR);
-  const resolved = resolveConfig(config, "quick");
-
-  // pluginOrder should be preserved
-  expect(resolved.pluginOrder).toEqual(["plugin-b", "plugin-a"]);
-});
 
 // =============================================================================
 // Issue #1: afterDesign hooks should use resolved config with preset

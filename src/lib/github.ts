@@ -87,6 +87,13 @@ export interface PRFeedback {
   createdAt: string;
   /** For review_comment: ID of the parent comment if this is a reply */
   inReplyToId?: number;
+  // RFC: Review Providers - context fields for resolution loop
+  /** Review provider name (e.g., "local", "github", "custom") */
+  reviewProvider?: string;
+  /** Diff side for the comment ("left" or "right") */
+  reviewSide?: string;
+  /** Original item ID from the review provider */
+  reviewItemId?: string;
 }
 
 export interface FeedbackCursors {
@@ -248,7 +255,10 @@ export async function postPRComment(
 
 // Bot detection
 
-export function isBotFeedback(feedback: PRFeedback, _botLogin: string): boolean {
+export function isBotFeedback(
+  feedback: PRFeedback,
+  _botLogin: string
+): boolean {
   // Check if message starts with bot emoji marker
   return feedback.body.trimStart().startsWith(BOT_MARKER);
 }

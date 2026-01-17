@@ -12,7 +12,7 @@ import type { HookPoint, Hook, HookRegistry, PluginFactory } from "./types.js";
 /**
  * Load plugins from configuration and build a HookRegistry.
  *
- * @param config - The prloom config with plugins and pluginOrder
+ * @param config - The prloom config with plugins
  * @param repoRoot - Repository root for resolving relative module paths
  * @returns HookRegistry with hooks organized by hook point
  */
@@ -27,10 +27,8 @@ export async function loadPlugins(
     return registry;
   }
 
-  // Determine load order: pluginOrder if specified, otherwise object keys order
-  const order = config.pluginOrder ?? Object.keys(config.plugins);
-
-  for (const name of order) {
+  // Load plugins in object key order
+  for (const name of Object.keys(config.plugins)) {
     const pluginDef = config.plugins[name];
 
     // Skip if plugin not found in plugins config
