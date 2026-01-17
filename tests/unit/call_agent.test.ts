@@ -468,4 +468,134 @@ describe("Adapter session ID extraction", () => {
       expect(resumeArgs).toContain("--prompt");
     });
   });
+
+  describe("Amp", () => {
+    test("extracts session_id from stream json output", async () => {
+      const { callAgent } = await import("../../src/lib/adapters/call.js");
+
+      const mockExeca = mock(() =>
+        Promise.resolve({
+          stdout:
+            JSON.stringify({ type: "system", session_id: "T-abc123" }) +
+            "\n" +
+            JSON.stringify({ type: "result", session_id: "T-abc123" }) +
+            "\n",
+          exitCode: 0,
+        })
+      );
+
+      const result = await callAgent({
+        agent: "amp",
+        cwd,
+        prompt: "Test",
+        _execaOverride: mockExeca as any,
+      });
+
+      expect(result.sessionId).toBe("T-abc123");
+    });
+
+    test("uses --execute and --stream-json for initial call", async () => {
+      const { callAgent } = await import("../../src/lib/adapters/call.js");
+
+      const execaCalls: any[] = [];
+      const mockExeca = mock((...args: any[]) => {
+        execaCalls.push(args);
+        return Promise.resolve({
+          stdout: JSON.stringify({ type: "system", session_id: "T-init" }) + "\n",
+          exitCode: 0,
+        });
+      });
+
+      await callAgent({
+        agent: "amp",
+        cwd,
+        prompt: "Test",
+        _execaOverride: mockExeca as any,
+      });
+
+      const args = execaCalls[0]![1];
+      expect(args).toContain("--execute");
+      expect(args).toContain("--stream-json");
+    });
+
+    test("initial call uses --model when provided", async () => {
+      const { callAgent } = await import("../../src/lib/adapters/call.js");
+
+      const execaCalls: any[] = [];
+      const mockExeca = mock((...args: any[]) => {
+        execaCalls.push(args);
+        return Promise.resolve({
+          stdout: JSON.stringify({ type: "system", session_id: "T-model" }) + "\n",
+          exitCode: 0,
+        });
+      });
+
+      await callAgent({
+        agent: "amp",
+        cwd,
+        prompt: "Test",
+        model: "smart",
+        _execaOverride: mockExeca as any,
+      });
+
+      const args = execaCalls[0]![1];
+      expect(args).toContain("--model");
+      expect(args).toContain("smart");
+    });
+
+    test("resume uses amp threads continue with --stream-json", async () => {
+      const { callAgent } = await import("../../src/lib/adapters/call.js");
+
+      const execaCalls: any[] = [];
+      const mockExeca = mock((...args: any[]) => {
+        execaCalls.push(args);
+        return Promise.resolve({
+          stdout: JSON.stringify({ type: "system", session_id: "T-resume" }) + "\n",
+          exitCode: 0,
+        });
+      });
+
+      const result = await callAgent({
+        agent: "amp",
+        cwd,
+        prompt: "First",
+        _execaOverride: mockExeca as any,
+      });
+
+      await result.resume("Follow-up");
+
+      const resumeArgs = execaCalls[1]![1];
+      expect(resumeArgs).toContain("threads");
+      expect(resumeArgs).toContain("continue");
+      expect(resumeArgs).toContain("--execute");
+      expect(resumeArgs).toContain("--stream-json");
+    });
+
+    test("resume ignores model override from initial call", async () => {
+      const { callAgent } = await import("../../src/lib/adapters/call.js");
+
+      const execaCalls: any[] = [];
+      const mockExeca = mock((...args: any[]) => {
+        execaCalls.push(args);
+        return Promise.resolve({
+          stdout: JSON.stringify({ type: "system", session_id: "T-resume-model" }) + "\n",
+          exitCode: 0,
+        });
+      });
+
+      const result = await callAgent({
+        agent: "amp",
+        cwd,
+        prompt: "First",
+        model: "smart",
+        _execaOverride: mockExeca as any,
+      });
+
+      await result.resume("Follow-up");
+
+      const resumeArgs = execaCalls[1]![1];
+      expect(resumeArgs).not.toContain("--model");
+      expect(resumeArgs).not.toContain("smart");
+    });
+  });
 });

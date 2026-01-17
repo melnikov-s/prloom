@@ -166,6 +166,37 @@ const sessionHandlers: Record<AgentName, SessionHandler> = {
       return args;
     },
   },
+
+  amp: {
+    command: "amp",
+    extractSessionId(stdout: string, generatedId?: string): string {
+      const lines = stdout.trim().split("\n");
+      for (const line of lines) {
+        try {
+          const parsed = JSON.parse(line);
+          if (parsed.session_id) {
+            return parsed.session_id;
+          }
+        } catch {
+          // Not JSON, skip
+        }
+      }
+      if (generatedId) {
+        return generatedId;
+      }
+      throw new Error("Could not extract session_id from amp output");
+    },
+    buildInitialArgs(opts: CallAgentOptions): string[] {
+      const args = ["--execute", opts.prompt, "--stream-json"];
+      if (opts.model) {
+        args.push("--model", opts.model);
+      }
+      return args;
+    },
+    buildResumeArgs(opts: CallAgentOptions, _sessionId: string): string[] {
+      return ["threads", "continue", "--execute", opts.prompt, "--stream-json"];
+    },
+  },
 };
 
 /**

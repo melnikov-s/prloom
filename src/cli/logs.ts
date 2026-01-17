@@ -54,9 +54,10 @@ export async function runLogs(
   // Show resume command based on agent
   const agentName = ps.agent ?? getAgentConfig(config, "worker").agent;
   const resumeCommands: Record<string, string> = {
+    amp: "amp threads continue",
+    claude: "claude --continue",
     codex: "codex --resume",
     opencode: "opencode --continue",
-    claude: "claude --continue",
   };
   const resumeCmd = resumeCommands[agentName];
   if (resumeCmd && ps.worktree) {

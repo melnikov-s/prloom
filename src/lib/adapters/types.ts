@@ -1,6 +1,6 @@
 import { execa } from "execa";
 
-export type AgentName = "codex" | "opencode" | "claude" | "gemini";
+export type AgentName = "amp" | "claude" | "codex" | "gemini" | "opencode";
 
 export interface TmuxConfig {
   sessionName: string;
@@ -42,9 +42,10 @@ export interface AgentAdapter {
 
 export function isAgentName(value: string): value is AgentName {
   return (
-    value === "codex" ||
-    value === "opencode" ||
+    value === "amp" ||
     value === "claude" ||
-    value === "gemini"
+    value === "codex" ||
+    value === "gemini" ||
+    value === "opencode"
   );
 }

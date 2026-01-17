@@ -96,7 +96,7 @@ yargs(hideBin(process.argv))
         .positional("plan-id", { type: "string", describe: "Plan ID" })
         .option("agent", {
           type: "string",
-          describe: "Coding agent to use (codex, opencode, claude, gemini)",
+          describe: "Coding agent to use (codex, opencode, claude, gemini, amp)",
         })
         .option("model", {
           alias: "m",
@@ -143,7 +143,7 @@ yargs(hideBin(process.argv))
         .positional("plan-id", { type: "string" })
         .option("agent", {
           type: "string",
-          describe: "Coding agent to use (codex, opencode, claude, gemini)",
+          describe: "Coding agent to use (codex, opencode, claude, gemini, amp)",
         })
         .option("no-designer", {
           type: "boolean",

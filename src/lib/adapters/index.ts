@@ -2,6 +2,7 @@ import type { AgentAdapter, AgentName } from "./types.js";
 import { codexAdapter } from "./codex.js";
 import { opencodeAdapter } from "./opencode.js";
 import { claudeAdapter } from "./claude.js";
+import { ampAdapter } from "./amp.js";
 import { geminiAdapter } from "./gemini.js";
 
 export type { AgentAdapter, AgentName, ExecutionResult } from "./types.js";
@@ -9,10 +10,11 @@ export { isAgentName } from "./types.js";
 export { callAgent, type CallAgentOptions, type CallAgentResult } from "./call.js";
 
 const adapters: Record<AgentName, AgentAdapter> = {
-  codex: codexAdapter,
-  opencode: opencodeAdapter,
+  amp: ampAdapter,
   claude: claudeAdapter,
+  codex: codexAdapter,
   gemini: geminiAdapter,
+  opencode: opencodeAdapter,
 };
 
 /**

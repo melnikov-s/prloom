@@ -107,10 +107,11 @@ export interface AgentModelConfig {
  */
 export interface AgentsConfig {
   default: AgentName;
-  opencode?: AgentModelConfig;
+  amp?: AgentModelConfig;
   claude?: AgentModelConfig;
   codex?: AgentModelConfig;
   gemini?: AgentModelConfig;
+  opencode?: AgentModelConfig;
 }
 
 /**
@@ -183,10 +184,11 @@ export function loadConfig(repoRoot: string): Config {
 
     const agents: AgentsConfig = {
       default: defaultAgent,
-      opencode: parseAgentModelConfig(parsed.agents?.opencode),
+      amp: parseAgentModelConfig(parsed.agents?.amp),
       claude: parseAgentModelConfig(parsed.agents?.claude),
       codex: parseAgentModelConfig(parsed.agents?.codex),
       gemini: parseAgentModelConfig(parsed.agents?.gemini),
+      opencode: parseAgentModelConfig(parsed.agents?.opencode),
     };
 
     // Parse github config
