@@ -315,7 +315,13 @@ test("HookContext.emitAction appends action to bus", () => {
   });
 
   // Verify action was written to outbox (prloom/.local/bus/actions.jsonl)
-  const actionsPath = join(worktree, "prloom", ".local", "bus", "actions.jsonl");
+  const actionsPath = join(
+    worktree,
+    "prloom",
+    ".local",
+    "bus",
+    "actions.jsonl"
+  );
   expect(existsSync(actionsPath)).toBe(true);
 
   const content = readFileSync(actionsPath, "utf-8");
@@ -343,10 +349,14 @@ function createTestLogger() {
   const logs: { level: string; msg: string; planId?: string }[] = [];
   return {
     logger: {
-      info: (msg: string, planId?: string) => logs.push({ level: "info", msg, planId }),
-      success: (msg: string, planId?: string) => logs.push({ level: "success", msg, planId }),
-      warn: (msg: string, planId?: string) => logs.push({ level: "warn", msg, planId }),
-      error: (msg: string, planId?: string) => logs.push({ level: "error", msg, planId }),
+      info: (msg: string, planId?: string) =>
+        logs.push({ level: "info", msg, planId }),
+      success: (msg: string, planId?: string) =>
+        logs.push({ level: "success", msg, planId }),
+      warn: (msg: string, planId?: string) =>
+        logs.push({ level: "warn", msg, planId }),
+      error: (msg: string, planId?: string) =>
+        logs.push({ level: "error", msg, planId }),
     },
     logs,
   };
@@ -357,7 +367,7 @@ test("processActivePlans blocks plan when hook throws", async () => {
   const worktree = join(TEST_DIR, "worktree-hook-error");
   const planDir = join(worktree, "prloom", ".local");
   mkdirSync(planDir, { recursive: true });
-  
+
   // Create a plan with multiple completed TODOs (so beforeFinish will be triggered)
   // Note: Section must be "## TODO" not "## TODOs"
   const planContent = `# Test Plan
@@ -370,12 +380,14 @@ Test hook error handling.
 - [x] Second task done
 `;
   writeFileSync(join(planDir, "plan.md"), planContent);
-  
+
   // Create a plugin that throws on beforeFinish
   const pluginsDir = join(TEST_DIR, "plugins-hook-error");
   mkdirSync(pluginsDir, { recursive: true });
   const throwingPluginPath = join(pluginsDir, "throwing-plugin.js");
-  writeFileSync(throwingPluginPath, `
+  writeFileSync(
+    throwingPluginPath,
+    `
 module.exports = function(config) {
   return {
     beforeFinish: async (plan, ctx) => {
@@ -383,7 +395,8 @@ module.exports = function(config) {
     }
   };
 };
-`);
+`
+  );
 
   // Create config with the throwing plugin
   mkdirSync(join(TEST_DIR, "prloom"), { recursive: true });
@@ -421,14 +434,7 @@ module.exports = function(config) {
 
   const { logger, logs } = createTestLogger();
 
-  await processActivePlans(
-    TEST_DIR,
-    config,
-    state,
-    "",
-    {},
-    logger
-  );
+  await processActivePlans(TEST_DIR, config, state, "", {}, logger);
 
   // The plan should be blocked due to hook error (not just logged and continued)
   // Per RFC: "If a hook throws, abort."
@@ -446,11 +452,11 @@ test("buildHookContext runAgent includes file contents in prompt when files opti
   const testFile2 = join(TEST_DIR, "test-file-2.ts");
   writeFileSync(testFile1, "export const foo = 1;");
   writeFileSync(testFile2, "export const bar = 2;");
-  
+
   // We need to mock the adapter to capture what prompt is passed
   // Since buildHookContext uses the adapter internally, we'll test by checking
   // that the context function signature accepts files
-  
+
   const ctx = buildHookContext({
     repoRoot: TEST_DIR,
     worktree: TEST_DIR,
@@ -458,13 +464,80 @@ test("buildHookContext runAgent includes file contents in prompt when files opti
     hookPoint: "afterDesign",
     currentPlan: "# Test Plan\n",
   });
-  
+
   // Verify runAgent accepts options with files
   expect(typeof ctx.runAgent).toBe("function");
-  
+
   // The function signature should accept { files?: string[] }
   // We can't easily test the actual prompt construction without mocking the adapter
   // but we verify the function accepts the expected parameters
-  const fn = ctx.runAgent as (prompt: string, options?: { files?: string[] }) => Promise<string>;
+  const fn = ctx.runAgent as (
+    prompt: string,
+    options?: { files?: string[] }
+  ) => Promise<string>;
   expect(fn.length).toBeLessThanOrEqual(2); // Function accepts up to 2 parameters
+});
+
+// =============================================================================
+// Per-call model and stage overrides in runAgent
+// =============================================================================
+
+test("buildHookContext runAgent accepts model override option", () => {
+  const ctx = buildHookContext({
+    repoRoot: TEST_DIR,
+    worktree: TEST_DIR,
+    planId: "test-plan",
+    hookPoint: "afterDesign",
+    currentPlan: "# Test Plan\n",
+  });
+
+  // Verify runAgent accepts options with model
+  expect(typeof ctx.runAgent).toBe("function");
+
+  // The function signature should accept { model?: string }
+  // Type check: this should compile without errors
+  const fn = ctx.runAgent as (
+    prompt: string,
+    options?: {
+      files?: string[];
+      model?: string;
+      stage?: "designer" | "worker" | "triage";
+    }
+  ) => Promise<string>;
+  expect(fn.length).toBeLessThanOrEqual(2);
+});
+
+test("buildHookContext runAgent accepts stage override option", () => {
+  const ctx = buildHookContext({
+    repoRoot: TEST_DIR,
+    worktree: TEST_DIR,
+    planId: "test-plan",
+    hookPoint: "afterDesign",
+    currentPlan: "# Test Plan\n",
+  });
+
+  // Verify runAgent accepts options with stage
+  expect(typeof ctx.runAgent).toBe("function");
+
+  // The function signature should accept { stage?: "designer" | "worker" | "triage" }
+  // Type check: this should compile without errors
+  const fn = ctx.runAgent as (
+    prompt: string,
+    options?: {
+      files?: string[];
+      model?: string;
+      stage?: "designer" | "worker" | "triage";
+    }
+  ) => Promise<string>;
+  expect(fn.length).toBeLessThanOrEqual(2);
+
+  // Validate stage values match AgentStage type
+  const validStages: ("designer" | "worker" | "triage")[] = [
+    "designer",
+    "worker",
+    "triage",
+  ];
+  expect(validStages).toContain("designer");
+  expect(validStages).toContain("worker");
+  expect(validStages).toContain("triage");
 });

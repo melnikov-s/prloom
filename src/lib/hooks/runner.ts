@@ -151,7 +151,11 @@ export function buildHookContext(opts: BuildHookContextOptions): HookContext {
      */
     runAgent: async (
       prompt: string,
-      options?: { files?: string[] }
+      options?: {
+        files?: string[];
+        model?: string;
+        stage?: "designer" | "worker" | "triage";
+      }
     ): Promise<string> => {
       // Build the system prompt with plan context injection
       const systemPrompt = `You are modifying a prloom plan. ${PLAN_FORMAT_DOCS}
@@ -179,8 +183,8 @@ ${currentPlanContent}
 ${filesContext}
 Instructions: ${prompt}`;
 
-      // Get the worker agent configuration (hooks use worker agent by default)
-      const agentConfig = getAgentConfig(config, "worker");
+      // Get agent configuration for requested stage (defaults to worker)
+      const agentConfig = getAgentConfig(config, options?.stage ?? "worker");
       const adapter = getAdapter(agentConfig.agent);
 
       // Create a temporary file for the agent to write its response
@@ -206,7 +210,7 @@ Do NOT include any other text or explanation, just the plan content.`;
         cwd: worktree,
         prompt: fullPrompt,
         tmux: tmuxConfig,
-        model: agentConfig.model,
+        model: options?.model ?? agentConfig.model,
       });
 
       // Wait for completion

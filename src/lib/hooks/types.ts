@@ -57,7 +57,14 @@ export interface HookContext {
    * Run agent with automatic plan context injection.
    * Uses prloom's configured adapter and associates sessions with the plan.
    */
-  runAgent: (prompt: string, options?: { files?: string[] }) => Promise<string>;
+  runAgent: (
+    prompt: string,
+    options?: {
+      files?: string[];
+      model?: string;
+      stage?: "designer" | "worker" | "triage";
+    }
+  ) => Promise<string>;
 
   /**
    * Emit action to outbox for bridge delivery.
