@@ -18,10 +18,13 @@ import {
   makeFakeBinaries,
   createTestLogger,
   writeTestConfig,
+  writeInboxPlan,
+  buildPlanContent,
   applyEnvOverrides,
   createTracePlugin,
   type TempRepoResult,
 } from "./harness.js";
+
 
 import { ingestInboxPlans, processActivePlans } from "../../src/lib/dispatcher.js";
 import { loadState } from "../../src/lib/state.js";
@@ -81,16 +84,11 @@ test("presets: plan with preset uses preset config", async () => {
 
   // Write a plan that uses the preset
   const planId = "preset-test";
-  const planContent = `# Test Plan
-
-## Objective
-
-Testing preset overrides.
-
-## TODO
-
-- [ ] Single task
-`;
+  const planContent = buildPlanContent({
+    title: "Test Plan",
+    objective: "Testing preset overrides.",
+    todos: ["Single task"],
+  });
   writeInboxPlanWithPreset(repoRoot, planId, planContent, "opencode", "no-github");
 
   const config = loadConfig(repoRoot);
@@ -129,16 +127,11 @@ test("presets: worktree config is written for preset plans", async () => {
 
   // Write a plan that uses the preset
   const planId = "worktree-config-test";
-  const planContent = `# Test Plan
-
-## Objective
-
-Testing worktree config for presets.
-
-## TODO
-
-- [ ] Task
-`;
+  const planContent = buildPlanContent({
+    title: "Test Plan",
+    objective: "Testing worktree config for presets.",
+    todos: ["Task"],
+  });
   writeInboxPlanWithPreset(repoRoot, planId, planContent, "opencode", "custom-agent");
 
   const config = loadConfig(repoRoot);
@@ -191,16 +184,12 @@ test("presets: plugin overrides in preset", async () => {
 
   // Write a plan that uses the preset
   const planId = "plugin-override-test";
-  const planContent = `# Test Plan
+  const planContent = buildPlanContent({
+    title: "Test Plan",
+    objective: "Testing preset plugins.",
+    todos: ["Task"],
+  });
 
-## Objective
-
-Testing plugin override in preset.
-
-## TODO
-
-- [ ] Task
-`;
   writeInboxPlanWithPreset(repoRoot, planId, planContent, "opencode", "no-plugins");
 
   const config = loadConfig(repoRoot);
@@ -250,16 +239,12 @@ test("presets: plan without preset uses global config", async () => {
 
   // Write a plan WITHOUT a preset
   const planId = "no-preset-test";
-  const planContent = `# Test Plan
+  const planContent = buildPlanContent({
+    title: "Test Plan",
+    objective: "Testing no preset.",
+    todos: ["Task"],
+  });
 
-## Objective
-
-Testing plan without preset uses global config.
-
-## TODO
-
-- [ ] Task
-`;
 
   // Use regular writeInboxPlan (no preset)
   const inboxDir = join(repoRoot, "prloom", ".local", "inbox");

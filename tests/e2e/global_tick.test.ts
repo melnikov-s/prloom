@@ -26,6 +26,7 @@ import {
   createTestLogger,
   writeTestConfig,
   applyEnvOverrides,
+  buildPlanContent,
   type TempRepoResult,
 } from "./harness.js";
 
@@ -167,8 +168,15 @@ test("global tick: bridge emits upsert_plan, core bridge creates inbox plan", as
             {
               id: 123,
               title: "Fix login bug",
-                body: "# Fix Login Bug\n\n## Plan Summary\n\n- Login fix\n\n## Objective\n\nFix the login issue.\n\n## Context\n\nPlan-specific setup\n\n## Scope (In/Out)\n\nIn: login flow\nOut: signup flow\n\n## Success Criteria\n\n- Login works\n\n## Constraints\n\nNone\n\n## Assumptions\n\nNone\n\n## Architecture Notes\n\nNone\n\n## Decision Log\n\nNone\n\n## Implementation Notes\n\nNone\n\n## Plan-Specific Checks\n\nNone\n\n## Review Focus\n\nNone\n\n## Open Questions\n\nNone\n\n## TODO\n\n- [ ] Reproduce issue\n- [ ] Fix code",
-
+              body: buildPlanContent({
+                title: "Fix Login Bug",
+                summary: "- Login fix",
+                objective: "Fix the login issue.",
+                context: "Plan-specific setup",
+                scope: "In: login flow\nOut: signup flow",
+                successCriteria: "- Login works",
+                todos: ["Reproduce issue", "Fix code"],
+              }),
             },
           ],
         },
@@ -224,7 +232,10 @@ test("global tick: duplicate detection via source identity", async () => {
             {
               id: 456,
               title: "Original title",
-              body: "# Original\n\n## TODO\n\n- [ ] Task 1",
+              body: buildPlanContent({
+                title: "Original",
+                todos: ["Task 1"],
+              }),
             },
           ],
         },
@@ -263,8 +274,15 @@ test("global tick: plan_created lifecycle event emitted", async () => {
             {
               id: 789,
               title: "New feature",
-                body: "# New Feature\n\n## Plan Summary\n\n- New feature\n\n## Objective\n\nShip the feature\n\n## Context\n\nPlan-specific setup\n\n## Scope (In/Out)\n\nIn: feature\nOut: extras\n\n## Success Criteria\n\n- Feature works\n\n## Constraints\n\nNone\n\n## Assumptions\n\nNone\n\n## Architecture Notes\n\nNone\n\n## Decision Log\n\nNone\n\n## Implementation Notes\n\nNone\n\n## Plan-Specific Checks\n\nNone\n\n## Review Focus\n\nNone\n\n## Open Questions\n\nNone\n\n## TODO\n\n- [ ] Implement",
-
+              body: buildPlanContent({
+                title: "New Feature",
+                summary: "- New feature",
+                objective: "Ship the feature",
+                context: "Plan-specific setup",
+                scope: "In: feature\nOut: extras",
+                successCriteria: "- Feature works",
+                todos: ["Implement"],
+              }),
             },
           ],
         },
@@ -308,8 +326,15 @@ test("global tick: global plugin receives plan_created event", async () => {
             {
               id: 999,
               title: "Plugin test",
-                body: "# Plugin Test\n\n## Plan Summary\n\n- Plugin test\n\n## Objective\n\nValidate plugin\n\n## Context\n\nPlan-specific setup\n\n## Scope (In/Out)\n\nIn: plugin test\nOut: extras\n\n## Success Criteria\n\n- Plugin runs\n\n## Constraints\n\nNone\n\n## Assumptions\n\nNone\n\n## Architecture Notes\n\nNone\n\n## Decision Log\n\nNone\n\n## Implementation Notes\n\nNone\n\n## Plan-Specific Checks\n\nNone\n\n## Review Focus\n\nNone\n\n## Open Questions\n\nNone\n\n## TODO\n\n- [ ] Test",
-
+              body: buildPlanContent({
+                title: "Plugin Test",
+                summary: "- Plugin test",
+                objective: "Validate plugin",
+                context: "Plan-specific setup",
+                scope: "In: plugin test\nOut: extras",
+                successCriteria: "- Plugin runs",
+                todos: ["Test"],
+              }),
             },
           ],
         },
@@ -357,12 +382,18 @@ test("global tick: bridge state persists across invocations", async () => {
             {
               id: 1,
               title: "Issue 1",
-              body: "# Issue 1\n\n## TODO\n\n- [ ] Task",
+              body: buildPlanContent({
+                title: "Issue 1",
+                todos: ["Task"],
+              }),
             },
             {
               id: 2,
               title: "Issue 2",
-              body: "# Issue 2\n\n## TODO\n\n- [ ] Task",
+              body: buildPlanContent({
+                title: "Issue 2",
+                todos: ["Task"],
+              }),
             },
           ],
         },

@@ -18,15 +18,17 @@ import { mkdirSync, readFileSync } from "fs";
 
 import {
   makeTempRepo,
-  makeFakeBinaries,
   createTestLogger,
   writeTestConfig,
   writeInboxPlan,
+  buildPlanContent,
   applyEnvOverrides,
-  readTraceFile,
+  makeFakeBinaries,
   createTracePlugin,
+  readTraceFile,
   type TempRepoResult,
 } from "./harness.js";
+
 
 import { ingestInboxPlans, processActivePlans } from "../../src/lib/dispatcher.js";
 import { loadState } from "../../src/lib/state.js";
@@ -64,16 +66,11 @@ test("hooks: beforeTodo → worker → afterTodo ordering", async () => {
   });
 
   const planId = "hooks-order-1";
-  const planContent = `# Hook Ordering Test
-
-## Objective
-
-Test hook ordering.
-
-## TODO
-
-- [ ] Single task to track
-`;
+  const planContent = buildPlanContent({
+    title: "Hook Ordering Test",
+    objective: "Test hook ordering.",
+    todos: ["Single task to track"],
+  });
 
   writeInboxPlan(repoRoot, planId, planContent, "opencode");
 
@@ -133,16 +130,11 @@ test("hooks: afterTodo receives todoCompleted context", async () => {
   });
 
   const planId = "hooks-ctx-1";
-  const planContent = `# Hook Context Test
-
-## Objective
-
-Test afterTodo context.
-
-## TODO
-
-- [ ] Implement user authentication
-`;
+  const planContent = buildPlanContent({
+    title: "Hook Context Test",
+    objective: "Test afterTodo context.",
+    todos: ["Implement user authentication"],
+  });
 
   writeInboxPlan(repoRoot, planId, planContent, "opencode");
 
@@ -182,16 +174,11 @@ test("hooks: planId is passed to all hooks", async () => {
   });
 
   const planId = "hooks-planid-1";
-  const planContent = `# Plan ID Test
-
-## Objective
-
-Test planId context.
-
-## TODO
-
-- [ ] Test task
-`;
+  const planContent = buildPlanContent({
+    title: "Plan ID Test",
+    objective: "Test planId context.",
+    todos: ["Test task"],
+  });
 
   writeInboxPlan(repoRoot, planId, planContent, "opencode");
 
@@ -232,17 +219,11 @@ test("hooks: multiple TODOs run hooks for each", async () => {
   });
 
   const planId = "hooks-multi-1";
-  const planContent = `# Multi-TODO Hooks Test
-
-## Objective
-
-Test hooks run for each TODO.
-
-## TODO
-
-- [ ] First task
-- [ ] Second task
-`;
+  const planContent = buildPlanContent({
+    title: "Multi-TODO Hooks Test",
+    objective: "Test hooks run for each TODO.",
+    todos: ["First task", "Second task"],
+  });
 
   writeInboxPlan(repoRoot, planId, planContent, "opencode");
 
@@ -299,16 +280,11 @@ test("hooks: ordering with GitHub enabled includes all phases", async () => {
   });
 
   const planId = "hooks-gh-1";
-  const planContent = `# GitHub Hooks Test
-
-## Objective
-
-Test hooks with GitHub enabled.
-
-## TODO
-
-- [ ] Single task
-`;
+  const planContent = buildPlanContent({
+    title: "GitHub Hooks Test",
+    objective: "Test hooks with GitHub enabled.",
+    todos: ["Single task"],
+  });
 
   writeInboxPlan(repoRoot, planId, planContent, "opencode");
 

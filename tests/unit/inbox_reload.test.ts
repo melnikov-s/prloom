@@ -12,6 +12,7 @@ import {
   type State,
 } from "../../src/lib/state.js";
 import { loadConfig } from "../../src/lib/config.js";
+import { buildPlanContent } from "../plan_helper.js";
 
 // No-op logger for tests
 const noopLogger = {
@@ -37,62 +38,10 @@ test("setPlanStatus persists status to disk and can be read back", () => {
   const inboxPath = getInboxPath(repoRoot, id);
   writeFileSync(
     inboxPath,
-    `## Plan Summary
-
-- Queued plan
-
-## Objective
-
-None
-
-## Context
-
-None
-
-## Scope (In/Out)
-
-In: none
-Out: none
-
-## Success Criteria
-
-None
-
-## Constraints
-
-None
-
-## Assumptions
-
-None
-
-## Architecture Notes
-
-None
-
-## Decision Log
-
-None
-
-## Implementation Notes
-
-None
-
-## Plan-Specific Checks
-
-None
-
-## Review Focus
-
-None
-
-## Open Questions
-
-None
-
-## TODO
-- [ ] A task
-`
+    buildPlanContent({
+      title: "Test plan",
+      todos: ["A task"],
+    })
   );
 
 
@@ -115,63 +64,12 @@ test("dispatcher sees plan status changes made externally (simulates UI → disp
   const inboxPath = getInboxPath(repoRoot, id);
   writeFileSync(
     inboxPath,
-    `## Plan Summary
-
-- Inbox plan
-
-## Objective
-
-None
-
-## Context
-
-None
-
-## Scope (In/Out)
-
-In: none
-Out: none
-
-## Success Criteria
-
-None
-
-## Constraints
-
-None
-
-## Assumptions
-
-None
-
-## Architecture Notes
-
-None
-
-## Decision Log
-
-None
-
-## Implementation Notes
-
-None
-
-## Plan-Specific Checks
-
-None
-
-## Review Focus
-
-None
-
-## Open Questions
-
-None
-
-## TODO
-- [ ] A task
-`
+    buildPlanContent({
+      title: "Test plan",
+      todos: ["A task"],
+    })
   );
+
 
 
   // Simulate dispatcher having an in-memory state with plan as draft
@@ -211,62 +109,10 @@ test("ingestInboxPlans picks up plans queued by external process", async () => {
   const inboxPath = getInboxPath(repoRoot, id);
   writeFileSync(
     inboxPath,
-    `## Plan Summary
-
-- Queued plan
-
-## Objective
-
-None
-
-## Context
-
-None
-
-## Scope (In/Out)
-
-In: none
-Out: none
-
-## Success Criteria
-
-None
-
-## Constraints
-
-None
-
-## Assumptions
-
-None
-
-## Architecture Notes
-
-None
-
-## Decision Log
-
-None
-
-## Implementation Notes
-
-None
-
-## Plan-Specific Checks
-
-None
-
-## Review Focus
-
-None
-
-## Open Questions
-
-None
-
-## TODO
-- [ ] A task
-`
+    buildPlanContent({
+      title: "Queued plan",
+      todos: ["A task"],
+    })
   );
 
 
@@ -304,121 +150,17 @@ test("plan status survives state reload with other plans present", () => {
   // Create two inbox plans
   writeFileSync(
     getInboxPath(repoRoot, id1),
-    `## Plan Summary
-
-- Plan one
-
-## Objective
-
-None
-
-## Context
-
-None
-
-## Scope (In/Out)
-
-In: none
-Out: none
-
-## Success Criteria
-
-None
-
-## Constraints
-
-None
-
-## Assumptions
-
-None
-
-## Architecture Notes
-
-None
-
-## Decision Log
-
-None
-
-## Implementation Notes
-
-None
-
-## Plan-Specific Checks
-
-None
-
-## Review Focus
-
-None
-
-## Open Questions
-
-None
-
-## TODO
-- [ ] Task
-`
+    buildPlanContent({
+      title: "Plan one",
+      todos: ["Task"],
+    })
   );
   writeFileSync(
     getInboxPath(repoRoot, id2),
-    `## Plan Summary
-
-- Plan two
-
-## Objective
-
-None
-
-## Context
-
-None
-
-## Scope (In/Out)
-
-In: none
-Out: none
-
-## Success Criteria
-
-None
-
-## Constraints
-
-None
-
-## Assumptions
-
-None
-
-## Architecture Notes
-
-None
-
-## Decision Log
-
-None
-
-## Implementation Notes
-
-None
-
-## Plan-Specific Checks
-
-None
-
-## Review Focus
-
-None
-
-## Open Questions
-
-None
-
-## TODO
-- [ ] Task
-`
+    buildPlanContent({
+      title: "Plan two",
+      todos: ["Task"],
+    })
   );
 
   // Set different statuses
@@ -440,63 +182,12 @@ test("ingestInboxPlans uses filename as plan ID (frontmatter ID is ignored)", as
 
   writeFileSync(
     inboxPath,
-    `## Plan Summary
-
-- External change plan
-
-## Objective
-
-None
-
-## Context
-
-None
-
-## Scope (In/Out)
-
-In: none
-Out: none
-
-## Success Criteria
-
-None
-
-## Constraints
-
-None
-
-## Assumptions
-
-None
-
-## Architecture Notes
-
-None
-
-## Decision Log
-
-None
-
-## Implementation Notes
-
-None
-
-## Plan-Specific Checks
-
-None
-
-## Review Focus
-
-None
-
-## Open Questions
-
-None
-
-## TODO
-- [ ] Task one
-`
+    buildPlanContent({
+      title: "External change plan",
+      todos: ["Task one"],
+    })
   );
+
 
 
   // Set status using the filename (which is now the plan ID)

@@ -13,16 +13,18 @@ import { readFileSync } from "fs";
 
 import {
   makeTempRepo,
-  makeFakeBinaries,
   createTestLogger,
   writeTestConfig,
   writeInboxPlan,
+  buildPlanContent,
   applyEnvOverrides,
+  makeFakeBinaries,
+  createBlockingPlugin,
   readTraceFile,
   readGhState,
-  createBlockingPlugin,
   type TempRepoResult,
 } from "./harness.js";
+
 
 import { ingestInboxPlans, processActivePlans } from "../../src/lib/dispatcher.js";
 import { loadState } from "../../src/lib/state.js";
@@ -59,16 +61,11 @@ test("beforeFinish: adds TODO to prevent completion", async () => {
   });
 
   const planId = "block-test-1";
-  const planContent = `# Blocking Test
-
-## Objective
-
-Test beforeFinish blocking.
-
-## TODO
-
-- [ ] Original task
-`;
+  const planContent = buildPlanContent({
+    title: "Blocking Test",
+    objective: "Test beforeFinish blocking.",
+    todos: ["Original task"],
+  });
 
   writeInboxPlan(repoRoot, planId, planContent, "opencode");
 
@@ -119,16 +116,11 @@ test("beforeFinish: plan completes after hook-added TODO is done", async () => {
   });
 
   const planId = "block-test-2";
-  const planContent = `# Complete After Block Test
-
-## Objective
-
-Test completing after beforeFinish adds TODO.
-
-## TODO
-
-- [ ] Original task
-`;
+  const planContent = buildPlanContent({
+    title: "Complete After Block Test",
+    objective: "Test completing after beforeFinish adds TODO.",
+    todos: ["Original task"],
+  });
 
   writeInboxPlan(repoRoot, planId, planContent, "opencode");
 
@@ -187,16 +179,11 @@ test("beforeFinish: GitHub PR not marked ready when blocked", async () => {
   });
 
   const planId = "block-gh-1";
-  const planContent = `# GitHub Block Test
-
-## Objective
-
-Test PR not marked ready when blocked.
-
-## TODO
-
-- [ ] Original task
-`;
+  const planContent = buildPlanContent({
+    title: "GitHub Block Test",
+    objective: "Test PR not marked ready when blocked.",
+    todos: ["Original task"],
+  });
 
   writeInboxPlan(repoRoot, planId, planContent, "opencode");
 
@@ -240,16 +227,11 @@ test("beforeFinish: logs indicate hooks added new TODOs", async () => {
   });
 
   const planId = "block-log-1";
-  const planContent = `# Logging Test
-
-## Objective
-
-Test logs show hook added TODOs.
-
-## TODO
-
-- [ ] Original task
-`;
+  const planContent = buildPlanContent({
+    title: "Logging Test",
+    objective: "Test logs show hook added TODOs.",
+    todos: ["Original task"],
+  });
 
   writeInboxPlan(repoRoot, planId, planContent, "opencode");
 
@@ -286,16 +268,12 @@ test("beforeFinish: trace shows blocking action", async () => {
   });
 
   const planId = "block-trace-1";
-  const planContent = `# Trace Test
+  const planContent = buildPlanContent({
+    title: "Trace Test",
+    objective: "Test trace shows blocking.",
+    todos: ["Original task"],
+  });
 
-## Objective
-
-Test trace shows blocking action.
-
-## TODO
-
-- [ ] Original task
-`;
 
   writeInboxPlan(repoRoot, planId, planContent, "opencode");
 

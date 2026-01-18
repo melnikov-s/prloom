@@ -13,6 +13,7 @@ import {
   type State,
 } from "../../src/lib/state.js";
 import { loadConfig } from "../../src/lib/config.js";
+import { buildPlanContent } from "../plan_helper.js";
 
 // No-op logger for tests
 const noopLogger = {
@@ -37,61 +38,10 @@ test("ingestInboxPlans: skips plan with no TODOs", async () => {
   const id = "empty-plan";
   const inboxPath = getInboxPath(repoRoot, id);
   // Create a plan with NO todos (just skeleton, manually cleared if needed)
-  const content = `## Plan Summary
-
-- Empty plan
-
-## Objective
-
-None
-
-## Context
-
-None
-
-## Scope (In/Out)
-
-In: none
-Out: none
-
-## Success Criteria
-
-None
-
-## Constraints
-
-None
-
-## Assumptions
-
-None
-
-## Architecture Notes
-
-None
-
-## Decision Log
-
-None
-
-## Implementation Notes
-
-None
-
-## Plan-Specific Checks
-
-None
-
-## Review Focus
-
-None
-
-## Open Questions
-
-None
-
-## TODO
-`;
+  const content = buildPlanContent({
+    title: "Empty plan",
+    todos: [],
+  });
 
   writeFileSync(inboxPath, content);
 
@@ -115,62 +65,10 @@ None
 test("ingestInboxPlans: plan with no meta defaults to draft (not ingested)", async () => {
   const id = "no-meta-plan";
   const inboxPath = getInboxPath(repoRoot, id);
-  const content = `## Plan Summary
-
-- Draft plan
-
-## Objective
-
-None
-
-## Context
-
-None
-
-## Scope (In/Out)
-
-In: none
-Out: none
-
-## Success Criteria
-
-None
-
-## Constraints
-
-None
-
-## Assumptions
-
-None
-
-## Architecture Notes
-
-None
-
-## Decision Log
-
-None
-
-## Implementation Notes
-
-None
-
-## Plan-Specific Checks
-
-None
-
-## Review Focus
-
-None
-
-## Open Questions
-
-None
-
-## TODO
-- [ ] A task
-`;
+  const content = buildPlanContent({
+    title: "Draft plan",
+    todos: ["A task"],
+  });
 
   writeFileSync(inboxPath, content);
 
@@ -193,61 +91,10 @@ test("processActivePlans: blocks active plan with no TODOs", async () => {
 
   // Create an active plan with NO todos in its worktree
   const planPath = join(worktreePath, planRelpath);
-  const content = `## Plan Summary
-
-- Empty active plan
-
-## Objective
-
-None
-
-## Context
-
-None
-
-## Scope (In/Out)
-
-In: none
-Out: none
-
-## Success Criteria
-
-None
-
-## Constraints
-
-None
-
-## Assumptions
-
-None
-
-## Architecture Notes
-
-None
-
-## Decision Log
-
-None
-
-## Implementation Notes
-
-None
-
-## Plan-Specific Checks
-
-None
-
-## Review Focus
-
-None
-
-## Open Questions
-
-None
-
-## TODO
-`;
+  const content = buildPlanContent({
+    title: "Empty active plan",
+    todos: [],
+  });
   writeFileSync(planPath, content);
 
 

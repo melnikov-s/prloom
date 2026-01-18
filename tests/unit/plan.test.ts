@@ -8,6 +8,7 @@ import {
   extractBody,
   generatePlanSkeleton,
 } from "../../src/lib/plan.js";
+import { buildPlanContent } from "../plan_helper.js";
 
 const FIXTURE_PATH = join(import.meta.dir, "../fixtures/plans/sample.md");
 
@@ -35,71 +36,23 @@ test("parsePlan extracts extended plan sections", () => {
   const tmpDir = mkdtempSync(join(tmpdir(), "prloom-test-"));
   const planPath = join(tmpDir, "test-plan.md");
 
-  const planContent = `## Title
-
-Add search filters
-
-## Plan Summary
-
-- Add advanced filters UI
-- Wire filters to API
-
-## Objective
-
-Deliver filterable search results
-
-## Context
-
-Scope limited to search page
-
-## Scope (In/Out)
-
-In: filters UI and query params
-Out: backend ranking tweaks
-
-## Success Criteria
-
-- Filters update results without reload
-- Query params reflect selected filters
-
-## Constraints
-
-Must stay under 200ms per request
-
-## Assumptions
-
-Search API already supports new params
-
-## Architecture Notes
-
-Use SearchFilters component and update query builder
-
-## Decision Log
-
-- Use URL params for shareable state
-
-## Implementation Notes
-
-Ensure SSR renders default filters
-
-## Plan-Specific Checks
-
-bun test tests/unit/search
-
-## Review Focus
-
-Verify filter state sync in URL
-
-## Open Questions
-
-Confirm which filters ship in v1
-
-## TODO
-
-- [ ] Add filters UI
-
-## Progress Log
-`;
+  const planContent = buildPlanContent({
+    title: "Add search filters",
+    summary: ["- Add advanced filters UI", "- Wire filters to API"],
+    objective: "Deliver filterable search results",
+    context: "Scope limited to search page",
+    scope: "In: filters UI and query params\nOut: backend ranking tweaks",
+    successCriteria: ["- Filters update results without reload", "- Query params reflect selected filters"],
+    constraints: "Must stay under 200ms per request",
+    assumptions: "Search API already supports new params",
+    architectureNotes: "Use SearchFilters component and update query builder",
+    decisionLog: "- Use URL params for shareable state",
+    implementationNotes: "Ensure SSR renders default filters",
+    planSpecificChecks: "bun test tests/unit/search",
+    reviewFocus: "Verify filter state sync in URL",
+    openQuestions: "Confirm which filters ship in v1",
+    todos: ["Add filters UI"],
+  });
   writeFileSync(planPath, planContent);
 
   const plan = parsePlan(planPath);
@@ -167,68 +120,10 @@ test("parsePlan strips HTML comments from title", () => {
   const planPath = join(tmpDir, "test-plan.md");
 
   // Plan with only HTML comment placeholder in title section
-  const planContent = `## Title
-
-<!-- Short PR title (e.g., "Fix PDF viewer pagination") -->
-
-## Plan Summary
-
-<!-- 3-6 bullets capturing scope at a glance -->
-
-## Objective
-
-<!-- Describe what will be built -->
-
-## Context
-
-<!-- Plan-specific background, key files, constraints -->
-
-## Scope (In/Out)
-
-<!-- What's included vs explicitly excluded -->
-
-## Success Criteria
-
-<!-- Measurable outcomes that define done -->
-
-## Constraints
-
-<!-- Non-obvious requirements or guardrails -->
-
-## Assumptions
-
-<!-- Reasonable defaults the worker can proceed with -->
-
-## Architecture Notes
-
-<!-- Components, invariants, data flow -->
-
-## Decision Log
-
-<!-- Decision + rationale + rejected options -->
-
-## Implementation Notes
-
-<!-- Gotchas, file paths, non-obvious details -->
-
-## Plan-Specific Checks
-
-<!-- Extra commands beyond repo defaults (optional) -->
-
-## Review Focus
-
-<!-- Areas reviewers should double-check (optional) -->
-
-## Open Questions
-
-<!-- Unknowns to resolve -->
-
-## TODO
-
-- [ ] <!-- First task -->
-
-## Progress Log
-`;
+  const planContent = buildPlanContent({
+    title: "<!-- Short PR title (e.g., \"Fix PDF viewer pagination\") -->",
+    todos: ["<!-- First task -->"],
+  });
 
   writeFileSync(planPath, planContent);
 
@@ -243,20 +138,12 @@ test("parsePlan extracts actual title when provided", () => {
   const tmpDir = mkdtempSync(join(tmpdir(), "prloom-test-"));
   const planPath = join(tmpDir, "test-plan.md");
 
-  const planContent = `## Title
+  const planContent = buildPlanContent({
+    title: "Add dark mode support for the dashboard",
+    objective: "Test objective",
+    todos: ["Do something"],
+  });
 
-Add dark mode support for the dashboard
-
-## Objective
-
-Test objective
-
-## TODO
-
-- [ ] Do something
-
-## Progress Log
-`;
   writeFileSync(planPath, planContent);
 
   const plan = parsePlan(planPath);

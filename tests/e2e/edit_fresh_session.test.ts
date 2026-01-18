@@ -10,7 +10,7 @@ import { mkdirSync, writeFileSync, readFileSync, existsSync, chmodSync } from "f
 import { join } from "path";
 import { PassThrough } from "stream";
 
-import { makeTempRepo, writeTestConfig, type TempRepoResult } from "./harness.js";
+import { makeTempRepo, writeTestConfig, buildPlanContent, type TempRepoResult } from "./harness.js";
 import { runEdit } from "../../src/cli/edit.js";
 import { setPromptIO } from "../../src/cli/prompt.js";
 
@@ -196,67 +196,15 @@ test("prloom edit prompt includes plan structure guidance", async () => {
   const inboxDir = join(repoRoot, "prloom", ".local", "inbox");
   mkdirSync(inboxDir, { recursive: true });
 
-  const planContent = `# My Feature
-
-## Plan Summary
-
-- Basic plan
-
-## Objective
-
-Build something cool.
-
-## Context
-
-N/A
-
-## Scope (In/Out)
-
-In: basic example
-Out: none
-
-## Success Criteria
-
-- Plan can be edited
-
-## Constraints
-
-None
-
-## Assumptions
-
-None
-
-## Architecture Notes
-
-None
-
-## Decision Log
-
-None
-
-## Implementation Notes
-
-None
-
-## Plan-Specific Checks
-
-None
-
-## Review Focus
-
-None
-
-## Open Questions
-
-None
-
-## TODO
-
-- [ ] Do the thing
-
-## Progress Log
-`;
+  const planContent = buildPlanContent({
+    title: "My Feature",
+    summary: "- Basic plan",
+    objective: "Build something cool.",
+    context: "N/A",
+    scope: "In: basic example\nOut: none",
+    successCriteria: "- Plan can be edited",
+    todos: ["Do the thing"],
+  });
 
   writeFileSync(join(inboxDir, `${planId}.md`), planContent);
   writeFileSync(

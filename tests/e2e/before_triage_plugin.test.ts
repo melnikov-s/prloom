@@ -17,9 +17,11 @@ import {
   createTestLogger,
   writeTestConfig,
   writeInboxPlan,
+  buildPlanContent,
   applyEnvOverrides,
   type TempRepoResult,
 } from "./harness.js";
+
 
 import {
   ingestInboxPlans,
@@ -190,16 +192,11 @@ test("onEvent: plugin can intercept events with marker", async () => {
   });
 
   const planId = "intercept-test-1";
-  const planContent = `# Intercept Test
-
-## Objective
-
-Test event interception.
-
-## TODO
-
-- [ ] Single task
-`;
+  const planContent = buildPlanContent({
+    title: "Intercept Test",
+    objective: "Test event interception.",
+    todos: ["Single task"],
+  });
 
   writeInboxPlan(repoRoot, planId, planContent, "opencode");
 
@@ -294,17 +291,12 @@ test("onEvent: plugin state persists across invocations", async () => {
   });
 
   const planId = "stateful-test-1";
-  const planContent = `# Stateful Test
+  const planContent = buildPlanContent({
+    title: "Stateful Test",
+    objective: "Test stateful plugins.",
+    todos: ["Single task"],
+  });
 
-## Objective
-
-Test state persistence.
-
-## TODO
-
-- [ ] Task one
-- [ ] Task two
-`;
 
   writeInboxPlan(repoRoot, planId, planContent, "opencode");
 
@@ -384,16 +376,11 @@ test("onEvent: handled events are added to processedEventIds", async () => {
   });
 
   const planId = "processed-ids-test";
-  const planContent = `# Processed IDs Test
-
-## Objective
-
-Test processed event tracking.
-
-## TODO
-
-- [ ] Single task
-`;
+  const planContent = buildPlanContent({
+    title: "Processed IDs Test",
+    objective: "Test processed event tracking.",
+    todos: ["Single task"],
+  });
 
   writeInboxPlan(repoRoot, planId, planContent, "opencode");
 

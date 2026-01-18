@@ -516,6 +516,9 @@ export function writeTestConfig(
   writeFileSync(join(configDir, "config.json"), JSON.stringify(config, null, 2));
 }
 
+import { buildPlanContent } from "../plan_helper.js";
+export { buildPlanContent };
+
 /**
  * Write an inbox plan and mark it as queued.
  */

@@ -5,6 +5,7 @@ import { tmpdir } from "os";
 import { processActivePlans } from "../../src/lib/dispatcher.js";
 import { loadConfig } from "../../src/lib/config.js";
 import { type State } from "../../src/lib/state.js";
+import { buildPlanContent } from "../plan_helper.js";
 
 const noopLogger = {
   info: () => {},
@@ -32,64 +33,10 @@ test("processActivePlans: immediately blocks plan with [b] marker", async () => 
 
   // Create an active plan with a blocked TODO
   const planPath = join(worktreePath, planRelpath);
-  const content = `## Plan Summary
-
-- Blocked plan
-
-## Objective
-
-None
-
-## Context
-
-None
-
-## Scope (In/Out)
-
-In: none
-Out: none
-
-## Success Criteria
-
-None
-
-## Constraints
-
-None
-
-## Assumptions
-
-None
-
-## Architecture Notes
-
-None
-
-## Decision Log
-
-None
-
-## Implementation Notes
-
-None
-
-## Plan-Specific Checks
-
-None
-
-## Review Focus
-
-None
-
-## Open Questions
-
-None
-
-## TODO
-- [x] Done task
-- [b] This task is blocked
-- [ ] Future task
-`;
+  const content = buildPlanContent({
+    title: "Blocked plan",
+    todos: ["- [x] Done task", "- [b] This task is blocked", "Future task"],
+  });
   writeFileSync(planPath, content);
 
 
@@ -122,62 +69,10 @@ test("processActivePlans: blocked plan preserves its status when unblocked", asy
 
   // Create a plan that was in review status when blocked
   const planPath = join(worktreePath, planRelpath);
-  const content = `## Plan Summary
-
-- Review plan
-
-## Objective
-
-None
-
-## Context
-
-None
-
-## Scope (In/Out)
-
-In: none
-Out: none
-
-## Success Criteria
-
-None
-
-## Constraints
-
-None
-
-## Assumptions
-
-None
-
-## Architecture Notes
-
-None
-
-## Decision Log
-
-None
-
-## Implementation Notes
-
-None
-
-## Plan-Specific Checks
-
-None
-
-## Review Focus
-
-None
-
-## Open Questions
-
-None
-
-## TODO
-- [x] Done task
-`;
+  const content = buildPlanContent({
+    title: "Review plan",
+    todos: ["- [x] Done task"],
+  });
   writeFileSync(planPath, content);
 
 

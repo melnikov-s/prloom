@@ -20,6 +20,7 @@ import {
   createTestLogger,
   writeTestConfig,
   writeInboxPlan,
+  buildPlanContent,
   getGitLog,
   applyEnvOverrides,
   readGhState,
@@ -56,16 +57,11 @@ test("local-only: ingests inbox plan and creates worktree", async () => {
 
   // Create inbox plan
   const planId = "test-plan-1";
-  const planContent = `# Test Plan
-
-## Objective
-
-Test local-only mode.
-
-## TODO
-
-- [ ] First task to complete
-`;
+  const planContent = buildPlanContent({
+    title: "Test Plan",
+    objective: "Test local-only mode.",
+    todos: ["First task to complete"],
+  });
 
   writeInboxPlan(repoRoot, planId, planContent, "opencode");
 
@@ -121,16 +117,11 @@ test("local-only: worker marks TODO done and creates commit", async () => {
 
   // Create inbox plan
   const planId = "test-plan-2";
-  const planContent = `# Test Plan
-
-## Objective
-
-Test worker execution.
-
-## TODO
-
-- [ ] Implement feature X
-`;
+  const planContent = buildPlanContent({
+    title: "Test Plan",
+    objective: "Test worker execution.",
+    todos: ["Implement feature X"],
+  });
 
   writeInboxPlan(repoRoot, planId, planContent, "opencode");
 
@@ -179,18 +170,12 @@ test("local-only: multiple TODOs are processed sequentially", async () => {
 
   // Create inbox plan with multiple TODOs
   const planId = "test-plan-3";
-  const planContent = `# Test Plan
+  const planContent = buildPlanContent({
+    title: "Test Plan",
+    objective: "Test full execution.",
+    todos: ["First task", "Second task", "Third task"],
+  });
 
-## Objective
-
-Test multiple TODOs.
-
-## TODO
-
-- [ ] First task
-- [ ] Second task
-- [ ] Third task
-`;
 
   writeInboxPlan(repoRoot, planId, planContent, "opencode");
 
@@ -252,16 +237,11 @@ test("local-only: inbox plan file is removed after ingestion", async () => {
   });
 
   const planId = "test-plan-4";
-  const planContent = `# Test Plan
-
-## Objective
-
-Test inbox cleanup.
-
-## TODO
-
-- [ ] Single task
-`;
+  const planContent = buildPlanContent({
+    title: "Test Plan",
+    objective: "Test inbox cleanup.",
+    todos: ["Single task"],
+  });
 
   writeInboxPlan(repoRoot, planId, planContent, "opencode");
 

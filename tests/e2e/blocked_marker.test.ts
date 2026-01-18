@@ -18,9 +18,11 @@ import {
   createTestLogger,
   writeTestConfig,
   writeInboxPlan,
+  buildPlanContent,
   applyEnvOverrides,
   type TempRepoResult,
 } from "./harness.js";
+
 
 import { ingestInboxPlans, processActivePlans } from "../../src/lib/dispatcher.js";
 import { loadState } from "../../src/lib/state.js";
@@ -52,17 +54,11 @@ test("blocked_marker: plan with [b] TODO is immediately blocked", async () => {
 
   // Write a plan where the first TODO has [b] marker
   const planId = "blocked-first";
-  const planContent = `# Test Plan
-
-## Objective
-
-Testing blocked marker behavior.
-
-## TODO
-
-- [b] This task is blocked and cannot proceed
-- [ ] This task should never run
-`;
+  const planContent = buildPlanContent({
+    title: "Test Plan",
+    objective: "Testing blocked marker behavior.",
+    todos: ["- [b] This task is blocked and cannot proceed", "This task should never run"],
+  });
   writeInboxPlan(repoRoot, planId, planContent, "opencode");
 
   const config = loadConfig(repoRoot);
@@ -100,18 +96,11 @@ test("blocked_marker: second TODO with [b] blocks plan after first completes", a
 
   // Write a plan where the second TODO has [b] marker
   const planId = "blocked-second";
-  const planContent = `# Test Plan
-
-## Objective
-
-Testing blocked marker on second TODO.
-
-## TODO
-
-- [ ] First task - this should complete
-- [b] This task is blocked and cannot proceed
-- [ ] This task should never run
-`;
+  const planContent = buildPlanContent({
+    title: "Test Plan",
+    objective: "Testing blocked marker on second TODO.",
+    todos: ["First task - this should complete", "- [b] This task is blocked and cannot proceed", "This task should never run"],
+  });
   writeInboxPlan(repoRoot, planId, planContent, "opencode");
 
   const config = loadConfig(repoRoot);
@@ -162,17 +151,12 @@ test("blocked_marker: worker can mark TODO as blocked via [b]", async () => {
 
   // Write a plan with one TODO
   const planId = "worker-blocks";
-  const planContent = `# Test Plan
+  const planContent = buildPlanContent({
+    title: "Test Plan",
+    objective: "Testing worker marking blocked.",
+    todos: ["Task that will be marked blocked", "Next task"],
+  });
 
-## Objective
-
-Testing worker marking TODO as blocked.
-
-## TODO
-
-- [ ] Task that will be marked blocked by worker
-- [ ] Next task
-`;
   writeInboxPlan(repoRoot, planId, planContent, "opencode");
 
   // Create custom shim that marks TODO as blocked instead of complete
@@ -256,17 +240,12 @@ test("blocked_marker: uppercase [B] is not treated as blocked", async () => {
 
   // Write a plan where a TODO has uppercase [B] (should not be recognized as blocked)
   const planId = "uppercase-b";
-  const planContent = `# Test Plan
+  const planContent = buildPlanContent({
+    title: "Test Plan",
+    objective: "Testing blocked marker behavior.",
+    todos: ["- [B] This task is uppercase"],
+  });
 
-## Objective
-
-Testing that uppercase B is not blocked.
-
-## TODO
-
-- [B] This task has uppercase B (should not block)
-- [ ] Second task
-`;
   writeInboxPlan(repoRoot, planId, planContent, "opencode");
 
   const config = loadConfig(repoRoot);

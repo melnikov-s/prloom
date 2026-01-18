@@ -17,11 +17,12 @@ import {
   createTestLogger,
   writeTestConfig,
   writeInboxPlan,
-  readTraceFile,
+  buildPlanContent,
   applyEnvOverrides,
   createThrowingPlugin,
   type TempRepoResult,
 } from "./harness.js";
+
 
 import { ingestInboxPlans, processActivePlans } from "../../src/lib/dispatcher.js";
 import { loadState } from "../../src/lib/state.js";
@@ -60,16 +61,11 @@ test("hook_error: beforeTodo hook error blocks the plan", async () => {
 
   // Write a plan
   const planId = "hook-error-before";
-  const planContent = `# Test Plan
-
-## Objective
-
-Testing beforeTodo hook error.
-
-## TODO
-
-- [ ] This task will trigger the throwing hook
-`;
+  const planContent = buildPlanContent({
+    title: "Test Plan",
+    objective: "Testing beforeTodo hook error.",
+    todos: ["This task will trigger the throwing hook"],
+  });
   writeInboxPlan(repoRoot, planId, planContent, "opencode");
 
   const config = loadConfig(repoRoot);
@@ -112,17 +108,11 @@ test("hook_error: afterTodo hook error blocks the plan", async () => {
 
   // Write a plan with two TODOs
   const planId = "hook-error-after";
-  const planContent = `# Test Plan
-
-## Objective
-
-Testing afterTodo hook error.
-
-## TODO
-
-- [ ] First task
-- [ ] Second task
-`;
+  const planContent = buildPlanContent({
+    title: "Test Plan",
+    objective: "Testing afterTodo hook error.",
+    todos: ["First task", "Second task"],
+  });
   writeInboxPlan(repoRoot, planId, planContent, "opencode");
 
   const config = loadConfig(repoRoot);
@@ -174,16 +164,12 @@ test("hook_error: beforeFinish hook error blocks the plan", async () => {
 
   // Write a plan with one TODO (will complete quickly)
   const planId = "hook-error-finish";
-  const planContent = `# Test Plan
+  const planContent = buildPlanContent({
+    title: "Test Plan",
+    objective: "Testing triage hook error.",
+    todos: ["Single task"],
+  });
 
-## Objective
-
-Testing beforeFinish hook error.
-
-## TODO
-
-- [ ] Only task
-`;
   writeInboxPlan(repoRoot, planId, planContent, "opencode");
 
   const config = loadConfig(repoRoot);
@@ -227,16 +213,12 @@ test("hook_error: hook error prevents retry loops", async () => {
 
   // Write a plan
   const planId = "no-retry-on-error";
-  const planContent = `# Test Plan
+  const planContent = buildPlanContent({
+    title: "Test Plan",
+    objective: "Testing worker hook error.",
+    todos: ["Single task"],
+  });
 
-## Objective
-
-Testing that hook errors block and don't retry.
-
-## TODO
-
-- [ ] Task that will be blocked by hook error
-`;
   writeInboxPlan(repoRoot, planId, planContent, "opencode");
 
   const config = loadConfig(repoRoot);

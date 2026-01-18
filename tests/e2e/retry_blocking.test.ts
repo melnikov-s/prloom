@@ -18,11 +18,35 @@ import {
   createTestLogger,
   writeTestConfig,
   writeInboxPlan,
-  readTraceFile,
+  buildPlanContent,
   applyEnvOverrides,
-  createFailingOpencodeShim,
+  readTraceFile,
   type TempRepoResult,
 } from "./harness.js";
+
+/**
+ * Create an opencode shim that always fails (doesn't mark TODO [x]).
+ */
+function createFailingOpencodeShim(binDir: string): void {
+  const shim = `#!/usr/bin/env node
+const fs = require("fs");
+const path = require("path");
+
+const cwd = process.cwd();
+const tracePath = path.join(cwd, "prloom", ".local", "e2e-trace.jsonl");
+
+function appendTrace(entry) {
+  fs.mkdirSync(path.dirname(tracePath), { recursive: true });
+  fs.appendFileSync(tracePath, JSON.stringify({ ...entry, ts: new Date().toISOString() }) + "\\n");
+}
+
+appendTrace({ hook: "worker", action: "failing" });
+process.exit(0);
+`;
+  const opencodePath = join(binDir, "opencode");
+  writeFileSync(opencodePath, shim);
+}
+
 
 import { ingestInboxPlans, processActivePlans } from "../../src/lib/dispatcher.js";
 import { loadState } from "../../src/lib/state.js";
@@ -54,16 +78,11 @@ test("retry_blocking: plan blocks after MAX_TODO_RETRIES (3) failed attempts", a
 
   // Write a plan with one TODO
   const planId = "retry-test";
-  const planContent = `# Test Plan
-
-## Objective
-
-Testing retry blocking behavior.
-
-## TODO
-
-- [ ] Task that worker will fail to complete
-`;
+  const planContent = buildPlanContent({
+    title: "Test Plan",
+    objective: "Testing retry blocking behavior.",
+    todos: ["Task that worker will fail to complete"],
+  });
   writeInboxPlan(repoRoot, planId, planContent, "opencode");
 
   // Replace the opencode shim with a failing one
@@ -108,17 +127,11 @@ test("retry_blocking: retry count resets when moving to a new TODO", async () =>
 
   // Write a plan with two TODOs
   const planId = "retry-reset";
-  const planContent = `# Test Plan
-
-## Objective
-
-Testing retry reset behavior.
-
-## TODO
-
-- [ ] First task
-- [ ] Second task
-`;
+  const planContent = buildPlanContent({
+    title: "Test Plan",
+    objective: "Testing retry reset behavior.",
+    todos: ["First task", "Second task"],
+  });
   writeInboxPlan(repoRoot, planId, planContent, "opencode");
 
   // Create a custom shim that fails first TODO once, then succeeds
@@ -219,16 +232,12 @@ test("retry_blocking: worker trace shows all retry attempts", async () => {
 
   // Write a plan
   const planId = "trace-retry";
-  const planContent = `# Test Plan
+  const planContent = buildPlanContent({
+    title: "Test Plan",
+    objective: "Testing manual unblock.",
+    todos: ["Task that worker will fail to complete"],
+  });
 
-## Objective
-
-Testing trace file for retries.
-
-## TODO
-
-- [ ] Task that will retry
-`;
   writeInboxPlan(repoRoot, planId, planContent, "opencode");
 
   // Use failing shim

@@ -21,6 +21,7 @@ import {
   createTestLogger,
   writeTestConfig,
   writeInboxPlan,
+  buildPlanContent,
   getGitLog,
   applyEnvOverrides,
   readGhState,
@@ -57,67 +58,15 @@ test("github-enabled: creates draft PR on ingestion", async () => {
 
   // Create inbox plan
   const planId = "gh-test-1";
-  const planContent = `## Title
-
-Feature: User Authentication
-
-## Plan Summary
-
-- Add auth endpoints
-
-## Objective
-
-Add user authentication support.
-
-## Context
-
-Plan-specific setup
-
-## Scope (In/Out)
-
-In: login endpoint
-Out: signup flow
-
-## Success Criteria
-
-- Users can log in
-
-## Constraints
-
-None
-
-## Assumptions
-
-None
-
-## Architecture Notes
-
-None
-
-## Decision Log
-
-None
-
-## Implementation Notes
-
-None
-
-## Plan-Specific Checks
-
-None
-
-## Review Focus
-
-None
-
-## Open Questions
-
-None
-
-## TODO
-
-- [ ] Implement login endpoint
-`;
+  const planContent = buildPlanContent({
+    title: "Feature: User Authentication",
+    summary: "- Add auth endpoints",
+    objective: "Add user authentication support.",
+    context: "Plan-specific setup",
+    scope: "In: login endpoint\nOut: signup flow",
+    successCriteria: "- Users can log in",
+    todos: ["Implement login endpoint"],
+  });
 
   writeInboxPlan(repoRoot, planId, planContent, "opencode");
 
@@ -163,68 +112,15 @@ test("github-enabled: updates PR body after TODO completion", async () => {
   });
 
   const planId = "gh-test-2";
-  const planContent = `## Title
-
-Test PR Body Update
-
-## Plan Summary
-
-- Validate PR body updates
-
-## Objective
-
-Test PR body updates.
-
-## Context
-
-Plan-specific setup
-
-## Scope (In/Out)
-
-In: PR body updates
-Out: review flow
-
-## Success Criteria
-
-- PR body updates after TODO
-
-## Constraints
-
-None
-
-## Assumptions
-
-None
-
-## Architecture Notes
-
-None
-
-## Decision Log
-
-None
-
-## Implementation Notes
-
-None
-
-## Plan-Specific Checks
-
-None
-
-## Review Focus
-
-None
-
-## Open Questions
-
-None
-
-## TODO
-
-- [ ] Task one
-- [ ] Task two
-`;
+  const planContent = buildPlanContent({
+    title: "Test PR Body Update",
+    summary: "- Validate PR body updates",
+    objective: "Test PR body updates.",
+    context: "Plan-specific setup",
+    scope: "In: PR body updates\nOut: review flow",
+    successCriteria: "- PR body updates after TODO",
+    todos: ["Task one", "Task two"],
+  });
 
   writeInboxPlan(repoRoot, planId, planContent, "opencode");
 
@@ -263,67 +159,15 @@ test("github-enabled: marks PR ready when all TODOs complete", async () => {
   });
 
   const planId = "gh-test-3";
-  const planContent = `## Title
-
-Single Task Plan
-
-## Plan Summary
-
-- Single task plan
-
-## Objective
-
-Test PR ready marking.
-
-## Context
-
-Plan-specific setup
-
-## Scope (In/Out)
-
-In: ready marking
-Out: extra workflows
-
-## Success Criteria
-
-- PR marked ready
-
-## Constraints
-
-None
-
-## Assumptions
-
-None
-
-## Architecture Notes
-
-None
-
-## Decision Log
-
-None
-
-## Implementation Notes
-
-None
-
-## Plan-Specific Checks
-
-None
-
-## Review Focus
-
-None
-
-## Open Questions
-
-None
-
-## TODO
-
-- [ ] The only task
-`;
+  const planContent = buildPlanContent({
+    title: "Single Task Plan",
+    summary: "- Single task plan",
+    objective: "Test PR ready marking.",
+    context: "Plan-specific setup",
+    scope: "In: ready marking\nOut: extra workflows",
+    successCriteria: "- PR marked ready",
+    todos: ["The only task"],
+  });
 
   writeInboxPlan(repoRoot, planId, planContent, "opencode");
 
@@ -369,69 +213,15 @@ test("github-enabled: full workflow with multiple TODOs", async () => {
   });
 
   const planId = "gh-test-4";
-  const planContent = `## Title
-
-Multi-Task Feature
-
-## Plan Summary
-
-- End-to-end workflow
-
-## Objective
-
-Full workflow test.
-
-## Context
-
-Plan-specific setup
-
-## Scope (In/Out)
-
-In: db schema + API + tests
-Out: deployments
-
-## Success Criteria
-
-- All TODOs complete
-
-## Constraints
-
-None
-
-## Assumptions
-
-None
-
-## Architecture Notes
-
-None
-
-## Decision Log
-
-None
-
-## Implementation Notes
-
-None
-
-## Plan-Specific Checks
-
-None
-
-## Review Focus
-
-None
-
-## Open Questions
-
-None
-
-## TODO
-
-- [ ] Setup database schema
-- [ ] Create API endpoints
-- [ ] Add tests
-`;
+  const planContent = buildPlanContent({
+    title: "Multi-Task Feature",
+    summary: "- End-to-end workflow",
+    objective: "Full workflow test.",
+    context: "Plan-specific setup",
+    scope: "In: db schema + API + tests\nOut: deployments",
+    successCriteria: "- All TODOs complete",
+    todos: ["Setup database schema", "Create API endpoints", "Add tests"],
+  });
 
   writeInboxPlan(repoRoot, planId, planContent, "opencode");
 
@@ -492,18 +282,11 @@ test("github-enabled: gh api user is called for bot login", async () => {
   });
 
   const planId = "gh-test-5";
-  const planContent = `## Title
-
-API User Test
-
-## Objective
-
-Test gh api user call.
-
-## TODO
-
-- [ ] Single task
-`;
+  const planContent = buildPlanContent({
+    title: "API User Test",
+    objective: "Test gh api user call.",
+    todos: ["Single task"],
+  });
 
   writeInboxPlan(repoRoot, planId, planContent, "opencode");
 

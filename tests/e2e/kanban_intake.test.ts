@@ -18,11 +18,12 @@ import { mkdirSync, writeFileSync, readFileSync, existsSync } from "fs";
 import {
   makeTempRepo,
   makeFakeBinaries,
-  createTestLogger,
   writeTestConfig,
+  buildPlanContent,
   applyEnvOverrides,
   type TempRepoResult,
 } from "./harness.js";
+
 
 import { loadState } from "../../src/lib/state.js";
 import { loadConfig } from "../../src/lib/config.js";
@@ -140,7 +141,10 @@ test("kanban intake: issue to plan creation", async () => {
             {
               number: 123,
               title: "Fix login bug",
-              body: "# Fix Login Bug\n\n- [ ] Reproduce issue\n- [ ] Fix code\n- [ ] Add tests",
+              body: buildPlanContent({
+                title: "Fix Login Bug",
+                todos: ["Reproduce issue", "Fix code", "Add tests"],
+              }),
             },
           ],
         },
