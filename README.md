@@ -12,7 +12,7 @@ You write a plan (a Markdown checklist), `prloom` turns it into a dedicated git 
 
 - Plans start locally in `prloom/.local/inbox/` (gitignored; clean `git status`).
 - The dispatcher ingests a plan into a new branch/worktree and opens a draft PR.
-- The plan file stays in `<worktree>/prloom/.local/plan.md` (never committed) — the PR description contains the Objective, Context, and Progress Log.
+- The plan file stays in `<worktree>/prloom/.local/plan.md` (never committed) — the PR description contains the Objective, Plan Summary, Context, and Progress Log.
 - The worker agent executes exactly one TODO per iteration and updates the local plan file.
 - PR comments/reviews trigger a triage agent which updates the plan with new TODOs and posts a reply.
 - When all TODOs are complete, the PR is marked ready; you merge when satisfied.

@@ -61,9 +61,58 @@ test("github-enabled: creates draft PR on ingestion", async () => {
 
 Feature: User Authentication
 
+## Plan Summary
+
+- Add auth endpoints
+
 ## Objective
 
 Add user authentication support.
+
+## Context
+
+Plan-specific setup
+
+## Scope (In/Out)
+
+In: login endpoint
+Out: signup flow
+
+## Success Criteria
+
+- Users can log in
+
+## Constraints
+
+None
+
+## Assumptions
+
+None
+
+## Architecture Notes
+
+None
+
+## Decision Log
+
+None
+
+## Implementation Notes
+
+None
+
+## Plan-Specific Checks
+
+None
+
+## Review Focus
+
+None
+
+## Open Questions
+
+None
 
 ## TODO
 
@@ -118,9 +167,58 @@ test("github-enabled: updates PR body after TODO completion", async () => {
 
 Test PR Body Update
 
+## Plan Summary
+
+- Validate PR body updates
+
 ## Objective
 
 Test PR body updates.
+
+## Context
+
+Plan-specific setup
+
+## Scope (In/Out)
+
+In: PR body updates
+Out: review flow
+
+## Success Criteria
+
+- PR body updates after TODO
+
+## Constraints
+
+None
+
+## Assumptions
+
+None
+
+## Architecture Notes
+
+None
+
+## Decision Log
+
+None
+
+## Implementation Notes
+
+None
+
+## Plan-Specific Checks
+
+None
+
+## Review Focus
+
+None
+
+## Open Questions
+
+None
 
 ## TODO
 
@@ -169,9 +267,58 @@ test("github-enabled: marks PR ready when all TODOs complete", async () => {
 
 Single Task Plan
 
+## Plan Summary
+
+- Single task plan
+
 ## Objective
 
 Test PR ready marking.
+
+## Context
+
+Plan-specific setup
+
+## Scope (In/Out)
+
+In: ready marking
+Out: extra workflows
+
+## Success Criteria
+
+- PR marked ready
+
+## Constraints
+
+None
+
+## Assumptions
+
+None
+
+## Architecture Notes
+
+None
+
+## Decision Log
+
+None
+
+## Implementation Notes
+
+None
+
+## Plan-Specific Checks
+
+None
+
+## Review Focus
+
+None
+
+## Open Questions
+
+None
 
 ## TODO
 
@@ -226,9 +373,58 @@ test("github-enabled: full workflow with multiple TODOs", async () => {
 
 Multi-Task Feature
 
+## Plan Summary
+
+- End-to-end workflow
+
 ## Objective
 
 Full workflow test.
+
+## Context
+
+Plan-specific setup
+
+## Scope (In/Out)
+
+In: db schema + API + tests
+Out: deployments
+
+## Success Criteria
+
+- All TODOs complete
+
+## Constraints
+
+None
+
+## Assumptions
+
+None
+
+## Architecture Notes
+
+None
+
+## Decision Log
+
+None
+
+## Implementation Notes
+
+None
+
+## Plan-Specific Checks
+
+None
+
+## Review Focus
+
+None
+
+## Open Questions
+
+None
 
 ## TODO
 

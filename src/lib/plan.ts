@@ -12,8 +12,19 @@ export interface TodoItem {
 export interface Plan {
   path: string;
   title: string;
+  planSummary: string;
   objective: string;
   context: string;
+  scope: string;
+  successCriteria: string;
+  constraints: string;
+  assumptions: string;
+  architectureNotes: string;
+  decisionLog: string;
+  implementationNotes: string;
+  planSpecificChecks: string;
+  reviewFocus: string;
+  openQuestions: string;
   todos: TodoItem[];
   progressLog: string;
   raw: string;
@@ -26,8 +37,19 @@ export function parsePlan(path: string): Plan {
   // Strip HTML comments from title so placeholder comments don't become PR titles
   const rawTitle = extractSection(raw, "Title") ?? "";
   const title = stripHtmlComments(rawTitle);
+  const planSummary = extractSection(raw, "Plan Summary") ?? "";
   const objective = extractSection(raw, "Objective") ?? "";
   const context = extractSection(raw, "Context") ?? "";
+  const scope = extractSection(raw, "Scope (In/Out)") ?? "";
+  const successCriteria = extractSection(raw, "Success Criteria") ?? "";
+  const constraints = extractSection(raw, "Constraints") ?? "";
+  const assumptions = extractSection(raw, "Assumptions") ?? "";
+  const architectureNotes = extractSection(raw, "Architecture Notes") ?? "";
+  const decisionLog = extractSection(raw, "Decision Log") ?? "";
+  const implementationNotes = extractSection(raw, "Implementation Notes") ?? "";
+  const planSpecificChecks = extractSection(raw, "Plan-Specific Checks") ?? "";
+  const reviewFocus = extractSection(raw, "Review Focus") ?? "";
+  const openQuestions = extractSection(raw, "Open Questions") ?? "";
   const progressLog = extractSection(raw, "Progress Log") ?? "";
 
   // Parse TODOs
@@ -37,8 +59,19 @@ export function parsePlan(path: string): Plan {
   return {
     path,
     title,
+    planSummary,
     objective,
     context,
+    scope,
+    successCriteria,
+    constraints,
+    assumptions,
+    architectureNotes,
+    decisionLog,
+    implementationNotes,
+    planSpecificChecks,
+    reviewFocus,
+    openQuestions,
     todos,
     progressLog,
     raw,
@@ -46,10 +79,16 @@ export function parsePlan(path: string): Plan {
 }
 
 function extractSection(content: string, heading: string): string | null {
-  const regex = new RegExp(`## ${heading}\\s*\\n([\\s\\S]*?)(?=\\n## |$)`, "i");
+  const safeHeading = escapeRegExp(heading);
+  const regex = new RegExp(`## ${safeHeading}\\s*\\n([\\s\\S]*?)(?=\\n## |$)`, "i");
   const match = content.match(regex);
   return match ? match[1]!.trim() : null;
 }
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 
 /**
  * Strip HTML comments from content.
@@ -104,8 +143,52 @@ export function findNextUnchecked(plan: Plan): TodoItem | null {
 export function extractBody(plan: Plan): string {
   let body = `## Objective\n\n${plan.objective}`;
 
+  if (plan.planSummary) {
+    body += `\n\n## Plan Summary\n\n${plan.planSummary}`;
+  }
+
   if (plan.context) {
     body += `\n\n## Context\n\n${plan.context}`;
+  }
+
+  if (plan.scope) {
+    body += `\n\n## Scope (In/Out)\n\n${plan.scope}`;
+  }
+
+  if (plan.successCriteria) {
+    body += `\n\n## Success Criteria\n\n${plan.successCriteria}`;
+  }
+
+  if (plan.constraints) {
+    body += `\n\n## Constraints\n\n${plan.constraints}`;
+  }
+
+  if (plan.assumptions) {
+    body += `\n\n## Assumptions\n\n${plan.assumptions}`;
+  }
+
+  if (plan.architectureNotes) {
+    body += `\n\n## Architecture Notes\n\n${plan.architectureNotes}`;
+  }
+
+  if (plan.decisionLog) {
+    body += `\n\n## Decision Log\n\n${plan.decisionLog}`;
+  }
+
+  if (plan.implementationNotes) {
+    body += `\n\n## Implementation Notes\n\n${plan.implementationNotes}`;
+  }
+
+  if (plan.planSpecificChecks) {
+    body += `\n\n## Plan-Specific Checks\n\n${plan.planSpecificChecks}`;
+  }
+
+  if (plan.reviewFocus) {
+    body += `\n\n## Review Focus\n\n${plan.reviewFocus}`;
+  }
+
+  if (plan.openQuestions) {
+    body += `\n\n## Open Questions\n\n${plan.openQuestions}`;
   }
 
   if (plan.progressLog) {
@@ -125,13 +208,57 @@ export function generatePlanSkeleton(): string {
 
 <!-- Short PR title (e.g., "Fix PDF viewer pagination") -->
 
+## Plan Summary
+
+<!-- 3-6 bullets capturing scope at a glance -->
+
 ## Objective
 
 <!-- Describe what will be built -->
 
 ## Context
 
-<!-- Key files, test commands, constraints -->
+<!-- Plan-specific background, key files, constraints -->
+
+## Scope (In/Out)
+
+<!-- What's included vs explicitly excluded -->
+
+## Success Criteria
+
+<!-- Measurable outcomes that define done -->
+
+## Constraints
+
+<!-- Non-obvious requirements or guardrails -->
+
+## Assumptions
+
+<!-- Reasonable defaults the worker can proceed with -->
+
+## Architecture Notes
+
+<!-- Components, invariants, data flow -->
+
+## Decision Log
+
+<!-- Decision + rationale + rejected options -->
+
+## Implementation Notes
+
+<!-- Gotchas, file paths, non-obvious details -->
+
+## Plan-Specific Checks
+
+<!-- Extra commands beyond repo defaults (optional) -->
+
+## Review Focus
+
+<!-- Areas reviewers should double-check (optional) -->
+
+## Open Questions
+
+<!-- Unknowns to resolve -->
 
 ## TODO
 

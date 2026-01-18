@@ -32,15 +32,66 @@ test("processActivePlans: immediately blocks plan with [b] marker", async () => 
 
   // Create an active plan with a blocked TODO
   const planPath = join(worktreePath, planRelpath);
-  const content = `---
-id: ${id}
----
+  const content = `## Plan Summary
+
+- Blocked plan
+
+## Objective
+
+None
+
+## Context
+
+None
+
+## Scope (In/Out)
+
+In: none
+Out: none
+
+## Success Criteria
+
+None
+
+## Constraints
+
+None
+
+## Assumptions
+
+None
+
+## Architecture Notes
+
+None
+
+## Decision Log
+
+None
+
+## Implementation Notes
+
+None
+
+## Plan-Specific Checks
+
+None
+
+## Review Focus
+
+None
+
+## Open Questions
+
+None
+
 ## TODO
 - [x] Done task
 - [b] This task is blocked
 - [ ] Future task
 `;
   writeFileSync(planPath, content);
+
 
   const config = loadConfig(repoRoot);
   const state: State = {
@@ -71,13 +122,64 @@ test("processActivePlans: blocked plan preserves its status when unblocked", asy
 
   // Create a plan that was in review status when blocked
   const planPath = join(worktreePath, planRelpath);
-  const content = `---
-id: ${id}
----
+  const content = `## Plan Summary
+
+- Review plan
+
+## Objective
+
+None
+
+## Context
+
+None
+
+## Scope (In/Out)
+
+In: none
+Out: none
+
+## Success Criteria
+
+None
+
+## Constraints
+
+None
+
+## Assumptions
+
+None
+
+## Architecture Notes
+
+None
+
+## Decision Log
+
+None
+
+## Implementation Notes
+
+None
+
+## Plan-Specific Checks
+
+None
+
+## Review Focus
+
+None
+
+## Open Questions
+
+None
+
 ## TODO
 - [x] Done task
 `;
   writeFileSync(planPath, content);
+
 
   const config = loadConfig(repoRoot);
   const state: State = {

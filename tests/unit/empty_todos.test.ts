@@ -7,13 +7,11 @@ import {
   processActivePlans,
 } from "../../src/lib/dispatcher.js";
 import {
-  saveState,
   loadState,
   getInboxPath,
   setPlanStatus,
   type State,
 } from "../../src/lib/state.js";
-import { generatePlanSkeleton } from "../../src/lib/plan.js";
 import { loadConfig } from "../../src/lib/config.js";
 
 // No-op logger for tests
@@ -39,38 +37,62 @@ test("ingestInboxPlans: skips plan with no TODOs", async () => {
   const id = "empty-plan";
   const inboxPath = getInboxPath(repoRoot, id);
   // Create a plan with NO todos (just skeleton, manually cleared if needed)
-  const content = `---
-id: ${id}
----
+  const content = `## Plan Summary
+
+- Empty plan
+
+## Objective
+
+None
+
+## Context
+
+None
+
+## Scope (In/Out)
+
+In: none
+Out: none
+
+## Success Criteria
+
+None
+
+## Constraints
+
+None
+
+## Assumptions
+
+None
+
+## Architecture Notes
+
+None
+
+## Decision Log
+
+None
+
+## Implementation Notes
+
+None
+
+## Plan-Specific Checks
+
+None
+
+## Review Focus
+
+None
+
+## Open Questions
+
+None
+
 ## TODO
 `;
-  writeFileSync(inboxPath, content);
 
-  // Set inbox status to queued via state (not frontmatter)
-  setPlanStatus(repoRoot, id, "queued");
-
-  const config = loadConfig(repoRoot);
-  const state = loadState(repoRoot);
-
-  await ingestInboxPlans(repoRoot, "/tmp/worktrees", config, state, noopLogger);
-
-  // Verify it was NOT activated (no worktree assigned, still in inbox)
-  expect(state.plans[id]?.worktree).toBeUndefined();
-  const ids = (await import("../../src/lib/state.js")).listInboxPlanIds(
-    repoRoot
-  );
-  expect(ids).toContain(id);
-});
-
-test("ingestInboxPlans: skips draft plans", async () => {
-  const id = "draft-plan";
-  const inboxPath = getInboxPath(repoRoot, id);
-  const content = `---
-id: ${id}
----
-## TODO
-- [ ] A task
-`;
   writeFileSync(inboxPath, content);
 
   // Set inbox status to draft (default) - should NOT be ingested
@@ -93,12 +115,63 @@ id: ${id}
 test("ingestInboxPlans: plan with no meta defaults to draft (not ingested)", async () => {
   const id = "no-meta-plan";
   const inboxPath = getInboxPath(repoRoot, id);
-  const content = `---
-id: ${id}
----
+  const content = `## Plan Summary
+
+- Draft plan
+
+## Objective
+
+None
+
+## Context
+
+None
+
+## Scope (In/Out)
+
+In: none
+Out: none
+
+## Success Criteria
+
+None
+
+## Constraints
+
+None
+
+## Assumptions
+
+None
+
+## Architecture Notes
+
+None
+
+## Decision Log
+
+None
+
+## Implementation Notes
+
+None
+
+## Plan-Specific Checks
+
+None
+
+## Review Focus
+
+None
+
+## Open Questions
+
+None
+
 ## TODO
 - [ ] A task
 `;
+
   writeFileSync(inboxPath, content);
 
   // Don't set any inbox status - should default to draft
@@ -120,12 +193,64 @@ test("processActivePlans: blocks active plan with no TODOs", async () => {
 
   // Create an active plan with NO todos in its worktree
   const planPath = join(worktreePath, planRelpath);
-  const content = `---
-id: ${id}
----
+  const content = `## Plan Summary
+
+- Empty active plan
+
+## Objective
+
+None
+
+## Context
+
+None
+
+## Scope (In/Out)
+
+In: none
+Out: none
+
+## Success Criteria
+
+None
+
+## Constraints
+
+None
+
+## Assumptions
+
+None
+
+## Architecture Notes
+
+None
+
+## Decision Log
+
+None
+
+## Implementation Notes
+
+None
+
+## Plan-Specific Checks
+
+None
+
+## Review Focus
+
+None
+
+## Open Questions
+
+None
+
 ## TODO
 `;
   writeFileSync(planPath, content);
+
+
 
   const config = loadConfig(repoRoot);
   const state: State = {

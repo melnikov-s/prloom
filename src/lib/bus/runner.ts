@@ -81,7 +81,8 @@ export async function initBusRunner(
   // Per RFC: derive github.enabled from review.provider when review config is present
   const githubConfig = config.bridges.github;
   const githubEnabled = deriveGitHubEnabled(config);
-  if (githubEnabled && !githubConfig?.module) {
+  const githubBridgeEnabled = githubConfig?.enabled !== false;
+  if (githubEnabled && githubBridgeEnabled && !githubConfig?.module) {
     registry.register(githubBridge);
   }
 

@@ -198,6 +198,10 @@ test("prloom edit prompt includes plan structure guidance", async () => {
 
   const planContent = `# My Feature
 
+## Plan Summary
+
+- Basic plan
+
 ## Objective
 
 Build something cool.
@@ -205,6 +209,47 @@ Build something cool.
 ## Context
 
 N/A
+
+## Scope (In/Out)
+
+In: basic example
+Out: none
+
+## Success Criteria
+
+- Plan can be edited
+
+## Constraints
+
+None
+
+## Assumptions
+
+None
+
+## Architecture Notes
+
+None
+
+## Decision Log
+
+None
+
+## Implementation Notes
+
+None
+
+## Plan-Specific Checks
+
+None
+
+## Review Focus
+
+None
+
+## Open Questions
+
+None
 
 ## TODO
 

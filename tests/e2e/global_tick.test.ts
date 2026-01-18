@@ -167,7 +167,8 @@ test("global tick: bridge emits upsert_plan, core bridge creates inbox plan", as
             {
               id: 123,
               title: "Fix login bug",
-              body: "# Fix Login Bug\n\n## Objective\n\nFix the login issue.\n\n## TODO\n\n- [ ] Reproduce issue\n- [ ] Fix code",
+                body: "# Fix Login Bug\n\n## Plan Summary\n\n- Login fix\n\n## Objective\n\nFix the login issue.\n\n## Context\n\nPlan-specific setup\n\n## Scope (In/Out)\n\nIn: login flow\nOut: signup flow\n\n## Success Criteria\n\n- Login works\n\n## Constraints\n\nNone\n\n## Assumptions\n\nNone\n\n## Architecture Notes\n\nNone\n\n## Decision Log\n\nNone\n\n## Implementation Notes\n\nNone\n\n## Plan-Specific Checks\n\nNone\n\n## Review Focus\n\nNone\n\n## Open Questions\n\nNone\n\n## TODO\n\n- [ ] Reproduce issue\n- [ ] Fix code",
+
             },
           ],
         },
@@ -262,7 +263,8 @@ test("global tick: plan_created lifecycle event emitted", async () => {
             {
               id: 789,
               title: "New feature",
-              body: "# New Feature\n\n## TODO\n\n- [ ] Implement",
+                body: "# New Feature\n\n## Plan Summary\n\n- New feature\n\n## Objective\n\nShip the feature\n\n## Context\n\nPlan-specific setup\n\n## Scope (In/Out)\n\nIn: feature\nOut: extras\n\n## Success Criteria\n\n- Feature works\n\n## Constraints\n\nNone\n\n## Assumptions\n\nNone\n\n## Architecture Notes\n\nNone\n\n## Decision Log\n\nNone\n\n## Implementation Notes\n\nNone\n\n## Plan-Specific Checks\n\nNone\n\n## Review Focus\n\nNone\n\n## Open Questions\n\nNone\n\n## TODO\n\n- [ ] Implement",
+
             },
           ],
         },
@@ -281,7 +283,8 @@ test("global tick: plan_created lifecycle event emitted", async () => {
   const createdEvent = events.find((e) => e.type === "plan_created");
 
   expect(createdEvent).toBeDefined();
-  expect(createdEvent!.context?.source?.id).toBe("789");
+  const source = createdEvent!.context?.source as { id?: string } | undefined;
+  expect(source?.id).toBe("789");
 });
 
 test("global tick: global plugin receives plan_created event", async () => {
@@ -305,7 +308,8 @@ test("global tick: global plugin receives plan_created event", async () => {
             {
               id: 999,
               title: "Plugin test",
-              body: "# Plugin Test\n\n## TODO\n\n- [ ] Test",
+                body: "# Plugin Test\n\n## Plan Summary\n\n- Plugin test\n\n## Objective\n\nValidate plugin\n\n## Context\n\nPlan-specific setup\n\n## Scope (In/Out)\n\nIn: plugin test\nOut: extras\n\n## Success Criteria\n\n- Plugin runs\n\n## Constraints\n\nNone\n\n## Assumptions\n\nNone\n\n## Architecture Notes\n\nNone\n\n## Decision Log\n\nNone\n\n## Implementation Notes\n\nNone\n\n## Plan-Specific Checks\n\nNone\n\n## Review Focus\n\nNone\n\n## Open Questions\n\nNone\n\n## TODO\n\n- [ ] Test",
+
             },
           ],
         },

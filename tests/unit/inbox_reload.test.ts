@@ -37,13 +37,64 @@ test("setPlanStatus persists status to disk and can be read back", () => {
   const inboxPath = getInboxPath(repoRoot, id);
   writeFileSync(
     inboxPath,
-    `---
-id: ${id}
----
+    `## Plan Summary
+
+- Queued plan
+
+## Objective
+
+None
+
+## Context
+
+None
+
+## Scope (In/Out)
+
+In: none
+Out: none
+
+## Success Criteria
+
+None
+
+## Constraints
+
+None
+
+## Assumptions
+
+None
+
+## Architecture Notes
+
+None
+
+## Decision Log
+
+None
+
+## Implementation Notes
+
+None
+
+## Plan-Specific Checks
+
+None
+
+## Review Focus
+
+None
+
+## Open Questions
+
+None
+
 ## TODO
 - [ ] A task
 `
   );
+
 
   // Initially no meta should default to draft
   expect(getPlanMeta(repoRoot, id).status).toBe("draft");
@@ -64,13 +115,64 @@ test("dispatcher sees plan status changes made externally (simulates UI → disp
   const inboxPath = getInboxPath(repoRoot, id);
   writeFileSync(
     inboxPath,
-    `---
-id: ${id}
----
+    `## Plan Summary
+
+- Inbox plan
+
+## Objective
+
+None
+
+## Context
+
+None
+
+## Scope (In/Out)
+
+In: none
+Out: none
+
+## Success Criteria
+
+None
+
+## Constraints
+
+None
+
+## Assumptions
+
+None
+
+## Architecture Notes
+
+None
+
+## Decision Log
+
+None
+
+## Implementation Notes
+
+None
+
+## Plan-Specific Checks
+
+None
+
+## Review Focus
+
+None
+
+## Open Questions
+
+None
+
 ## TODO
-- [ ] Task one
+- [ ] A task
 `
   );
+
 
   // Simulate dispatcher having an in-memory state with plan as draft
   const dispatcherState: State = {
@@ -109,13 +211,64 @@ test("ingestInboxPlans picks up plans queued by external process", async () => {
   const inboxPath = getInboxPath(repoRoot, id);
   writeFileSync(
     inboxPath,
-    `---
-id: ${id}
----
+    `## Plan Summary
+
+- Queued plan
+
+## Objective
+
+None
+
+## Context
+
+None
+
+## Scope (In/Out)
+
+In: none
+Out: none
+
+## Success Criteria
+
+None
+
+## Constraints
+
+None
+
+## Assumptions
+
+None
+
+## Architecture Notes
+
+None
+
+## Decision Log
+
+None
+
+## Implementation Notes
+
+None
+
+## Plan-Specific Checks
+
+None
+
+## Review Focus
+
+None
+
+## Open Questions
+
+None
+
 ## TODO
 - [ ] A task
 `
   );
+
 
   // Start with draft in state
   setPlanStatus(repoRoot, id, "draft");
@@ -151,11 +304,121 @@ test("plan status survives state reload with other plans present", () => {
   // Create two inbox plans
   writeFileSync(
     getInboxPath(repoRoot, id1),
-    `---\nid: ${id1}\n---\n## TODO\n- [ ] Task\n`
+    `## Plan Summary
+
+- Plan one
+
+## Objective
+
+None
+
+## Context
+
+None
+
+## Scope (In/Out)
+
+In: none
+Out: none
+
+## Success Criteria
+
+None
+
+## Constraints
+
+None
+
+## Assumptions
+
+None
+
+## Architecture Notes
+
+None
+
+## Decision Log
+
+None
+
+## Implementation Notes
+
+None
+
+## Plan-Specific Checks
+
+None
+
+## Review Focus
+
+None
+
+## Open Questions
+
+None
+
+## TODO
+- [ ] Task
+`
   );
   writeFileSync(
     getInboxPath(repoRoot, id2),
-    `---\nid: ${id2}\n---\n## TODO\n- [ ] Task\n`
+    `## Plan Summary
+
+- Plan two
+
+## Objective
+
+None
+
+## Context
+
+None
+
+## Scope (In/Out)
+
+In: none
+Out: none
+
+## Success Criteria
+
+None
+
+## Constraints
+
+None
+
+## Assumptions
+
+None
+
+## Architecture Notes
+
+None
+
+## Decision Log
+
+None
+
+## Implementation Notes
+
+None
+
+## Plan-Specific Checks
+
+None
+
+## Review Focus
+
+None
+
+## Open Questions
+
+None
+
+## TODO
+- [ ] Task
+`
   );
 
   // Set different statuses
@@ -177,13 +440,64 @@ test("ingestInboxPlans uses filename as plan ID (frontmatter ID is ignored)", as
 
   writeFileSync(
     inboxPath,
-    `---
-id: abc123
----
+    `## Plan Summary
+
+- External change plan
+
+## Objective
+
+None
+
+## Context
+
+None
+
+## Scope (In/Out)
+
+In: none
+Out: none
+
+## Success Criteria
+
+None
+
+## Constraints
+
+None
+
+## Assumptions
+
+None
+
+## Architecture Notes
+
+None
+
+## Decision Log
+
+None
+
+## Implementation Notes
+
+None
+
+## Plan-Specific Checks
+
+None
+
+## Review Focus
+
+None
+
+## Open Questions
+
+None
+
 ## TODO
-- [ ] A task
+- [ ] Task one
 `
   );
+
 
   // Set status using the filename (which is now the plan ID)
   setPlanStatus(repoRoot, filename, "queued");

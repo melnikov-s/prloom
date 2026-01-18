@@ -38,7 +38,10 @@ test("renderWorkerPrompt uses built-in template", () => {
   expect(prompt).toContain("Sample plan fixture");
   expect(prompt).toContain("prloom/.local/plan.md");
   expect(prompt).toContain("## TODO");
-  expect(prompt).toContain("sample");
+  expect(prompt).toContain("Sample plan fixture");
+  expect(prompt).toContain("Plan Summary");
+  expect(prompt).toContain("Plan-Specific Checks");
+  expect(prompt).toContain("Sample summary item");
 });
 
 test("renderDesignerNewPrompt includes path and context", () => {

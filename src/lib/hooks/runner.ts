@@ -47,21 +47,34 @@ A prloom plan is a markdown file with the following structure:
 
 ### Sections
 - **Title (h1)**: Short PR title (e.g., "# Fix PDF viewer pagination")
+- **Plan Summary (h2)**: 3-6 bullets capturing scope at a glance
 - **Objective (h2)**: What will be built (1-2 sentences)
-- **Context (h2)**: Files to modify, constraints, notes for the Worker
+- **Context (h2)**: Plan-specific background, key files, constraints
+- **Scope (In/Out) (h2)**: What's included vs explicitly excluded
+- **Success Criteria (h2)**: Measurable outcomes that define "done"
+- **Constraints (h2)**: Non-obvious requirements or guardrails
+- **Assumptions (h2)**: Reasonable defaults the worker can proceed with
+- **Architecture Notes (h2)**: Components, invariants, data flow
+- **Decision Log (h2)**: Decision + rationale + rejected options
+- **Implementation Notes (h2)**: Gotchas, file paths, non-obvious details
+- **Plan-Specific Checks (h2)**: Extra commands beyond repo defaults (optional)
+- **Review Focus (h2)**: Areas reviewers should double-check (optional)
+- **Open Questions (h2)**: Unknowns to resolve
 - **TODOs (h2)**: Checklist of tasks, each becomes one commit
+- **Progress Log (h2)**: Worker-appended status updates
 
 ### TODO Syntax
 - \`- [ ] Task description\` — Unchecked task
 - \`- [x] Task description\` — Completed task
-- \`- [!] Task description\` — Blocked task (stops execution)
+- \`- [b] Task description\` — Blocked task (needs follow-up)
 
 ### Rules
 1. Each TODO should be ONE atomic commit
 2. TODOs are executed in order, top to bottom
 3. Only mark a TODO complete when the work is done
-4. Use [!] to block if human intervention is needed
+4. Use [b] to mark tasks blocked by external issues
 `;
+
 
 // =============================================================================
 // Hook Execution

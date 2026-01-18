@@ -32,7 +32,7 @@ prloom is a dispatcher-based system that manages coding work through **plans**.
 
 ### Plans
 
-A plan is a markdown file with sections: Title, Objective, Context, TODO, Progress Log. Inbox plans live at `prloom/.local/inbox/<id>.md` with metadata in `prloom/.local/inbox/<id>.json`. When activated, the plan is copied to `<worktree>/prloom/.local/plan.md` (still gitignored).
+A plan is a markdown file with sections: Title, Plan Summary, Objective, Context, Scope (In/Out), Success Criteria, Constraints, Assumptions, Architecture Notes, Decision Log, Implementation Notes, Plan-Specific Checks, Review Focus, Open Questions, TODO, Progress Log. Inbox plans live at `prloom/.local/inbox/<id>.md` with metadata in `prloom/.local/inbox/<id>.json`. When activated, the plan is copied to `<worktree>/prloom/.local/plan.md` (still gitignored).
 
 ### Worktrees
 

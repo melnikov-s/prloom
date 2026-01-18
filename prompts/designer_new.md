@@ -65,12 +65,18 @@ Then:
 The plan file already has a template with these sections. Fill them in:
 
 - **Title**: Short PR title (e.g., "Fix PDF viewer pagination")
+- **Plan Summary**: 3-6 bullets capturing scope at a glance
 - **Objective**: What will be built (1-2 sentences)
+- **Context**: Plan-specific background, key files, constraints
 - **Scope (In/Out)**: What's included vs explicitly excluded
-- **Constraints**: Non-obvious constraints (policy, perf, licensing)
+- **Success Criteria**: Measurable outcomes that define "done"
+- **Constraints**: Non-obvious requirements or guardrails for this plan
+- **Assumptions**: Reasonable defaults the worker can proceed with
 - **Architecture Notes**: Components, invariants, data flow
 - **Decision Log**: Decision + rationale + rejected options
-- **Implementation Notes**: Gotchas, file paths, test commands
+- **Implementation Notes**: Gotchas, file paths, non-obvious details
+- **Plan-Specific Checks**: Extra commands beyond repo defaults (optional)
+- **Review Focus**: Areas reviewers should double-check (optional)
 - **Open Questions**: Unknowns to resolve
 - **TODO (Commits)**: Each item is ONE commit the Worker will make
 
@@ -90,7 +96,7 @@ Each TODO item represents a **single commit**. Think of them as the git log you 
 - `Trace the code to understand X` — this is research, not a commit
 - `Validate acceptance criteria` — this is testing, not a commit
 
-If there are tests or type-checks to run, specify them in the Implementation Notes section (e.g., `npm test`, `npm run typecheck`). The Worker will only run what you specify.
+If there are plan-specific checks to run, list them in **Plan-Specific Checks** (these are in addition to repo defaults from `prloom/worker.md`).
 
 ## Important
 
