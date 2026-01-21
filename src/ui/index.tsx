@@ -20,11 +20,14 @@ interface RenderTUIOptions {
   spawnPlan?: (args: string[]) => void;
 }
 
-function TUIRunner({ repoRoot, spawnPlan }: TUIRunnerProps): React.ReactElement {
+function TUIRunner({
+  repoRoot,
+  spawnPlan,
+}: TUIRunnerProps): React.ReactElement {
   const { exit } = useApp();
 
   const [uiState, setUIState] = useState<DispatcherUIState>(
-    dispatcherEvents.getUIState()
+    dispatcherEvents.getUIState(),
   );
   const [planTodos, setPlanTodos] = useState<
     Map<string, { done: number; total: number }>
@@ -37,8 +40,9 @@ function TUIRunner({ repoRoot, spawnPlan }: TUIRunnerProps): React.ReactElement 
   const [isInActionMode, setIsInActionMode] = useState(false);
   const [isCreatingPlan, setIsCreatingPlan] = useState(false);
   const [newPlanBranch, setNewPlanBranch] = useState("");
-  const [newPlanBranchError, setNewPlanBranchError] =
-    useState<string | null>(null);
+  const [newPlanBranchError, setNewPlanBranchError] = useState<string | null>(
+    null,
+  );
   const [newPlanPresets, setNewPlanPresets] = useState<string[]>([]);
   const [selectedPresetIndex, setSelectedPresetIndex] = useState(0);
 
@@ -49,7 +53,7 @@ function TUIRunner({ repoRoot, spawnPlan }: TUIRunnerProps): React.ReactElement 
   // Get current plan info
   const currentPlanId = allPlanIds[selectedPlanIndex];
   const currentStatus = currentPlanId
-    ? uiState.state.plans[currentPlanId]?.status ?? "draft"
+    ? (uiState.state.plans[currentPlanId]?.status ?? "draft")
     : "active";
   const availableActions = getAvailableActions(currentStatus);
 
@@ -90,7 +94,7 @@ function TUIRunner({ repoRoot, spawnPlan }: TUIRunnerProps): React.ReactElement 
         });
       }
     },
-    [repoRoot, exit]
+    [repoRoot, exit],
   );
 
   const startNewPlan = useCallback(
@@ -114,7 +118,7 @@ function TUIRunner({ repoRoot, spawnPlan }: TUIRunnerProps): React.ReactElement 
         stdio: "inherit",
       });
     },
-    [exit, spawnPlan]
+    [exit, spawnPlan],
   );
 
   const openNewPlanDialog = useCallback(() => {
@@ -162,7 +166,7 @@ function TUIRunner({ repoRoot, spawnPlan }: TUIRunnerProps): React.ReactElement 
         return;
       }
 
-      if (key.backspace) {
+      if (key.backspace || key.delete) {
         setNewPlanBranch((prev) => prev.slice(0, -1));
         if (newPlanBranchError) {
           setNewPlanBranchError(null);
@@ -173,13 +177,13 @@ function TUIRunner({ repoRoot, spawnPlan }: TUIRunnerProps): React.ReactElement 
       if (presetCount > 0) {
         if (key.upArrow) {
           setSelectedPresetIndex((prev) =>
-            prev > 0 ? prev - 1 : presetCount - 1
+            prev > 0 ? prev - 1 : presetCount - 1,
           );
           return;
         }
         if (key.downArrow) {
           setSelectedPresetIndex((prev) =>
-            prev < presetCount - 1 ? prev + 1 : 0
+            prev < presetCount - 1 ? prev + 1 : 0,
           );
           return;
         }
@@ -220,11 +224,11 @@ function TUIRunner({ repoRoot, spawnPlan }: TUIRunnerProps): React.ReactElement 
       // In action mode - navigate between actions
       if (key.leftArrow) {
         setSelectedActionIndex((prev) =>
-          prev > 0 ? prev - 1 : availableActions.length - 1
+          prev > 0 ? prev - 1 : availableActions.length - 1,
         );
       } else if (key.rightArrow) {
         setSelectedActionIndex((prev) =>
-          prev < availableActions.length - 1 ? prev + 1 : 0
+          prev < availableActions.length - 1 ? prev + 1 : 0,
         );
       } else if (key.upArrow) {
         // Go back to plan selection (collapse)
@@ -350,7 +354,7 @@ function TUIRunner({ repoRoot, spawnPlan }: TUIRunnerProps): React.ReactElement 
 
 export async function renderTUI(
   repoRoot: string,
-  options: RenderTUIOptions = {}
+  options: RenderTUIOptions = {},
 ): Promise<void> {
   dispatcherEvents.start();
 
@@ -358,7 +362,10 @@ export async function renderTUI(
   const initialState = loadState(repoRoot);
   dispatcherEvents.setState(initialState);
 
-  const renderOptions: { stdin?: NodeJS.ReadStream; stdout?: NodeJS.WriteStream } = {};
+  const renderOptions: {
+    stdin?: NodeJS.ReadStream;
+    stdout?: NodeJS.WriteStream;
+  } = {};
   if (options.stdin) {
     renderOptions.stdin = options.stdin;
   }
@@ -368,7 +375,7 @@ export async function renderTUI(
 
   const { waitUntilExit } = render(
     <TUIRunner repoRoot={repoRoot} spawnPlan={options.spawnPlan} />,
-    renderOptions
+    renderOptions,
   );
 
   await waitUntilExit();
