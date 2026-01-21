@@ -44,6 +44,11 @@ export async function runInit(
       worktrees_dir: existing.worktrees_dir,
       github_poll_interval_ms: existing.github_poll_interval_ms,
       base_branch: defaultBranch,
+      // RFC: Commit Review Gate - set enabled: true to activate
+      commitReview: {
+        enabled: false,
+        maxLoops: 2,
+      },
     };
     writeFileSync(configPath, JSON.stringify(config, null, 2) + "\n");
     console.log(`Wrote ${configPath}`);

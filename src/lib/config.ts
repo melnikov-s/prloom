@@ -192,6 +192,11 @@ const DEFAULTS: Config = {
   base_branch: "main",
   bus: DEFAULT_BUS,
   bridges: DEFAULT_BRIDGES,
+  // RFC: Commit Review Gate - disabled by default, set enabled: true to activate
+  commitReview: {
+    enabled: false,
+    maxLoops: 2,
+  },
 };
 
 export function loadConfig(repoRoot: string): Config {
