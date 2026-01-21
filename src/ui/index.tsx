@@ -198,9 +198,14 @@ function TUIRunner({
         !key.leftArrow &&
         !key.rightArrow
       ) {
-        setNewPlanBranch((prev) => prev + input);
-        if (newPlanBranchError) {
-          setNewPlanBranchError(null);
+        // Filter out invalid Git branch name characters:
+        // space, ~, ^, :, ?, *, [, \, and control characters (ASCII < 32 or 127)
+        const filtered = input.replace(/[\s~^:?*[\\\x00-\x1f\x7f]/g, "");
+        if (filtered) {
+          setNewPlanBranch((prev) => prev + filtered);
+          if (newPlanBranchError) {
+            setNewPlanBranchError(null);
+          }
         }
       }
 
