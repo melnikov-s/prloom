@@ -89,6 +89,7 @@ test("loadConfig reads agents from config file with new structure", () => {
         claude: {
           default: "sonnet",
           designer: "opus",
+          maxTokens: 9000,
         },
       },
       base_branch: "develop",
@@ -100,6 +101,9 @@ test("loadConfig reads agents from config file with new structure", () => {
   expect(config.agents.default).toBe("claude");
   expect(config.agents.claude?.default).toBe("sonnet");
   expect(config.agents.claude?.designer).toBe("opus");
+  expect((config.agents.claude as Record<string, unknown>)?.maxTokens).toBe(
+    9000
+  );
 });
 
 test("loadConfig ignores invalid agent names", () => {
@@ -203,6 +207,51 @@ test("getAgentConfig respects agent override parameter", () => {
   const claudeWorker = getAgentConfig(config, "worker", "claude");
   expect(claudeWorker.agent).toBe("claude");
   expect(claudeWorker.model).toBe("opus");
+});
+
+test("getAgentConfig resolves stage presets to agent and model", () => {
+  mkdirSync(join(TEST_DIR, "prloom"), { recursive: true });
+  writeFileSync(
+    join(TEST_DIR, "prloom", "config.json"),
+    JSON.stringify({
+      models: {
+        High: { agent: "claude", model: "opus" },
+      },
+      stages: {
+        worker: "high",
+      },
+      agents: {
+        default: "opencode",
+      },
+    })
+  );
+
+  const config = loadConfig(TEST_DIR);
+  const workerConfig = getAgentConfig(config, "worker");
+
+  expect(workerConfig.agent).toBe("claude");
+  expect(workerConfig.model).toBe("opus");
+});
+
+test("getAgentConfig accepts agent/model objects for stage overrides", () => {
+  mkdirSync(join(TEST_DIR, "prloom"), { recursive: true });
+  writeFileSync(
+    join(TEST_DIR, "prloom", "config.json"),
+    JSON.stringify({
+      stages: {
+        worker: { agent: "claude", model: "opus" },
+      },
+      agents: {
+        default: "opencode",
+      },
+    })
+  );
+
+  const config = loadConfig(TEST_DIR);
+  const workerConfig = getAgentConfig(config, "worker");
+
+  expect(workerConfig.agent).toBe("claude");
+  expect(workerConfig.model).toBe("opus");
 });
 
 // =============================================================================

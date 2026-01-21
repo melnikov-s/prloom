@@ -69,6 +69,8 @@ Plans can be marked `hidden` in metadata (typically via global bridges). Hidden 
 
 | Stage | Purpose | Config key |
 |-------|---------|------------|
-| designer | Creates plan from user description | `agents.<name>.designer` |
-| worker | Executes individual TODOs | `agents.<name>.worker` |
-| triage | Processes PR feedback into TODOs | `agents.<name>.triage` |
+| designer | Creates plan from user description | `stages.designer` or `agents.<name>.designer` |
+| worker | Executes individual TODOs | `stages.worker` or `agents.<name>.worker` |
+| triage | Processes PR feedback into TODOs | `stages.triage` or `agents.<name>.triage` |
+
+Stage entries in `stages` can use model presets or inline `{ agent, model }` objects to override the agent and model for that stage. If unset, prloom falls back to the per-agent model settings in `agents.<name>.*`.

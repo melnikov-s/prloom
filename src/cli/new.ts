@@ -4,6 +4,7 @@ import {
   getAgentConfig,
   getPresetNames,
   resolveConfig,
+  resolveModelRef,
 } from "../lib/config.js";
 import { getAdapter, type AgentName } from "../lib/adapters/index.js";
 import { nanoid } from "nanoid";
@@ -59,7 +60,9 @@ export async function runNew(
 
   // Resolve designer agent: CLI flag > config.designer > config.default
   const designerConfig = getAgentConfig(config, "designer");
-  const designerAgent = (agentOverride as AgentName) ?? designerConfig.agent;
+  const modelOverride = resolveModelRef(config, model);
+  const designerAgent =
+    modelOverride?.agent ?? (agentOverride as AgentName) ?? designerConfig.agent;
 
   // Resolve worker agent: CLI flag > config.default
   const workerConfig = getAgentConfig(config, "worker");
@@ -153,7 +156,7 @@ export async function runNew(
   await adapter.interactive({
     cwd: repoRoot,
     prompt,
-    model: model ?? designerConfig.model,
+    model: modelOverride?.model ?? designerConfig.model,
   });
 
   console.log("");

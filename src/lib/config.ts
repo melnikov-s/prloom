@@ -90,7 +90,7 @@ export interface CommitReviewConfig {
   /** Agent to use for review (overrides default) */
   agent?: AgentName;
   /** Model to use for review */
-  model?: string;
+  model?: ModelRef;
 }
 
 /**
@@ -100,6 +100,8 @@ export interface CommitReviewConfig {
 export interface PresetConfig {
   github?: Partial<GithubConfig>;
   agents?: Partial<AgentsConfig>;
+  models?: Record<string, ModelPreset>;
+  stages?: Partial<StageModelConfig>;
   github_poll_interval_ms?: number;
   base_branch?: string;
   /** Plugin overrides (enable/disable, config overrides) */
@@ -107,6 +109,27 @@ export interface PresetConfig {
 }
 
 export type AgentStage = "designer" | "worker" | "triage" | "commitReview";
+
+/**
+ * Named model preset combining agent and model selection.
+ */
+export interface ModelPreset {
+  agent: AgentName;
+  model?: string;
+}
+
+export type ModelRef = string | ModelPreset;
+
+/**
+ * Stage-specific agent/model configuration.
+ */
+export interface StageModelConfig {
+  default?: ModelRef;
+  designer?: ModelRef;
+  worker?: ModelRef;
+  triage?: ModelRef;
+  commitReview?: ModelRef;
+}
 
 /**
  * Model configuration for a specific agent.
@@ -120,6 +143,10 @@ export interface AgentModelConfig {
   commitReview?: string;
 }
 
+export interface AgentConfig extends AgentModelConfig {
+  [key: string]: unknown;
+}
+
 /**
  * Agents configuration.
  * - `default`: which agent to use by default
@@ -127,11 +154,11 @@ export interface AgentModelConfig {
  */
 export interface AgentsConfig {
   default: AgentName;
-  amp?: AgentModelConfig;
-  claude?: AgentModelConfig;
-  codex?: AgentModelConfig;
-  gemini?: AgentModelConfig;
-  opencode?: AgentModelConfig;
+  amp?: AgentConfig;
+  claude?: AgentConfig;
+  codex?: AgentConfig;
+  gemini?: AgentConfig;
+  opencode?: AgentConfig;
 }
 
 /**
@@ -145,6 +172,8 @@ export interface AgentStageConfig {
 export interface Config {
   agents: AgentsConfig;
   github: GithubConfig;
+  models?: Record<string, ModelPreset>;
+  stages?: StageModelConfig;
   presets?: Record<string, PresetConfig>;
   worktrees_dir: string;
   github_poll_interval_ms: number;
@@ -223,6 +252,9 @@ export function loadConfig(repoRoot: string): Config {
       opencode: parseAgentModelConfig(parsed.agents?.opencode),
     };
 
+    const models = parseModelPresets(parsed.models);
+    const stages = parseStageModelConfig(parsed.stages);
+
     // Parse github config
     const github: GithubConfig = {
       enabled: parsed.github?.enabled ?? DEFAULTS.github.enabled,
@@ -281,6 +313,8 @@ export function loadConfig(repoRoot: string): Config {
     return {
       agents,
       github,
+      models,
+      stages,
       presets,
       worktrees_dir: parsed.worktrees_dir ?? DEFAULTS.worktrees_dir,
       github_poll_interval_ms:
@@ -348,6 +382,63 @@ function parsePlugins(
   return Object.keys(result).length > 0 ? result : undefined;
 }
 
+function normalizeModelPresetName(name: string): string | undefined {
+  const normalized = name.trim().toLowerCase();
+  return normalized ? normalized : undefined;
+}
+
+function parseModelRef(value: unknown): ModelRef | undefined {
+  if (typeof value === "string") {
+    return value;
+  }
+
+  if (typeof value !== "object" || value === null) {
+    return undefined;
+  }
+
+  const obj = value as Record<string, unknown>;
+  const agent = parseAgentName(obj.agent);
+  if (!agent) {
+    return undefined;
+  }
+
+  const model = typeof obj.model === "string" ? obj.model : undefined;
+  return { agent, model };
+}
+
+function parseModelPresets(
+  value: unknown,
+): Record<string, ModelPreset> | undefined {
+  if (typeof value !== "object" || value === null) {
+    return undefined;
+  }
+
+  const result: Record<string, ModelPreset> = {};
+  for (const [name, preset] of Object.entries(value)) {
+    if (typeof preset !== "object" || preset === null) {
+      continue;
+    }
+
+    const presetObj = preset as Record<string, unknown>;
+    const agent = parseAgentName(presetObj.agent);
+    if (!agent) {
+      continue;
+    }
+
+    const normalized = normalizeModelPresetName(name);
+    if (!normalized) {
+      continue;
+    }
+
+    result[normalized] = {
+      agent,
+      model: typeof presetObj.model === "string" ? presetObj.model : undefined,
+    };
+  }
+
+  return Object.keys(result).length > 0 ? result : undefined;
+}
+
 /**
  * Parse commit review config from raw JSON.
  * RFC: docs/rfc-commit-review-gate.md
@@ -370,28 +461,60 @@ function parseCommitReviewConfig(
     enabled: obj.enabled,
     maxLoops: typeof obj.maxLoops === "number" ? obj.maxLoops : undefined,
     agent: parseAgentName(obj.agent),
-    model: typeof obj.model === "string" ? obj.model : undefined,
+    model: parseModelRef(obj.model),
   };
 }
 
-function parseAgentModelConfig(value: unknown): AgentModelConfig | undefined {
-  if (typeof value === "object" && value !== null) {
-    const obj = value as Record<string, unknown>;
-    const config: AgentModelConfig = {};
-
-    if (typeof obj.default === "string") config.default = obj.default;
-    if (typeof obj.designer === "string") config.designer = obj.designer;
-    if (typeof obj.worker === "string") config.worker = obj.worker;
-    if (typeof obj.triage === "string") config.triage = obj.triage;
-    if (typeof obj.commitReview === "string")
-      config.commitReview = obj.commitReview;
-
-    // Only return if at least one model is configured
-    if (Object.keys(config).length > 0) {
-      return config;
-    }
+function parseAgentModelConfig(value: unknown): AgentConfig | undefined {
+  if (typeof value !== "object" || value === null) {
+    return undefined;
   }
-  return undefined;
+
+  const obj = value as Record<string, unknown>;
+  const config: AgentConfig = {};
+  const stageKeys = new Set([
+    "default",
+    "designer",
+    "worker",
+    "triage",
+    "commitReview",
+  ]);
+
+  for (const [key, val] of Object.entries(obj)) {
+    if (stageKeys.has(key)) {
+      if (typeof val === "string") {
+        (config as AgentModelConfig)[key as keyof AgentModelConfig] = val;
+      }
+      continue;
+    }
+
+    config[key] = val;
+  }
+
+  return Object.keys(config).length > 0 ? config : undefined;
+}
+
+function parseStageModelConfig(value: unknown): StageModelConfig | undefined {
+  if (typeof value !== "object" || value === null) {
+    return undefined;
+  }
+
+  const obj = value as Record<string, unknown>;
+  const config: StageModelConfig = {};
+
+  const defaultModel = parseModelRef(obj.default);
+  const designerModel = parseModelRef(obj.designer);
+  const workerModel = parseModelRef(obj.worker);
+  const triageModel = parseModelRef(obj.triage);
+  const commitReviewModel = parseModelRef(obj.commitReview);
+
+  if (defaultModel) config.default = defaultModel;
+  if (designerModel) config.designer = designerModel;
+  if (workerModel) config.worker = workerModel;
+  if (triageModel) config.triage = triageModel;
+  if (commitReviewModel) config.commitReview = commitReviewModel;
+
+  return Object.keys(config).length > 0 ? config : undefined;
 }
 
 function parseAgentName(value: unknown): AgentName | undefined {
@@ -399,6 +522,65 @@ function parseAgentName(value: unknown): AgentName | undefined {
     return value;
   }
   return undefined;
+}
+
+export function resolveModelRef(
+  config: Config,
+  modelRef: ModelRef | undefined,
+): { agent?: AgentName; model?: string } | undefined {
+  if (!modelRef) {
+    return undefined;
+  }
+
+  if (typeof modelRef === "string") {
+    const presetName = normalizeModelPresetName(modelRef);
+    const preset = presetName ? config.models?.[presetName] : undefined;
+    if (preset) {
+      return { agent: preset.agent, model: preset.model };
+    }
+
+    return { model: modelRef };
+  }
+
+  const agent = parseAgentName(modelRef.agent);
+  if (!agent) {
+    return undefined;
+  }
+
+  return {
+    agent,
+    model: typeof modelRef.model === "string" ? modelRef.model : undefined,
+  };
+}
+
+function resolveStageConfig(
+  config: Config,
+  stage: AgentStage,
+  baseAgent: AgentName,
+  modelRef?: ModelRef,
+): AgentStageConfig {
+  const resolved = resolveModelRef(config, modelRef);
+  const agent = resolved?.agent ?? baseAgent;
+  const agentModels = config.agents[agent];
+  const defaultModel =
+    typeof agentModels?.default === "string" ? agentModels.default : undefined;
+  const stageModel =
+    agentModels && typeof agentModels[stage] === "string"
+      ? agentModels[stage]
+      : undefined;
+  const commitReviewModel =
+    agentModels && typeof agentModels.commitReview === "string"
+      ? agentModels.commitReview
+      : undefined;
+  const fallbackModel =
+    stage === "commitReview"
+      ? commitReviewModel ?? defaultModel
+      : stageModel ?? defaultModel;
+
+  return {
+    agent,
+    model: resolved?.model ?? fallbackModel,
+  };
 }
 
 /**
@@ -413,24 +595,22 @@ export function getAgentConfig(
   stage: AgentStage,
   agentOverride?: AgentName,
 ): AgentStageConfig {
+  const baseAgent = agentOverride ?? config.agents.default;
+
   // RFC: Commit Review Gate - commitReview stage can have its own agent/model in config.commitReview
   if (stage === "commitReview" && config.commitReview) {
-    const agent =
-      config.commitReview.agent ?? agentOverride ?? config.agents.default;
-    const model =
-      config.commitReview.model ??
-      config.agents[agent]?.commitReview ??
-      config.agents[agent]?.default;
-    return { agent, model };
+    const agent = config.commitReview.agent ?? baseAgent;
+    const stageOverride = config.stages?.commitReview ?? config.stages?.default;
+    const modelRef = config.commitReview.model ?? stageOverride;
+    return resolveStageConfig(config, stage, agent, modelRef);
   }
 
-  const agent = agentOverride ?? config.agents.default;
-  const agentModels = config.agents[agent];
+  const stageOverride = config.stages?.[stage] ?? config.stages?.default;
+  if (stageOverride) {
+    return resolveStageConfig(config, stage, baseAgent, stageOverride);
+  }
 
-  // Try stage-specific model, then default model for this agent
-  const model = agentModels?.[stage] ?? agentModels?.default;
-
-  return { agent, model };
+  return resolveStageConfig(config, stage, baseAgent);
 }
 
 export function resolveWorktreesDir(repoRoot: string, config: Config): string {
@@ -605,6 +785,10 @@ export function resolveConfig(
   const mergedBridges = merged.bridges as
     | Record<string, BridgeConfig>
     | undefined;
+  const mergedModels =
+    parseModelPresets(merged.models) ?? globalConfig.models;
+  const mergedStages =
+    parseStageModelConfig(merged.stages) ?? globalConfig.stages;
 
   // Merge plugin configs with proper override handling
   let mergedPlugins = globalConfig.plugins;
@@ -618,6 +802,8 @@ export function resolveConfig(
   return {
     agents: mergedAgents ?? DEFAULTS.agents,
     github: mergedGithub ?? DEFAULTS.github,
+    models: mergedModels,
+    stages: mergedStages,
     presets: merged.presets as Record<string, PresetConfig> | undefined,
     worktrees_dir: (merged.worktrees_dir as string) ?? DEFAULTS.worktrees_dir,
     github_poll_interval_ms:

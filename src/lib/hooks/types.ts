@@ -12,6 +12,7 @@ import type {
   InlineComment,
   JsonValue,
 } from "../bus/types.js";
+import type { ModelRef } from "../config.js";
 
 // =============================================================================
 // Hook Points
@@ -61,7 +62,7 @@ export interface HookContext {
     prompt: string,
     options?: {
       files?: string[];
-      model?: string;
+      model?: ModelRef;
       stage?: "designer" | "worker" | "triage";
     }
   ) => Promise<string>;
