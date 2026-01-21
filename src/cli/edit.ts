@@ -20,7 +20,7 @@ export async function runEdit(
   repoRoot: string,
   planIdInput?: string,
   agentOverride?: string,
-  noDesigner?: boolean
+  noDesigner?: boolean,
 ): Promise<void> {
   let planId: string;
 
@@ -31,7 +31,7 @@ export async function runEdit(
     const state = loadState(repoRoot);
     const diskIds = listInboxPlanIds(repoRoot);
     const allIds = Array.from(
-      new Set([...Object.keys(state.plans), ...diskIds])
+      new Set([...Object.keys(state.plans), ...diskIds]),
     );
 
     const options = allIds.map((id) => {
@@ -43,12 +43,7 @@ export async function runEdit(
         metadata: isDraftOrQueued
           ? `inbox [${ps.status}]`
           : `active [${ps.status}]`,
-        color:
-          ps.status === "draft"
-            ? "yellow"
-            : ps.blocked
-            ? "red"
-            : "green",
+        color: ps.status === "draft" ? "yellow" : ps.blocked ? "red" : "green",
       };
     });
 
@@ -86,7 +81,7 @@ export async function runEdit(
       console.error("Check inbox or active plans with 'prloom status'. ");
       if (ps && !ps.worktree) {
         console.error(
-          "Note: This plan is in state but not yet activated (no worktree)."
+          "Note: This plan is in state but not yet activated (no worktree).",
         );
       }
       process.exit(1);
@@ -110,7 +105,11 @@ export async function runEdit(
   const existingPlan = readFileSync(planPath, "utf-8");
 
   // Resolve agent: CLI flag > config default
-  const designerConfig = getAgentConfig(config, "designer", agentOverride as AgentName);
+  const designerConfig = getAgentConfig(
+    config,
+    "designer",
+    agentOverride as AgentName,
+  );
   const adapter = getAdapter(designerConfig.agent);
 
   console.log(`Agent: ${designerConfig.agent}`);
@@ -138,7 +137,12 @@ export async function runEdit(
         currentPlan: planContent,
         config: resolvedConfig,
       });
-      const updatedPlan = await runHooks("afterDesign", planContent, ctx, hookRegistry);
+      const updatedPlan = await runHooks(
+        "afterDesign",
+        planContent,
+        ctx,
+        hookRegistry,
+      );
       if (updatedPlan !== planContent) {
         writeFileSync(planPath, updatedPlan);
         console.log("Plan modified by afterDesign hooks.");
@@ -157,7 +161,7 @@ export async function runEdit(
       const shouldQueue = await confirm("Queue this plan for the dispatcher?");
       if (shouldQueue) {
         setPlanStatus(repoRoot, planId, "queued");
-        console.log("Plan queued. Run 'prloom start' to dispatch.");
+        console.log("Plan queued. Run 'prloom' to dispatch.");
       } else {
         console.log("Plan left as draft.");
       }

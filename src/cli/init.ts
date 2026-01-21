@@ -19,7 +19,7 @@ export function isInitialized(repoRoot: string): boolean {
 
 export async function runInit(
   cwd: string,
-  opts: InitOptions = {}
+  opts: InitOptions = {},
 ): Promise<void> {
   const repoRoot = cwd;
 
@@ -64,7 +64,7 @@ export async function runInit(
   console.log(`Base branch: ${defaultBranch}`);
 
   console.log("");
-  console.log("Next: run `prloom new <id>` then `prloom start`");
+  console.log("Next: run `prloom new <id>` then `prloom`");
 }
 
 async function ensureGhInstalled(): Promise<void> {
@@ -92,14 +92,14 @@ async function ensureGhRepoResolvable(repoRoot: string): Promise<void> {
     await execa(
       "gh",
       ["repo", "view", "--json", "nameWithOwner", "--jq", ".nameWithOwner"],
-      { cwd: repoRoot, stdio: "ignore" }
+      { cwd: repoRoot, stdio: "ignore" },
     );
   } catch {
     console.error(
-      "Unable to resolve the GitHub repository from this directory."
+      "Unable to resolve the GitHub repository from this directory.",
     );
     console.error(
-      "Make sure this repo has an `origin` remote pointing to GitHub."
+      "Make sure this repo has an `origin` remote pointing to GitHub.",
     );
     console.error("Then rerun `prloom init`. ");
     process.exit(1);
@@ -119,7 +119,7 @@ async function detectDefaultBranch(repoRoot: string): Promise<string> {
         "--jq",
         ".defaultBranchRef.name",
       ],
-      { cwd: repoRoot }
+      { cwd: repoRoot },
     );
     const branch = stdout.trim();
     if (branch) return branch;
@@ -132,7 +132,7 @@ async function detectDefaultBranch(repoRoot: string): Promise<string> {
     const { stdout } = await execa(
       "git",
       ["symbolic-ref", "--quiet", "--short", "refs/remotes/origin/HEAD"],
-      { cwd: repoRoot }
+      { cwd: repoRoot },
     );
     const ref = stdout.trim();
     const match = ref.match(/^origin\/(.+)$/);
@@ -146,7 +146,7 @@ async function detectDefaultBranch(repoRoot: string): Promise<string> {
 
 async function ensureGitignoreEntry(
   repoRoot: string,
-  entry: string
+  entry: string,
 ): Promise<void> {
   const gitignorePath = join(repoRoot, ".gitignore");
   const content = existsSync(gitignorePath)

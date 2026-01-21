@@ -80,7 +80,7 @@ function TUIRunner({
           stdio: "inherit",
         });
         // After the edit process completes, restart the TUI
-        spawnSync("prloom", ["start"], {
+        spawnSync("prloom", [], {
           stdio: "inherit",
         });
       } else if (action.command) {
@@ -114,7 +114,7 @@ function TUIRunner({
       });
       // After the new plan process completes, restart the TUI
       const { spawnSync: restartSync } = await import("child_process");
-      restartSync("prloom", ["start"], {
+      restartSync("prloom", [], {
         stdio: "inherit",
       });
     },

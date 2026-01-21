@@ -1,5 +1,10 @@
 import { existsSync, writeFileSync, readFileSync } from "fs";
-import { loadConfig, getAgentConfig, getPresetNames, resolveConfig } from "../lib/config.js";
+import {
+  loadConfig,
+  getAgentConfig,
+  getPresetNames,
+  resolveConfig,
+} from "../lib/config.js";
 import { getAdapter, type AgentName } from "../lib/adapters/index.js";
 import { nanoid } from "nanoid";
 import { generatePlanSkeleton } from "../lib/plan.js";
@@ -27,7 +32,7 @@ export async function runNew(
   model?: string,
   branchPreference?: string,
   presetOverride?: string,
-  options: RunNewOptions = {}
+  options: RunNewOptions = {},
 ): Promise<void> {
   const config = loadConfig(repoRoot);
 
@@ -143,7 +148,7 @@ export async function runNew(
     repoRoot,
     planPath,
     baseBranch,
-    workerAgent
+    workerAgent,
   );
   await adapter.interactive({
     cwd: repoRoot,
@@ -170,7 +175,12 @@ export async function runNew(
         currentPlan: planContent,
         config: resolvedConfig,
       });
-      const updatedPlan = await runHooks("afterDesign", planContent, ctx, hookRegistry);
+      const updatedPlan = await runHooks(
+        "afterDesign",
+        planContent,
+        ctx,
+        hookRegistry,
+      );
       if (updatedPlan !== planContent) {
         writeFileSync(planPath, updatedPlan);
         console.log("Plan modified by afterDesign hooks.");
@@ -186,7 +196,7 @@ export async function runNew(
   const shouldQueue = await confirm("Queue this plan for the dispatcher?");
   if (shouldQueue) {
     setPlanStatus(repoRoot, id, "queued");
-    console.log("Plan queued. Run 'prloom start' to dispatch.");
+    console.log("Plan queued. Run 'prloom' to dispatch.");
   } else {
     console.log("Plan left as draft. Use 'prloom edit' to continue later.");
   }
