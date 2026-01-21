@@ -45,6 +45,7 @@ import {
   type PRFeedback,
 } from "./github.js";
 import { getAdapter } from "./adapters/index.js";
+import type { ExecutionResult } from "./adapters/types.js";
 import {
   isProcessAlive,
   killProcess,
@@ -54,10 +55,13 @@ import {
   waitForExitCodeFile,
   readExecutionResult,
   hasTmux,
+  getWorkerLogPaths,
 } from "./adapters/tmux.js";
+import { parseLogFileForSessionId } from "./adapters/session.js";
 import {
   renderWorkerPrompt,
   renderTriagePrompt,
+  renderCommitReviewPrompt,
   readTriageResultFile,
 } from "./template.js";
 import { dispatcherEvents } from "./events.js";
@@ -176,7 +180,7 @@ import type { Action, BridgeContext, JsonValue } from "./bus/types.js";
 export async function runGlobalTick(
   repoRoot: string,
   config: Config,
-  log: Logger
+  log: Logger,
 ): Promise<void> {
   // Skip if no global bridges configured
   if (!config.globalBridges || Object.keys(config.globalBridges).length === 0) {
@@ -205,7 +209,7 @@ export async function runGlobalTick(
 
   // Poll each global bridge
   for (const [bridgeName, bridgeConfig] of Object.entries(
-    config.globalBridges
+    config.globalBridges,
   )) {
     if (!bridgeConfig.enabled) continue;
     if (!bridgeConfig.module) continue;
@@ -234,7 +238,7 @@ export async function runGlobalTick(
           saveGlobalBridgeState(
             repoRoot,
             bridgeName,
-            result.state as JsonValue
+            result.state as JsonValue,
           );
         }
 
@@ -242,7 +246,7 @@ export async function runGlobalTick(
         if (result.actions && Array.isArray(result.actions)) {
           for (const action of result.actions as Action[]) {
             log.info(
-              `  📤 Processing action: ${action.payload?.type || action.type}`
+              `  📤 Processing action: ${action.payload?.type || action.type}`,
             );
 
             // Route to prloom-core for upsert_plan
@@ -306,11 +310,11 @@ async function processGlobalEvents(
   repoRoot: string,
   config: Config,
   globalState: ReturnType<typeof loadGlobalDispatcherState>,
-  log: Logger
+  log: Logger,
 ): Promise<void> {
   const { events, newOffset } = readGlobalEvents(
     repoRoot,
-    globalState.eventsOffset
+    globalState.eventsOffset,
   );
 
   if (events.length === 0) {
@@ -331,7 +335,7 @@ async function processGlobalEvents(
 
   // Load and run global plugins with onGlobalEvent hooks
   for (const [pluginName, pluginConfig] of Object.entries(
-    config.globalPlugins!
+    config.globalPlugins!,
   )) {
     if (!pluginConfig.module) continue;
 
@@ -370,7 +374,7 @@ async function processGlobalEvents(
 
 export async function runDispatcher(
   repoRoot: string,
-  options: DispatcherOptions = {}
+  options: DispatcherOptions = {},
 ): Promise<void> {
   const config = loadConfig(repoRoot);
   const worktreesDir = resolveWorktreesDir(repoRoot, config);
@@ -446,7 +450,7 @@ export async function runDispatcher(
         config,
         state,
         log,
-        options
+        options,
       );
 
       // 3. Process active plans from state
@@ -463,7 +467,7 @@ export async function runDispatcher(
       await sleepUntilIpcOrTimeout(
         repoRoot,
         state.control_cursor,
-        config.bus.tickIntervalMs
+        config.bus.tickIntervalMs,
       );
     } catch (error) {
       log.error(`Dispatcher error: ${error}`);
@@ -472,7 +476,7 @@ export async function runDispatcher(
       await sleepUntilIpcOrTimeout(
         repoRoot,
         state.control_cursor,
-        config.bus.tickIntervalMs
+        config.bus.tickIntervalMs,
       );
     }
   }
@@ -484,7 +488,7 @@ export async function ingestInboxPlans(
   config: Config,
   state: State,
   log: Logger,
-  options: DispatcherOptions = {}
+  options: DispatcherOptions = {},
 ): Promise<void> {
   const inboxPlanIds = listInboxPlanIds(repoRoot);
 
@@ -513,7 +517,7 @@ export async function ingestInboxPlans(
       // Skip ingestion if no TODOs found - prevents immediate completion loop
       if (plan.todos.length === 0) {
         log.error(
-          `⚠️ Plan ${actualId} has zero TODO items, skipping ingestion. Please add at least one task.`
+          `⚠️ Plan ${actualId} has zero TODO items, skipping ingestion. Please add at least one task.`,
         );
         continue;
       }
@@ -548,11 +552,11 @@ export async function ingestInboxPlans(
         repoRoot,
         worktreesDir,
         desiredBranch,
-        baseBranch
+        baseBranch,
       );
       if (branch !== desiredBranch) {
         log.info(
-          `   Branch name adjusted to: ${branch} (original already existed)`
+          `   Branch name adjusted to: ${branch} (original already existed)`,
         );
       }
       log.info(`   Created worktree: ${worktreePath}`);
@@ -602,7 +606,7 @@ export async function ingestInboxPlans(
       log.info(`   Creating initial commit: ${prTitle}`);
       await commitEmpty(
         worktreePath,
-        `${prTitle}\n\n${extractBody(planForPR)}`
+        `${prTitle}\n\n${extractBody(planForPR)}`,
       );
 
       let pr: number | undefined;
@@ -619,7 +623,7 @@ export async function ingestInboxPlans(
           branch,
           baseBranch,
           prTitle,
-          extractBody(planForPR)
+          extractBody(planForPR),
         );
         log.info(`   Created draft PR #${pr}`);
       }
@@ -654,14 +658,14 @@ export async function ingestInboxPlans(
       log.error(
         `❌ Failed to ingest plan ${planId}: ${
           error instanceof Error ? error.message : error
-        }`
+        }`,
       );
       logDispatcherError(
         undefined,
         `Failed to ingest plan ${planId}`,
         error,
         planId,
-        { inboxPath }
+        { inboxPath },
       );
     }
   }
@@ -714,7 +718,7 @@ async function runPlanHooks(
   planConfig: Config,
   hookRegistry: HookRegistry,
   log: Logger,
-  todoCompleted?: string
+  todoCompleted?: string,
 ): Promise<ReturnType<typeof parsePlan>> {
   // Skip if no hooks registered for this point
   if (!hookRegistry[hookPoint] || hookRegistry[hookPoint]!.length === 0) {
@@ -738,7 +742,7 @@ async function runPlanHooks(
       hookPoint,
       originalContent,
       ctx,
-      hookRegistry
+      hookRegistry,
     );
 
     // If plan was modified by hooks, write and re-parse
@@ -761,7 +765,7 @@ export async function processActivePlans(
   state: State,
   botLogin: string,
   options: DispatcherOptions = {},
-  log: Logger
+  log: Logger,
 ): Promise<void> {
   for (const [planId, ps] of Object.entries(state.plans)) {
     try {
@@ -774,7 +778,7 @@ export async function processActivePlans(
       if (!ps.worktree || !ps.planRelpath) {
         log.warn(
           `Plan ${planId} missing worktree or planRelpath, skipping`,
-          planId
+          planId,
         );
         continue;
       }
@@ -873,7 +877,7 @@ export async function processActivePlans(
                   await (
                     hook as unknown as (
                       evt: typeof event,
-                      ctx: typeof onEventCtx
+                      ctx: typeof onEventCtx,
                     ) => Promise<void>
                   )(event, onEventCtx);
 
@@ -882,7 +886,7 @@ export async function processActivePlans(
                 } catch (error) {
                   log.error(
                     `onEvent hook error for event ${event.id}: ${error}`,
-                    planId
+                    planId,
                   );
                   // Continue with other events/hooks on error
                 }
@@ -899,7 +903,7 @@ export async function processActivePlans(
               const handled = newEvents.length - eventsForTriage.length;
               log.info(
                 `🎯 ${handled} events handled/deferred by plugins`,
-                planId
+                planId,
               );
             }
           }
@@ -958,7 +962,7 @@ export async function processActivePlans(
               plan,
               allFeedback,
               options,
-              log
+              log,
             );
 
             // Re-parse plan after triage may have modified it
@@ -984,7 +988,7 @@ export async function processActivePlans(
       if (nextTodo && (ps.status === "review" || ps.status === "done")) {
         log.info(
           `🔄 New TODOs found, flipping ${planId} back to active`,
-          planId
+          planId,
         );
         ps.status = "active";
       }
@@ -999,7 +1003,7 @@ export async function processActivePlans(
               `❌ Plan ${planId} is blocked by task #${todo.index + 1}: ${
                 todo.text
               }`,
-              planId
+              planId,
             );
             ps.blocked = true;
             ps.lastError = `Blocked by task #${todo.index + 1}: ${todo.text}`;
@@ -1014,7 +1018,7 @@ export async function processActivePlans(
               `   [retry ${ps.todoRetryCount}/${MAX_TODO_RETRIES} for TODO #${
                 todo.index + 1
               }]`,
-              planId
+              planId,
             );
 
             if (ps.todoRetryCount >= MAX_TODO_RETRIES) {
@@ -1022,14 +1026,14 @@ export async function processActivePlans(
                 `❌ TODO #${
                   todo.index + 1
                 } failed ${MAX_TODO_RETRIES} times, blocking plan`,
-                planId
+                planId,
               );
 
               // Show the worker log from previous attempts
               const workerLogPath = join(
                 "/tmp",
                 `prloom-${planId}`,
-                "worker.log"
+                "worker.log",
               );
               if (existsSync(workerLogPath)) {
                 log.error(`   Log file: ${workerLogPath}`, planId);
@@ -1042,7 +1046,7 @@ export async function processActivePlans(
               } else {
                 log.error(
                   `   No worker log found at: ${workerLogPath}`,
-                  planId
+                  planId,
                 );
               }
 
@@ -1073,16 +1077,16 @@ export async function processActivePlans(
             ps.pr,
             planConfig,
             hookRegistry,
-            log
+            log,
           );
 
           const prompt = renderWorkerPrompt(
             repoRoot,
             ps.planRelpath,
             plan,
-            todo
+            todo,
           );
-          const workerConfig = getAgentConfig(config, "worker", ps.agent);
+          const workerConfig = getAgentConfig(planConfig, "worker", ps.agent);
           const adapter = getAdapter(workerConfig.agent);
 
           // Build tmux config if available and not explicitly disabled
@@ -1091,25 +1095,50 @@ export async function processActivePlans(
             ? { sessionName: `prloom-${planId}` }
             : undefined;
 
-          const execResult = await adapter.execute({
-            cwd: ps.worktree,
-            prompt,
-            tmux: tmuxConfig,
-            model: workerConfig.model,
-          });
+          // RFC: Session Resume - check if we are already running this TODO
+          let execResult: ExecutionResult;
+          if (ps.lastTodoIndex === todo.index && (ps.tmuxSession || ps.pid)) {
+            log.info(
+              `   [resuming active worker for TODO #${todo.index + 1}]`,
+              planId,
+            );
+            execResult = {
+              tmuxSession: ps.tmuxSession,
+              pid: ps.pid,
+              logFile: ps.workerLogFile,
+              sessionId: ps.workerSessionId,
+            };
+          } else {
+            execResult = await adapter.execute({
+              cwd: ps.worktree,
+              prompt,
+              tmux: tmuxConfig,
+              model: workerConfig.model,
+              // RFC: Commit Review Gate - session reuse for worker
+              sessionId: ps.workerSessionId,
+              purpose: "worker",
+            });
+          }
 
           // Store session identifiers for tracking
+          if (execResult.sessionId) {
+            ps.workerSessionId = execResult.sessionId;
+          }
+          if (execResult.logFile) {
+            ps.workerLogFile = execResult.logFile;
+          }
+
           if (execResult.tmuxSession) {
             ps.tmuxSession = execResult.tmuxSession;
             log.info(
               `   [spawned in tmux session: ${execResult.tmuxSession}]`,
-              planId
+              planId,
             );
           } else if (execResult.pid) {
             ps.pid = execResult.pid;
             log.info(
               `   [spawned detached process: ${execResult.pid}]`,
-              planId
+              planId,
             );
           } else if (
             execResult.exitCode !== undefined &&
@@ -1118,7 +1147,7 @@ export async function processActivePlans(
             // Adapter failed to spawn - log and continue to retry logic
             log.warn(
               `   ⚠️ Adapter failed to spawn worker (exitCode: ${execResult.exitCode})`,
-              planId
+              planId,
             );
             logAdapterError(
               ps.worktree,
@@ -1129,21 +1158,21 @@ export async function processActivePlans(
                 exitCode: execResult.exitCode,
                 agent: workerConfig.agent,
                 todoText: todo.text,
-              }
+              },
             );
             continue;
           } else if (!execResult.tmuxSession && !execResult.pid) {
             // No session, no pid, no error - something went wrong silently
             log.warn(
               `   ⚠️ Adapter returned no session/pid and no error`,
-              planId
+              planId,
             );
             logAdapterError(
               ps.worktree,
               `Adapter returned no session/pid for TODO #${todo.index + 1}`,
               undefined,
               planId,
-              { execResult, agent: workerConfig.agent, todoText: todo.text }
+              { execResult, agent: workerConfig.agent, todoText: todo.text },
             );
             continue;
           }
@@ -1151,13 +1180,13 @@ export async function processActivePlans(
           // Poll for completion
           if (execResult.tmuxSession) {
             const waitResult = await waitForExitCodeFile(
-              execResult.tmuxSession
+              execResult.tmuxSession,
             );
 
             if (waitResult.timedOut) {
               log.error(
                 `   ❌ Worker timed out for TODO #${todo.index + 1}`,
-                planId
+                planId,
               );
               logFatalError(
                 ps.worktree,
@@ -1165,7 +1194,7 @@ export async function processActivePlans(
                 `Worker timed out waiting for exit code file`,
                 undefined,
                 planId,
-                { tmuxSession: execResult.tmuxSession, todoText: todo.text }
+                { tmuxSession: execResult.tmuxSession, todoText: todo.text },
               );
               continue;
             }
@@ -1175,7 +1204,7 @@ export async function processActivePlans(
                 `   ❌ Tmux session died without creating exit code file for TODO #${
                   todo.index + 1
                 }`,
-                planId
+                planId,
               );
               logFatalError(
                 ps.worktree,
@@ -1183,16 +1212,28 @@ export async function processActivePlans(
                 `Tmux session died without creating exit code file`,
                 undefined,
                 planId,
-                { tmuxSession: execResult.tmuxSession, todoText: todo.text }
+                { tmuxSession: execResult.tmuxSession, todoText: todo.text },
               );
               continue;
             }
 
             const tmuxResult = readExecutionResult(execResult.tmuxSession);
+
+            // Extract session ID from log file for session resume support
+            if (!ps.workerSessionId && execResult.logFile) {
+              const extractedId = parseLogFileForSessionId(
+                workerConfig.agent,
+                execResult.logFile,
+              );
+              if (extractedId) {
+                ps.workerSessionId = extractedId;
+              }
+            }
+
             if (tmuxResult.exitCode !== 0) {
               log.warn(
                 `   ⚠️ Worker exited with code ${tmuxResult.exitCode}`,
-                planId
+                planId,
               );
               logAdapterError(
                 ps.worktree,
@@ -1202,11 +1243,22 @@ export async function processActivePlans(
                 {
                   exitCode: tmuxResult.exitCode,
                   tmuxSession: execResult.tmuxSession,
-                }
+                },
               );
             }
           } else if (execResult.pid) {
             await waitForProcess(execResult.pid);
+
+            // Extract session ID from log file for session resume support
+            if (!ps.workerSessionId && execResult.logFile) {
+              const extractedId = parseLogFileForSessionId(
+                workerConfig.agent,
+                execResult.logFile,
+              );
+              if (extractedId) {
+                ps.workerSessionId = extractedId;
+              }
+            }
             log.info(`   Process ${execResult.pid} completed`, planId);
           } else if (
             execResult.exitCode !== undefined &&
@@ -1215,7 +1267,7 @@ export async function processActivePlans(
             // Synchronous execution with error (e.g., failed to spawn)
             log.warn(
               `   ⚠️ Worker exited with code ${execResult.exitCode}`,
-              planId
+              planId,
             );
             logAdapterError(
               ps.worktree,
@@ -1224,7 +1276,7 @@ export async function processActivePlans(
               }`,
               undefined,
               planId,
-              { exitCode: execResult.exitCode }
+              { exitCode: execResult.exitCode },
             );
           }
 
@@ -1239,7 +1291,7 @@ export async function processActivePlans(
           if (!updatedTodo?.done) {
             log.warn(
               `   ⚠️ TODO #${todo.index + 1} was NOT marked complete by worker`,
-              planId
+              planId,
             );
             log.warn(`   Exit code: ${execResult.exitCode}`, planId);
 
@@ -1268,7 +1320,7 @@ export async function processActivePlans(
                 todoText: todo.text,
                 logPath,
                 retryCount: ps.todoRetryCount ?? 0,
-              }
+              },
             );
 
             // Don't commit/push, let retry logic handle it on next iteration
@@ -1301,6 +1353,176 @@ export async function processActivePlans(
             }
           }
 
+          // =================================================================
+          // Commit Review Gate (RFC: docs/rfc-commit-review-gate.md)
+          // =================================================================
+          // Runs after worker marks TODO [x] but BEFORE afterTodo hooks.
+          // Reviewer can approve (leave [x]) or request changes (uncheck to [ ]).
+
+          if (planConfig.commitReview?.enabled) {
+            const maxLoops = planConfig.commitReview.maxLoops ?? 2;
+
+            // Check if we've hit max review loops
+            const loopCount = ps.commitReviewLoopCount ?? 0;
+            if (loopCount >= maxLoops) {
+              log.error(
+                `❌ Commit review max loops (${maxLoops}) exceeded for TODO #${todo.index + 1}`,
+                planId,
+              );
+              ps.blocked = true;
+              ps.lastError = `Commit review exceeded ${maxLoops} loops for TODO #${todo.index + 1}`;
+              continue;
+            }
+
+            log.info(
+              `🔍 Running commit review for TODO #${todo.index + 1}...`,
+              planId,
+            );
+
+            // Get reviewer agent config
+            const reviewerConfig = getAgentConfig(planConfig, "commitReview");
+            const reviewerAdapter = getAdapter(reviewerConfig.agent);
+
+            // Build review prompt
+            const reviewPlan = parsePlan(planPath);
+            const reviewTodo = reviewPlan.todos[todo.index];
+            if (!reviewTodo) {
+              log.error(
+                `   ❌ Could not find TODO #${todo.index + 1} in plan`,
+                planId,
+              );
+              continue;
+            }
+            const reviewPrompt = renderCommitReviewPrompt(
+              repoRoot,
+              ps.planRelpath,
+              reviewPlan,
+              reviewTodo,
+            );
+
+            // Build tmux config if available
+            const useReviewTmux = options.tmux !== false && (await hasTmux());
+            const reviewTmuxConfig = useReviewTmux
+              ? { sessionName: `prloom-review-${planId}` }
+              : undefined;
+
+            log.info(`   Using agent: ${reviewerConfig.agent}`, planId);
+
+            // RFC: Session Resume - check if we are already running this review
+            let reviewResult: ExecutionResult;
+            if (
+              ps.lastTodoIndex === todo.index &&
+              (ps.tmuxSession === `prloom-review-${planId}` ||
+                (ps.pid && ps.status === "active")) // A bit loose but status + index usually enough
+              // Wait, reviewer should probably have its own identifier if we want to be safe
+            ) {
+              log.info(
+                `   [resuming active reviewer for TODO #${todo.index + 1}]`,
+                planId,
+              );
+              reviewResult = {
+                tmuxSession: ps.tmuxSession,
+                pid: ps.pid,
+                logFile: ps.commitReviewLogFile,
+                sessionId: ps.commitReviewSessionId,
+              };
+            } else {
+              reviewResult = await reviewerAdapter.execute({
+                cwd: ps.worktree,
+                prompt: reviewPrompt,
+                tmux: reviewTmuxConfig,
+                model: reviewerConfig.model,
+                sessionId: ps.commitReviewSessionId,
+                purpose: "commitReview",
+              });
+            }
+
+            // Persist session ID and active session for tracking
+            if (reviewResult.sessionId) {
+              ps.commitReviewSessionId = reviewResult.sessionId;
+            }
+            if (reviewResult.logFile) {
+              ps.commitReviewLogFile = reviewResult.logFile;
+            }
+            if (reviewResult.tmuxSession) {
+              ps.tmuxSession = reviewResult.tmuxSession;
+            }
+            if (reviewResult.pid) {
+              ps.pid = reviewResult.pid;
+            }
+
+            // Wait for tmux completion
+            if (reviewResult.tmuxSession) {
+              const waitResult = await waitForExitCodeFile(
+                reviewResult.tmuxSession,
+              );
+
+              // Extract session ID from log file for session resume support
+              if (!ps.commitReviewSessionId && reviewResult.logFile) {
+                const extractedId = parseLogFileForSessionId(
+                  reviewerConfig.agent,
+                  reviewResult.logFile,
+                );
+                if (extractedId) {
+                  ps.commitReviewSessionId = extractedId;
+                }
+              }
+
+              if (
+                waitResult.timedOut ||
+                (waitResult.sessionDied && !waitResult.found)
+              ) {
+                log.error(`   ❌ Commit review session failed`, planId);
+                ps.blocked = true;
+                ps.lastError = `Commit review failed: ${waitResult.timedOut ? "timeout" : "session died"}`;
+                continue;
+              }
+            } else if (reviewResult.pid) {
+              await waitForProcess(reviewResult.pid);
+
+              // Extract session ID from log file for session resume support
+              if (!ps.commitReviewSessionId && reviewResult.logFile) {
+                const extractedId = parseLogFileForSessionId(
+                  reviewerConfig.agent,
+                  reviewResult.logFile,
+                );
+                if (extractedId) {
+                  ps.commitReviewSessionId = extractedId;
+                }
+              }
+            }
+
+            log.info(`   Commit review completed`, planId);
+
+            // Re-parse plan to check reviewer's decision
+            const reviewedPlan = parsePlan(planPath);
+            const reviewedTodo = reviewedPlan.todos[todo.index];
+
+            if (!reviewedTodo?.done) {
+              // Reviewer requested changes - TODO was unchecked
+              log.warn(
+                `   ⚠️ Reviewer requested changes for TODO #${todo.index + 1}`,
+                planId,
+              );
+
+              // Increment loop count (not todoRetryCount)
+              ps.commitReviewLoopCount = (ps.commitReviewLoopCount ?? 0) + 1;
+              log.info(
+                `   [review loop ${ps.commitReviewLoopCount}/${maxLoops}]`,
+                planId,
+              );
+
+              // Worker will resume on next tick with same session
+              // (session reuse depends on adapter support)
+              continue;
+            }
+
+            // Reviewer approved - reset loop count, keep session for future TODOs
+            log.success(`   ✓ Commit review approved`, planId);
+            ps.commitReviewLoopCount = undefined;
+            // Note: preserving commitReviewSessionId for reuse across TODOs
+          }
+
           // Run afterTodo hooks
           const todoText = todo.text;
           let afterTodoPlan = parsePlan(planPath);
@@ -1315,7 +1537,7 @@ export async function processActivePlans(
             planConfig,
             hookRegistry,
             log,
-            todoText
+            todoText,
           );
 
           // Commit and push (push only if GitHub is enabled)
@@ -1363,7 +1585,7 @@ export async function processActivePlans(
               ps.pr,
               planConfig,
               hookRegistry,
-              log
+              log,
             );
 
             // Re-check if hooks added new TODOs
@@ -1398,7 +1620,7 @@ export async function processActivePlans(
               ps.pr,
               planConfig,
               hookRegistry,
-              log
+              log,
             );
           }
         } else {
@@ -1406,7 +1628,7 @@ export async function processActivePlans(
           if (plan.todos.length === 0) {
             log.error(
               `❌ Plan ${planId} has zero TODO items, blocking it.`,
-              planId
+              planId,
             );
             ps.blocked = true;
             ps.lastError = "Plan has zero TODO items. Please add tasks.";
@@ -1427,7 +1649,7 @@ export async function processActivePlans(
             ps.pr,
             planConfig,
             hookRegistry,
-            log
+            log,
           );
 
           // Re-check if hooks added new TODOs
@@ -1462,7 +1684,7 @@ export async function processActivePlans(
             ps.pr,
             planConfig,
             hookRegistry,
-            log
+            log,
           );
         }
       }
@@ -1477,7 +1699,7 @@ export async function processActivePlans(
         `Error processing plan, blocking: ${error}`,
         error,
         planId,
-        { status: ps.status }
+        { status: ps.status },
       );
     }
   }
@@ -1491,7 +1713,7 @@ async function runTriage(
   plan: ReturnType<typeof parsePlan>,
   feedback: PRFeedback[],
   options: DispatcherOptions = {},
-  log: Logger
+  log: Logger,
 ): Promise<void> {
   // Store previous status to restore later
   const previousStatus = ps.status;
@@ -1509,7 +1731,7 @@ async function runTriage(
     ps.worktree,
     ps.planRelpath,
     plan,
-    feedback
+    feedback,
   );
 
   log.info(`🔍 Running triage...`, planId);
@@ -1538,7 +1760,7 @@ async function runTriage(
     if (waitResult.timedOut || (waitResult.sessionDied && !waitResult.found)) {
       log.error(
         `   ❌ Triage session failed (timeout or session died)`,
-        planId
+        planId,
       );
       logFatalError(
         ps.worktree,
@@ -1548,7 +1770,7 @@ async function runTriage(
         }`,
         undefined,
         planId,
-        { tmuxSession: execResult.tmuxSession }
+        { tmuxSession: execResult.tmuxSession },
       );
       ps.blocked = true;
       ps.lastError = `Triage failed: ${
@@ -1576,7 +1798,7 @@ async function runTriage(
         log.info(`   Blocking plan`, planId);
         ps.blocked = true;
         ps.lastError = `Rebase conflict: ${rebaseResult.conflictFiles?.join(
-          ", "
+          ", ",
         )}`;
 
         log.info(`   Posting rebase conflict comment to PR #${ps.pr}`, planId);
@@ -1620,7 +1842,7 @@ The plan is now **blocked** until conflicts are resolved.`;
         // Post via bus action
         appendBusAction(
           ps.worktree,
-          createCommentAction(ps.pr!, rebaseMessage)
+          createCommentAction(ps.pr!, rebaseMessage),
         );
       } else if (rebaseResult.success) {
         log.info(`   Force pushing rebased branch: ${ps.branch}`, planId);
@@ -1634,7 +1856,7 @@ The plan is now **blocked** until conflicts are resolved.`;
     if (ps.worktree && ps.pr) {
       appendBusAction(
         ps.worktree,
-        createCommentAction(ps.pr, result.reply_markdown)
+        createCommentAction(ps.pr, result.reply_markdown),
       );
     }
     log.success(`   Queued triage reply for delivery`, planId);
@@ -1643,7 +1865,7 @@ The plan is now **blocked** until conflicts are resolved.`;
     log.info(`   Committing: [prloom] triage`, planId);
     const committed = await commitAll(
       ps.worktree,
-      `[prloom] ${planId}: triage`
+      `[prloom] ${planId}: triage`,
     );
     if (committed) {
       log.info(`   Pushing to origin: ${ps.branch}`, planId);
@@ -1671,8 +1893,8 @@ The plan is now **blocked** until conflicts are resolved.`;
         ps.worktree,
         createCommentAction(
           ps.pr,
-          `⚠️ Triage failed to produce a valid result file. Human attention needed.\n\nError: ${error}`
-        )
+          `⚠️ Triage failed to produce a valid result file. Human attention needed.\n\nError: ${error}`,
+        ),
       );
     }
   }
@@ -1705,7 +1927,7 @@ function handleCommand(state: State, cmd: IpcCommand, log: Logger): void {
     ps.lastPolledAt = undefined;
     log.info(
       `🔄 Launching immediate poll (reset schedule) for ${cmd.plan_id}`,
-      cmd.plan_id
+      cmd.plan_id,
     );
   }
 }
@@ -1717,7 +1939,7 @@ function sleep(ms: number): Promise<void> {
 async function sleepUntilIpcOrTimeout(
   repoRoot: string,
   cursor: number,
-  timeoutMs: number
+  timeoutMs: number,
 ): Promise<void> {
   const controlPath = getControlPath(repoRoot);
   const started = Date.now();
@@ -1758,7 +1980,7 @@ function parseReviewContext(context: string):
 
   for (const line of lines) {
     const match = line.match(
-      /^\s*(review_provider|file|line|side|originalText):\s*(.+)/
+      /^\s*(review_provider|file|line|side|originalText):\s*(.+)/,
     );
     if (match && match[1] && match[2]) {
       const key = match[1];

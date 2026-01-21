@@ -13,6 +13,10 @@ export interface ExecutionResult {
   pid?: number;
   /** Tmux session name (for async execution with tmux) */
   tmuxSession?: string;
+  /** Path to log file (for session ID extraction after completion) */
+  logFile?: string;
+  /** LLM conversation/session identifier (RFC: Commit Review Gate) */
+  sessionId?: string;
 }
 
 export interface AgentAdapter {
@@ -20,7 +24,8 @@ export interface AgentAdapter {
 
   /**
    * Execute a prompt in headless mode (for automated worker execution).
-   * Session is ephemeral - disposed after completion.
+   * Session is ephemeral by default - disposed after completion.
+   * If sessionId is provided, resumes that conversation.
    * If tmux config provided, runs in a detached tmux session for observation.
    */
   execute(opts: {
@@ -28,6 +33,10 @@ export interface AgentAdapter {
     prompt: string;
     tmux?: TmuxConfig;
     model?: string;
+    /** Resume an existing session (RFC: Commit Review Gate) */
+    sessionId?: string;
+    /** Tag for log naming/separation (RFC: Commit Review Gate) */
+    purpose?: "worker" | "commitReview" | "triage" | "designer";
   }): Promise<ExecutionResult>;
 
   /**

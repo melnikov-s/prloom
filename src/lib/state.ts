@@ -75,6 +75,21 @@ export interface PlanState {
   todoRetryCount?: number;
 
   // ==========================================================================
+  // RFC: Commit Review Gate
+  // ==========================================================================
+
+  /** LLM session ID for worker (for session reuse across review loops) */
+  workerSessionId?: string;
+  /** Path to worker's log file (for session ID extraction) */
+  workerLogFile?: string;
+  /** LLM session ID for commit reviewer (for session reuse across loops) */
+  commitReviewSessionId?: string;
+  /** Path to reviewer's log file (for session ID extraction) */
+  commitReviewLogFile?: string;
+  /** Number of commit review → fix cycles for current TODO */
+  commitReviewLoopCount?: number;
+
+  // ==========================================================================
   // RFC: Global Bridges & Core Bridge extensions
   // ==========================================================================
 
@@ -298,7 +313,7 @@ export function setPlanStatus(
   repoRoot: string,
   planId: string,
   status: PlanState["status"],
-  agent?: AgentName
+  agent?: AgentName,
 ): void {
   const state = loadState(repoRoot);
   const existing = state.plans[planId] ?? { status: "draft" };
@@ -324,7 +339,7 @@ export function deletePlanMeta(repoRoot: string, planId: string): void {
  */
 export function findPlanBySource(
   repoRoot: string,
-  source: PlanSource
+  source: PlanSource,
 ): { planId: string; state: PlanState } | undefined {
   const state = loadState(repoRoot);
 

@@ -74,6 +74,25 @@ export interface PluginOverride {
   config?: unknown;
 }
 
+// ============================================================================
+// Commit Review Configuration
+// ============================================================================
+
+/**
+ * Configuration for the commit review gate.
+ * See RFC: docs/rfc-commit-review-gate.md
+ */
+export interface CommitReviewConfig {
+  /** Whether commit review gate is enabled (default: false) */
+  enabled: boolean;
+  /** Maximum review → fix cycles before blocking (default: 2) */
+  maxLoops?: number;
+  /** Agent to use for review (overrides default) */
+  agent?: AgentName;
+  /** Model to use for review */
+  model?: string;
+}
+
 /**
  * Partial config that can be used in presets or worktree overrides.
  * All fields are optional and will be merged with the base config.
@@ -87,7 +106,7 @@ export interface PresetConfig {
   plugins?: Record<string, PluginOverride>;
 }
 
-export type AgentStage = "designer" | "worker" | "triage";
+export type AgentStage = "designer" | "worker" | "triage" | "commitReview";
 
 /**
  * Model configuration for a specific agent.
@@ -98,6 +117,7 @@ export interface AgentModelConfig {
   designer?: string;
   worker?: string;
   triage?: string;
+  commitReview?: string;
 }
 
 /**
@@ -153,6 +173,13 @@ export interface Config {
 
   /** Review provider configuration (replaces bridges.github for review feedback) */
   review?: ReviewConfig;
+
+  // ==========================================================================
+  // RFC: Commit Review Gate
+  // ==========================================================================
+
+  /** Commit review gate configuration (pre-commit quality gate) */
+  commitReview?: CommitReviewConfig;
 }
 
 const DEFAULTS: Config = {
@@ -267,6 +294,7 @@ export function loadConfig(repoRoot: string): Config {
         ? parsed.initCommands
         : undefined,
       review,
+      commitReview: parseCommitReviewConfig(parsed.commitReview),
     };
   } catch {
     return { ...DEFAULTS };
@@ -274,7 +302,7 @@ export function loadConfig(repoRoot: string): Config {
 }
 
 function parsePresets(
-  value: unknown
+  value: unknown,
 ): Record<string, PresetConfig> | undefined {
   if (typeof value !== "object" || value === null) {
     return undefined;
@@ -291,7 +319,7 @@ function parsePresets(
 }
 
 function parsePlugins(
-  value: unknown
+  value: unknown,
 ): Record<string, PluginConfig> | undefined {
   if (typeof value !== "object" || value === null) {
     return undefined;
@@ -315,6 +343,32 @@ function parsePlugins(
   return Object.keys(result).length > 0 ? result : undefined;
 }
 
+/**
+ * Parse commit review config from raw JSON.
+ * RFC: docs/rfc-commit-review-gate.md
+ */
+function parseCommitReviewConfig(
+  value: unknown,
+): CommitReviewConfig | undefined {
+  if (typeof value !== "object" || value === null) {
+    return undefined;
+  }
+
+  const obj = value as Record<string, unknown>;
+
+  // enabled is required
+  if (typeof obj.enabled !== "boolean") {
+    return undefined;
+  }
+
+  return {
+    enabled: obj.enabled,
+    maxLoops: typeof obj.maxLoops === "number" ? obj.maxLoops : undefined,
+    agent: parseAgentName(obj.agent),
+    model: typeof obj.model === "string" ? obj.model : undefined,
+  };
+}
+
 function parseAgentModelConfig(value: unknown): AgentModelConfig | undefined {
   if (typeof value === "object" && value !== null) {
     const obj = value as Record<string, unknown>;
@@ -324,6 +378,8 @@ function parseAgentModelConfig(value: unknown): AgentModelConfig | undefined {
     if (typeof obj.designer === "string") config.designer = obj.designer;
     if (typeof obj.worker === "string") config.worker = obj.worker;
     if (typeof obj.triage === "string") config.triage = obj.triage;
+    if (typeof obj.commitReview === "string")
+      config.commitReview = obj.commitReview;
 
     // Only return if at least one model is configured
     if (Object.keys(config).length > 0) {
@@ -350,8 +406,19 @@ function parseAgentName(value: unknown): AgentName | undefined {
 export function getAgentConfig(
   config: Config,
   stage: AgentStage,
-  agentOverride?: AgentName
+  agentOverride?: AgentName,
 ): AgentStageConfig {
+  // RFC: Commit Review Gate - commitReview stage can have its own agent/model in config.commitReview
+  if (stage === "commitReview" && config.commitReview) {
+    const agent =
+      config.commitReview.agent ?? agentOverride ?? config.agents.default;
+    const model =
+      config.commitReview.model ??
+      config.agents[agent]?.commitReview ??
+      config.agents[agent]?.default;
+    return { agent, model };
+  }
+
   const agent = agentOverride ?? config.agents.default;
   const agentModels = config.agents[agent];
 
@@ -394,7 +461,7 @@ export function deepMerge(
         // Deep merge nested objects
         result[key] = deepMerge(
           result[key] as Record<string, unknown>,
-          value as Record<string, unknown>
+          value as Record<string, unknown>,
         );
       } else if (value !== undefined) {
         // Replace value
@@ -437,7 +504,7 @@ export function loadWorktreeConfig(worktreePath: string): PresetConfig {
  */
 export function writeWorktreeConfig(
   worktreePath: string,
-  config: PresetConfig
+  config: PresetConfig,
 ): void {
   const configDir = join(worktreePath, "prloom");
   if (!existsSync(configDir)) {
@@ -461,7 +528,7 @@ export function writeWorktreeConfig(
  */
 function mergePluginConfigs(
   basePlugins: Record<string, PluginConfig> | undefined,
-  overrides: Record<string, PluginOverride> | undefined
+  overrides: Record<string, PluginOverride> | undefined,
 ): Record<string, PluginConfig> | undefined {
   if (!basePlugins) return undefined;
   if (!overrides) return basePlugins;
@@ -511,7 +578,7 @@ function mergePluginConfigs(
 export function resolveConfig(
   globalConfig: Config,
   presetName?: string,
-  worktreeConfig?: PresetConfig
+  worktreeConfig?: PresetConfig,
 ): Config {
   // Get preset overrides
   const preset =
@@ -523,7 +590,7 @@ export function resolveConfig(
   const merged = deepMerge(
     globalConfig as unknown as Record<string, unknown>,
     preset as Record<string, unknown>,
-    (worktreeConfig ?? {}) as Record<string, unknown>
+    (worktreeConfig ?? {}) as Record<string, unknown>,
   );
 
   // Build result with proper defaults fallback
@@ -557,6 +624,8 @@ export function resolveConfig(
     plugins: mergedPlugins,
     // RFC: Review Providers - carry through from global config (not merged from presets)
     review: globalConfig.review,
+    // RFC: Commit Review Gate - merged from global -> preset -> worktree
+    commitReview: merged.commitReview as CommitReviewConfig | undefined,
   };
 }
 

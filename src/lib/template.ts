@@ -19,7 +19,7 @@ function loadTemplate(_repoRoot: string, name: PromptName): string {
  */
 export function loadAgentContext(
   repoRoot: string,
-  agentType: "planner" | "worker"
+  agentType: "planner" | "worker",
 ): string {
   const contextPath = join(repoRoot, "prloom", `${agentType}.md`);
   if (!existsSync(contextPath)) {
@@ -41,7 +41,7 @@ export function renderWorkerPrompt(
   repoRoot: string,
   planPath: string,
   plan: Plan,
-  todo: TodoItem
+  todo: TodoItem,
 ): string {
   const template = loadTemplate(repoRoot, "worker");
   const compiled = Handlebars.compile(template);
@@ -87,7 +87,7 @@ export function renderDesignerNewPrompt(
   planPath: string,
   baseBranch: string,
   workerAgent: string,
-  userDescription?: string
+  userDescription?: string,
 ): string {
   const template = BUILTIN_PROMPTS["designer_new"];
   const compiled = Handlebars.compile(template);
@@ -109,7 +109,7 @@ export function renderDesignerNewPrompt(
 export function renderDesignerEditPrompt(
   repoPath: string,
   planPath: string,
-  _existingPlan: string
+  _existingPlan: string,
 ): string {
   const template = BUILTIN_PROMPTS["designer_edit"];
   const compiled = Handlebars.compile(template);
@@ -121,6 +121,42 @@ export function renderDesignerEditPrompt(
   if (context) {
     prompt += `\n\n---\n\n# Repository Context\n\n${context}`;
   }
+  return prompt;
+}
+
+// =============================================================================
+// Commit Review Gate (RFC: docs/rfc-commit-review-gate.md)
+// =============================================================================
+
+/**
+ * Render the commit review prompt for the reviewer agent.
+ * The reviewer examines completed TODO work and decides to approve or request changes.
+ */
+export function renderCommitReviewPrompt(
+  repoRoot: string,
+  planPath: string,
+  plan: Plan,
+  todo: TodoItem,
+): string {
+  const template = loadTemplate(repoRoot, "commit_review");
+  const compiled = Handlebars.compile(template);
+
+  // Format current todo with context if available
+  let currentTodo = `TODO #${todo.index + 1}: ${todo.text}`;
+  if (todo.context) {
+    currentTodo += `\n\n**Context:**\n${todo.context}`;
+  }
+
+  const prompt = compiled({
+    plan_path: planPath,
+    plan_title: plan.title,
+    plan_objective: plan.objective,
+    plan_context: plan.context,
+    plan_success_criteria: plan.successCriteria,
+    plan_review_focus: plan.reviewFocus,
+    current_todo: currentTodo,
+  });
+
   return prompt;
 }
 
@@ -136,7 +172,7 @@ export function renderTriagePrompt(
   worktreePath: string,
   planPath: string,
   plan: Plan,
-  feedback: PRFeedback[]
+  feedback: PRFeedback[],
 ): string {
   const template = loadTemplate(repoRoot, "review_triage");
 
