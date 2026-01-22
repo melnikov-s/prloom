@@ -116,7 +116,7 @@ export type ActivatedPlanState = PlanState & {
   branch: string;
   planRelpath: string;
   baseBranch: string;
-  status: "active" | "review" | "triaging" | "done";
+  status: "active" | "paused" | "review" | "triaging" | "done";
 };
 
 // Logger that routes to TUI events or console
@@ -816,9 +816,9 @@ export async function processActivePlans(
         }
       }
 
-      // Skip if plan is blocked or triaging
+      // Skip if plan is blocked, paused, or triaging
       let plan = parsePlan(planPath);
-      if (ps.blocked || ps.status === "triaging") {
+      if (ps.blocked || ps.status === "triaging" || ps.status === "paused") {
         continue;
       }
 
@@ -1563,6 +1563,17 @@ export async function processActivePlans(
 
           // Check if all TODOs are now complete
           const remainingTodo = findNextUnchecked(updated);
+          if (
+            committed &&
+            planConfig.commitReview?.requireManualResume &&
+            remainingTodo
+          ) {
+            log.info(`   Paused for manual resume after commit`, planId);
+            ps.status = "paused";
+            ps.lastError =
+              `Paused for manual resume after commit. Run \`prloom resume ${planId}\` to continue.`;
+            continue;
+          }
           if (!remainingTodo) {
             if (updated.todos.length === 0) {
               log.error(`❌ Plan has zero TODO items, blocking it.`, planId);

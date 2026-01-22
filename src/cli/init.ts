@@ -48,6 +48,7 @@ export async function runInit(
       commitReview: {
         enabled: false,
         maxLoops: 2,
+        requireManualResume: false,
       },
     };
     writeFileSync(configPath, JSON.stringify(config, null, 2) + "\n");

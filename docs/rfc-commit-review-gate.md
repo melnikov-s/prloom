@@ -260,6 +260,7 @@ Add a new config block (global + preset + per-worktree override supported):
   "commitReview": {
     "enabled": false,
     "maxLoops": 2,
+    "requireManualResume": false,
     "agent": "opencode",
     "model": "gpt-5-mini"
   }
@@ -270,6 +271,7 @@ Semantics:
 
 - `enabled`: enable commit review gate.
 - `maxLoops`: max review → fix cycles per TODO before blocking.
+- `requireManualResume`: pause the dispatcher after each commit until manually resumed.
 - `agent` / `model`: reviewer agent selection (independent from worker).
 
 Note: commit review uses the dispatcher’s existing tmux behavior (same as worker). There is no per-feature tmux toggle.
@@ -312,6 +314,7 @@ If `sessions.enabled` is false, prloom runs in current ephemeral mode.
 5. After approval:
    - Run `afterTodo` hooks once (pre-commit).
    - Commit and push.
+   - If `requireManualResume` is true and more TODOs remain, set status to `paused`.
 
 ---
 
@@ -335,4 +338,3 @@ Add tests that cover:
 Mocking policy: only mock external services (GitHub API, filesystem via temp dirs, tmux/shell adapter boundaries). Do not mock internal modules.
 
 ---
-

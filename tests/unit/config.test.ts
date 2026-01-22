@@ -254,6 +254,26 @@ test("getAgentConfig accepts agent/model objects for stage overrides", () => {
   expect(workerConfig.model).toBe("opus");
 });
 
+test("loadConfig reads commitReview requireManualResume flag", () => {
+  mkdirSync(join(TEST_DIR, "prloom"), { recursive: true });
+  writeFileSync(
+    join(TEST_DIR, "prloom", "config.json"),
+    JSON.stringify({
+      commitReview: {
+        enabled: false,
+        maxLoops: 3,
+        requireManualResume: true,
+      },
+    })
+  );
+
+  const config = loadConfig(TEST_DIR);
+
+  expect(config.commitReview?.enabled).toBe(false);
+  expect(config.commitReview?.maxLoops).toBe(3);
+  expect(config.commitReview?.requireManualResume).toBe(true);
+});
+
 // =============================================================================
 // Bridge Configuration Tests
 // =============================================================================

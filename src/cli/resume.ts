@@ -1,10 +1,8 @@
-import { join } from "path";
 import { loadState, saveState } from "../lib/state.js";
-
 import { resolvePlanId } from "../lib/resolver.js";
 import { promptSelection } from "../ui/Selection.js";
 
-export async function runBlock(
+export async function runResume(
   repoRoot: string,
   planIdInput?: string
 ): Promise<void> {
@@ -19,17 +17,16 @@ export async function runBlock(
         id,
         label: id,
         metadata: ps.blocked ? "blocked" : (ps.status ?? "unknown"),
-        color:
-          ps.status === "paused" ? "blue" : ps.blocked ? "red" : "green",
+        color: ps.status === "paused" ? "blue" : ps.blocked ? "red" : "green",
       }))
-      .filter((opt) => opt.metadata !== "blocked" && opt.metadata !== "done");
+      .filter((opt) => opt.metadata === "paused");
 
     if (options.length === 0) {
-      console.log("No blockable plans found.");
+      console.log("No paused plans found.");
       return;
     }
 
-    planId = await promptSelection("Select a plan to block:", options);
+    planId = await promptSelection("Select a plan to resume:", options);
   }
 
   const ps = state.plans[planId];
@@ -39,7 +36,15 @@ export async function runBlock(
     process.exit(1);
   }
 
-  ps.blocked = true;
+  if (ps.status !== "paused") {
+    console.log(`Plan ${planId} is not paused.`);
+    return;
+  }
+
+  ps.status = "active";
+  ps.lastError = undefined;
+
   saveState(repoRoot, state);
-  console.log(`⏹️ Blocked ${planId}`);
+
+  console.log(`▶️ Resumed ${planId}`);
 }

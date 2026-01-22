@@ -49,7 +49,14 @@ export interface PlanState {
   planRelpath?: string;
 
   /** Plan execution status */
-  status: "draft" | "queued" | "active" | "review" | "triaging" | "done";
+  status:
+    | "draft"
+    | "queued"
+    | "active"
+    | "paused"
+    | "review"
+    | "triaging"
+    | "done";
 
   /** Whether the plan is blocked */
   blocked?: boolean;

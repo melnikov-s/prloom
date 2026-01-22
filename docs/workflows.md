@@ -44,10 +44,12 @@ prloom/.local/inbox/<id>.md
 | draft | queued | User runs `prloom queue <id>` |
 | queued | active | Dispatcher ingests plan |
 | active | review | All TODOs completed |
+| active | paused | Manual resume required after commit |
 | active | triaging | New feedback received |
 | triaging | active | Triage complete |
 | review | active | New TODOs added from feedback |
 | review | done | Manual/archive via external tooling |
+| paused | active | User runs `prloom resume <id>` |
 
 `done` is treated like `review`; new TODOs flip it back to `active`.
 

@@ -18,7 +18,7 @@ export async function runLogs(
       id,
       label: id,
       metadata: ps.blocked ? "blocked" : (ps.status ?? "unknown"),
-      color: ps.blocked ? "red" : "green",
+      color: ps.status === "paused" ? "blue" : ps.blocked ? "red" : "green",
     }));
 
     if (options.length === 0) {

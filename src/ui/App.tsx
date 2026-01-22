@@ -60,6 +60,8 @@ function getStatusColor(status: string, blocked?: boolean): string {
   switch (status) {
     case "active":
       return "green";
+    case "paused":
+      return "blue";
     case "queued":
       return "yellow";
     case "draft":
@@ -80,6 +82,8 @@ function getStatusEmoji(status: string, blocked?: boolean): string {
   switch (status) {
     case "active":
       return "🟢";
+    case "paused":
+      return "⏸️";
     case "queued":
       return "🟡";
     case "draft":

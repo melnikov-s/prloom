@@ -5,6 +5,7 @@ test("getStatusColor returns correct color for all valid statuses", () => {
   expect(getStatusColor("draft")).toBe("yellowBright");
   expect(getStatusColor("queued")).toBe("yellow");
   expect(getStatusColor("active")).toBe("green");
+  expect(getStatusColor("paused")).toBe("blue");
   expect(getStatusColor("review")).toBe("cyan");
   expect(getStatusColor("triaging")).toBe("magenta");
   expect(getStatusColor("done")).toBe("gray");
@@ -25,6 +26,7 @@ test("getStatusEmoji returns correct emoji for all valid statuses", () => {
   expect(getStatusEmoji("draft")).toBe("📝");
   expect(getStatusEmoji("queued")).toBe("🟡");
   expect(getStatusEmoji("active")).toBe("🟢");
+  expect(getStatusEmoji("paused")).toBe("⏸️");
   expect(getStatusEmoji("review")).toBe("👀");
   expect(getStatusEmoji("triaging")).toBe("🔍");
   expect(getStatusEmoji("done")).toBe("✅");

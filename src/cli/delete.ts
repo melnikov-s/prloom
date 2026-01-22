@@ -50,6 +50,8 @@ export async function runDelete(
         color:
           ps.status === "draft"
             ? "yellow"
+            : ps.status === "paused"
+            ? "blue"
             : ps.status === "done"
             ? "gray"
             : ps.blocked

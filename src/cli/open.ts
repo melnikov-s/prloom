@@ -40,16 +40,20 @@ export async function runOpen(
         id,
         label: id,
         metadata: ps.blocked ? "blocked" : (ps.status ?? "unknown"),
-        color: ps.blocked ? "red" : "green",
+        color:
+          ps.status === "paused" ? "blue" : ps.blocked ? "red" : "green",
       }))
-      .filter((opt) => opt.metadata === "blocked");
+      .filter((opt) => opt.metadata === "blocked" || opt.metadata === "paused");
 
     if (options.length === 0) {
-      console.log("No blocked plans found to open.");
+      console.log("No blocked or paused plans found to open.");
       return;
     }
 
-    planId = await promptSelection("Select a blocked plan to open:", options);
+    planId = await promptSelection(
+      "Select a blocked or paused plan to open:",
+      options,
+    );
   }
 
   const config = loadConfig(repoRoot);

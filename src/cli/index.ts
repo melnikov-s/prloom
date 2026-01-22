@@ -205,10 +205,22 @@ yargs(hideBin(process.argv))
     }
   )
 
+  // prloom resume
+  .command(
+    "resume [plan-id]",
+    "Resume a paused plan",
+    (yargs) => yargs.positional("plan-id", { type: "string" }),
+    async (argv) => {
+      const repoRoot = await getRepoRoot();
+      const { runResume } = await import("./resume.js");
+      await runResume(repoRoot, argv["plan-id"] as string | undefined);
+    }
+  )
+
   // prloom open
   .command(
     "open [plan-id]",
-    "Open TUI for manual work (requires blocked status)",
+    "Open TUI for manual work (blocked or paused)",
     (yargs) => yargs.positional("plan-id", { type: "string" }),
     async (argv) => {
       const repoRoot = await getRepoRoot();

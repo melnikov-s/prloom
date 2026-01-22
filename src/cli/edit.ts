@@ -43,7 +43,14 @@ export async function runEdit(
         metadata: isDraftOrQueued
           ? `inbox [${ps.status}]`
           : `active [${ps.status}]`,
-        color: ps.status === "draft" ? "yellow" : ps.blocked ? "red" : "green",
+        color:
+          ps.status === "draft"
+            ? "yellow"
+            : ps.status === "paused"
+            ? "blue"
+            : ps.blocked
+            ? "red"
+            : "green",
       };
     });
 

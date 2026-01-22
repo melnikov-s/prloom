@@ -5,6 +5,7 @@ import { tmpdir } from "os";
 import { runQueue } from "../../src/cli/queue.js";
 import { runBlock } from "../../src/cli/block.js";
 import { runUnblock } from "../../src/cli/unblock.js";
+import { runResume } from "../../src/cli/resume.js";
 import { runOpen } from "../../src/cli/open.js";
 import { runWatch } from "../../src/cli/watch.js";
 import { runLogs } from "../../src/cli/logs.js";
@@ -73,7 +74,21 @@ test("runOpen handles empty state without ID", async () => {
     console.log = originalLog;
   }
 
-  expect(logs.join("\n")).toContain("No blocked plans found to open.");
+  expect(logs.join("\n")).toContain("No blocked or paused plans found to open.");
+});
+
+test("runResume handles empty state without ID", async () => {
+  const logs: string[] = [];
+  const originalLog = console.log;
+  console.log = (msg: string) => logs.push(msg);
+
+  try {
+    await runResume(repoRoot, undefined);
+  } finally {
+    console.log = originalLog;
+  }
+
+  expect(logs.join("\n")).toContain("No paused plans found.");
 });
 
 test("runWatch handles empty state without ID", async () => {

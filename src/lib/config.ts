@@ -87,6 +87,8 @@ export interface CommitReviewConfig {
   enabled: boolean;
   /** Maximum review → fix cycles before blocking (default: 2) */
   maxLoops?: number;
+  /** Require manual resume after each TODO commit (default: false) */
+  requireManualResume?: boolean;
   /** Agent to use for review (overrides default) */
   agent?: AgentName;
   /** Model to use for review */
@@ -225,6 +227,7 @@ const DEFAULTS: Config = {
   commitReview: {
     enabled: false,
     maxLoops: 2,
+    requireManualResume: false,
   },
 };
 
@@ -460,6 +463,10 @@ function parseCommitReviewConfig(
   return {
     enabled: obj.enabled,
     maxLoops: typeof obj.maxLoops === "number" ? obj.maxLoops : undefined,
+    requireManualResume:
+      typeof obj.requireManualResume === "boolean"
+        ? obj.requireManualResume
+        : undefined,
     agent: parseAgentName(obj.agent),
     model: parseModelRef(obj.model),
   };

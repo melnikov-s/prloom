@@ -31,11 +31,12 @@ test("ActivatedPlanState type accepts 'triaging' status", () => {
   expect(planState.status).toBe("triaging");
 });
 
-test("PlanState allows all valid status values including 'triaging'", () => {
+test("PlanState allows all valid status values including 'paused'", () => {
   const validStatuses: PlanState["status"][] = [
     "draft",
     "queued",
     "active",
+    "paused",
     "review",
     "triaging",
     "done",
