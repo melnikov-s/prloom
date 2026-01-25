@@ -1,6 +1,6 @@
 import { execa } from "execa";
 import { loadState, saveState } from "../lib/state.js";
-import { loadConfig, getAgentConfig } from "../lib/config.js";
+import { loadConfig, getAgentConfig, resolveConfig } from "../lib/config.js";
 import { getAdapter } from "../lib/adapters/index.js";
 import { isProcessAlive, killProcess } from "../lib/adapters/process.js";
 import { confirm } from "./prompt.js";
@@ -101,13 +101,17 @@ export async function runOpen(
     saveState(repoRoot, state);
   }
 
-  // Get the plan's agent from state or use config default
-  const workerConfig = getAgentConfig(config, "worker");
-  const agentName = ps.agent ?? workerConfig.agent;
+  // Get the plan's agent from stage config
+  const resolvedConfig = resolveConfig(config, ps.preset);
+  const workerConfig = getAgentConfig(resolvedConfig, "worker");
+  const agentName = workerConfig.agent;
   const adapter = getAdapter(agentName);
+  const workerLabel = workerConfig.model
+    ? `${agentName} / ${workerConfig.model}`
+    : agentName;
 
   console.log(`Opening session for ${planId}...`);
-  console.log(`Agent: ${agentName}`);
+  console.log(`Model: ${workerLabel}`);
   console.log(`Worktree: ${ps.worktree}`);
 
   if (!ps.worktree) {
@@ -115,5 +119,5 @@ export async function runOpen(
     process.exit(1);
   }
 
-  await adapter.interactive({ cwd: ps.worktree });
+  await adapter.interactive({ cwd: ps.worktree, model: workerConfig.model });
 }

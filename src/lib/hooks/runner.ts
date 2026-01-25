@@ -35,7 +35,6 @@ import {
 import {
   loadConfig,
   getAgentConfig,
-  resolveModelRef,
   type ModelRef,
   type Config,
 } from "../config.js";
@@ -203,10 +202,12 @@ ${filesContext}
 Instructions: ${prompt}`;
 
       // Get agent configuration for requested stage (defaults to worker)
-      const agentConfig = getAgentConfig(config, options?.stage ?? "worker");
-      const modelOverride = resolveModelRef(config, options?.model);
-      const agent = modelOverride?.agent ?? agentConfig.agent;
-      const adapter = getAdapter(agent);
+      const agentConfig = getAgentConfig(
+        config,
+        options?.stage ?? "worker",
+        options?.model,
+      );
+      const adapter = getAdapter(agentConfig.agent);
 
       // Create a temporary file for the agent to write its response
       const tmpDir = join(tmpdir(), `prloom-hook-${planId}`);
@@ -231,7 +232,7 @@ Do NOT include any other text or explanation, just the plan content.`;
         cwd: worktree,
         prompt: fullPrompt,
         tmux: tmuxConfig,
-        model: modelOverride?.model ?? agentConfig.model,
+        model: agentConfig.model,
       });
 
       // Wait for completion

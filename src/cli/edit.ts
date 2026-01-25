@@ -1,7 +1,7 @@
 import { join } from "path";
 import { existsSync, readFileSync, writeFileSync } from "fs";
 import { loadConfig, getAgentConfig, resolveConfig } from "../lib/config.js";
-import { getAdapter, type AgentName } from "../lib/adapters/index.js";
+import { getAdapter } from "../lib/adapters/index.js";
 import { renderDesignerEditPrompt } from "../lib/template.js";
 import {
   listInboxPlanIds,
@@ -19,7 +19,6 @@ import { loadPlugins, runHooks, buildHookContext } from "../lib/hooks/index.js";
 export async function runEdit(
   repoRoot: string,
   planIdInput?: string,
-  agentOverride?: string,
   noDesigner?: boolean,
 ): Promise<void> {
   let planId: string;
@@ -102,6 +101,9 @@ export async function runEdit(
 
   console.log(`Plan path: ${planPath}`);
 
+  const planMeta = state.plans[planId];
+  const resolvedConfig = resolveConfig(config, planMeta?.preset);
+
   // Skip designer session if --no-designer flag is used
   if (noDesigner) {
     console.log("");
@@ -111,15 +113,13 @@ export async function runEdit(
 
   const existingPlan = readFileSync(planPath, "utf-8");
 
-  // Resolve agent: CLI flag > config default
-  const designerConfig = getAgentConfig(
-    config,
-    "designer",
-    agentOverride as AgentName,
-  );
+  const designerConfig = getAgentConfig(resolvedConfig, "designer");
   const adapter = getAdapter(designerConfig.agent);
 
-  console.log(`Agent: ${designerConfig.agent}`);
+  const designerLabel = designerConfig.model
+    ? `${designerConfig.agent} / ${designerConfig.model}`
+    : designerConfig.agent;
+  console.log(`Designer model: ${designerLabel}`);
 
   const prompt = renderDesignerEditPrompt(cwd, planPath, existingPlan);
   await adapter.interactive({ cwd, prompt, model: designerConfig.model });
@@ -129,8 +129,6 @@ export async function runEdit(
 
   // Run afterDesign hooks
   // Use resolved config with preset (from state) so plugin overrides take effect
-  const planMeta = state.plans[planId];
-  const resolvedConfig = resolveConfig(config, planMeta?.preset);
   const hookRegistry = await loadPlugins(resolvedConfig, repoRoot);
   if (hookRegistry.afterDesign && hookRegistry.afterDesign.length > 0) {
     console.log("Running afterDesign hooks...");

@@ -59,7 +59,6 @@ test("loadConfig uses defaults for missing fields", () => {
 
 test("resolveWorktreesDir resolves relative path", () => {
   const config = {
-    agents: { default: "opencode" as const },
     github: { enabled: true },
     worktrees_dir: "../worktrees",
     github_poll_interval_ms: 60000,
@@ -72,144 +71,15 @@ test("resolveWorktreesDir resolves relative path", () => {
   expect(resolved).toBe("/repo/worktrees");
 });
 
-test("loadConfig returns default agents when not specified", () => {
+test("loadConfig returns default stage model when not specified", () => {
   const config = loadConfig(TEST_DIR);
-
-  expect(config.agents.default).toBe("opencode");
-  expect(config.agents.opencode).toBeUndefined();
-});
-
-test("loadConfig reads agents from config file with new structure", () => {
-  mkdirSync(join(TEST_DIR, "prloom"), { recursive: true });
-  writeFileSync(
-    join(TEST_DIR, "prloom", "config.json"),
-    JSON.stringify({
-      agents: {
-        default: "claude",
-        claude: {
-          default: "sonnet",
-          designer: "opus",
-          maxTokens: 9000,
-        },
-      },
-      base_branch: "develop",
-    })
-  );
-
-  const config = loadConfig(TEST_DIR);
-
-  expect(config.agents.default).toBe("claude");
-  expect(config.agents.claude?.default).toBe("sonnet");
-  expect(config.agents.claude?.designer).toBe("opus");
-  expect((config.agents.claude as Record<string, unknown>)?.maxTokens).toBe(
-    9000
-  );
-});
-
-test("loadConfig ignores invalid agent names", () => {
-  mkdirSync(join(TEST_DIR, "prloom"), { recursive: true });
-  writeFileSync(
-    join(TEST_DIR, "prloom", "config.json"),
-    JSON.stringify({
-      agents: {
-        default: "invalid-agent",
-        opencode: {
-          default: "gpt-4",
-        },
-      },
-      base_branch: "develop",
-    })
-  );
-
-  const config = loadConfig(TEST_DIR);
-
-  // Falls back to default since "invalid-agent" isn't valid
-  expect(config.agents.default).toBe("opencode");
-  expect(config.agents.opencode?.default).toBe("gpt-4");
-});
-
-test("loadConfig reads agent models from config file", () => {
-  mkdirSync(join(TEST_DIR, "prloom"), { recursive: true });
-  writeFileSync(
-    join(TEST_DIR, "prloom", "config.json"),
-    JSON.stringify({
-      agents: {
-        default: "opencode",
-        opencode: {
-          default: "gpt-4",
-          triage: "claude-sonnet-4-20250514",
-        },
-      },
-    })
-  );
-
-  const config = loadConfig(TEST_DIR);
-
-  expect(config.agents.default).toBe("opencode");
-  expect(config.agents.opencode?.default).toBe("gpt-4");
-  expect(config.agents.opencode?.triage).toBe("claude-sonnet-4-20250514");
-});
-
-test("getAgentConfig returns stage-specific model or falls back to default", () => {
-  mkdirSync(join(TEST_DIR, "prloom"), { recursive: true });
-  writeFileSync(
-    join(TEST_DIR, "prloom", "config.json"),
-    JSON.stringify({
-      agents: {
-        default: "opencode",
-        opencode: {
-          default: "gpt-4",
-          triage: "claude-sonnet-4-20250514",
-        },
-      },
-    })
-  );
-
-  const config = loadConfig(TEST_DIR);
-
-  // Triage has specific model
-  const triageConfig = getAgentConfig(config, "triage");
-  expect(triageConfig.agent).toBe("opencode");
-  expect(triageConfig.model).toBe("claude-sonnet-4-20250514");
-
-  // Worker uses default model
   const workerConfig = getAgentConfig(config, "worker");
+
   expect(workerConfig.agent).toBe("opencode");
-  expect(workerConfig.model).toBe("gpt-4");
+  expect(workerConfig.model).toBeUndefined();
 });
 
-test("getAgentConfig respects agent override parameter", () => {
-  mkdirSync(join(TEST_DIR, "prloom"), { recursive: true });
-  writeFileSync(
-    join(TEST_DIR, "prloom", "config.json"),
-    JSON.stringify({
-      agents: {
-        default: "opencode",
-        opencode: {
-          default: "gpt-4",
-        },
-        claude: {
-          default: "sonnet",
-          worker: "opus",
-        },
-      },
-    })
-  );
-
-  const config = loadConfig(TEST_DIR);
-
-  // Default agent (opencode)
-  const defaultWorker = getAgentConfig(config, "worker");
-  expect(defaultWorker.agent).toBe("opencode");
-  expect(defaultWorker.model).toBe("gpt-4");
-
-  // Override to claude
-  const claudeWorker = getAgentConfig(config, "worker", "claude");
-  expect(claudeWorker.agent).toBe("claude");
-  expect(claudeWorker.model).toBe("opus");
-});
-
-test("getAgentConfig resolves stage presets to agent and model", () => {
+test("loadConfig reads model presets and stage references", () => {
   mkdirSync(join(TEST_DIR, "prloom"), { recursive: true });
   writeFileSync(
     join(TEST_DIR, "prloom", "config.json"),
@@ -220,9 +90,6 @@ test("getAgentConfig resolves stage presets to agent and model", () => {
       stages: {
         worker: "high",
       },
-      agents: {
-        default: "opencode",
-      },
     })
   );
 
@@ -231,6 +98,24 @@ test("getAgentConfig resolves stage presets to agent and model", () => {
 
   expect(workerConfig.agent).toBe("claude");
   expect(workerConfig.model).toBe("opus");
+});
+
+test("getAgentConfig falls back to stages.default", () => {
+  mkdirSync(join(TEST_DIR, "prloom"), { recursive: true });
+  writeFileSync(
+    join(TEST_DIR, "prloom", "config.json"),
+    JSON.stringify({
+      stages: {
+        default: { agent: "claude", model: "sonnet" },
+      },
+    })
+  );
+
+  const config = loadConfig(TEST_DIR);
+  const triageConfig = getAgentConfig(config, "triage");
+
+  expect(triageConfig.agent).toBe("claude");
+  expect(triageConfig.model).toBe("sonnet");
 });
 
 test("getAgentConfig accepts agent/model objects for stage overrides", () => {
@@ -241,9 +126,6 @@ test("getAgentConfig accepts agent/model objects for stage overrides", () => {
       stages: {
         worker: { agent: "claude", model: "opus" },
       },
-      agents: {
-        default: "opencode",
-      },
     })
   );
 
@@ -254,7 +136,48 @@ test("getAgentConfig accepts agent/model objects for stage overrides", () => {
   expect(workerConfig.model).toBe("opus");
 });
 
-test("loadConfig reads commitReview requireManualResume flag", () => {
+test("getAgentConfig ignores unknown presets and falls back", () => {
+  mkdirSync(join(TEST_DIR, "prloom"), { recursive: true });
+  writeFileSync(
+    join(TEST_DIR, "prloom", "config.json"),
+    JSON.stringify({
+      stages: {
+        default: { agent: "opencode", model: "gpt-4" },
+        worker: "unknown",
+      },
+    })
+  );
+
+  const config = loadConfig(TEST_DIR);
+  const workerConfig = getAgentConfig(config, "worker");
+
+  expect(workerConfig.agent).toBe("opencode");
+  expect(workerConfig.model).toBe("gpt-4");
+});
+
+test("getAgentConfig uses commitReview model override", () => {
+  mkdirSync(join(TEST_DIR, "prloom"), { recursive: true });
+  writeFileSync(
+    join(TEST_DIR, "prloom", "config.json"),
+    JSON.stringify({
+      models: {
+        review: { agent: "opencode", model: "gpt-4" },
+      },
+      commitReview: {
+        enabled: true,
+        model: "review",
+      },
+    })
+  );
+
+  const config = loadConfig(TEST_DIR);
+  const reviewConfig = getAgentConfig(config, "commitReview");
+
+  expect(reviewConfig.agent).toBe("opencode");
+  expect(reviewConfig.model).toBe("gpt-4");
+});
+
+test("loadConfig reads requireManualResume flag", () => {
   mkdirSync(join(TEST_DIR, "prloom"), { recursive: true });
   writeFileSync(
     join(TEST_DIR, "prloom", "config.json"),
@@ -262,8 +185,8 @@ test("loadConfig reads commitReview requireManualResume flag", () => {
       commitReview: {
         enabled: false,
         maxLoops: 3,
-        requireManualResume: true,
       },
+      requireManualResume: true,
     })
   );
 
@@ -271,7 +194,7 @@ test("loadConfig reads commitReview requireManualResume flag", () => {
 
   expect(config.commitReview?.enabled).toBe(false);
   expect(config.commitReview?.maxLoops).toBe(3);
-  expect(config.commitReview?.requireManualResume).toBe(true);
+  expect(config.requireManualResume).toBe(true);
 });
 
 // =============================================================================

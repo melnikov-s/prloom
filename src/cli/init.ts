@@ -37,18 +37,19 @@ export async function runInit(
   mkdirSync(prloomDir, { recursive: true });
 
   if (!existsSync(configPath) || opts.force) {
-    // Load existing (if any) so we preserve agent choices when force is used
+    // Load existing (if any) so we preserve model choices when force is used
     const existing = loadConfig(repoRoot);
     const config = {
-      agents: existing.agents,
+      models: existing.models,
+      stages: existing.stages,
       worktrees_dir: existing.worktrees_dir,
       github_poll_interval_ms: existing.github_poll_interval_ms,
       base_branch: defaultBranch,
+      requireManualResume: existing.requireManualResume,
       // RFC: Commit Review Gate - set enabled: true to activate
       commitReview: {
         enabled: false,
         maxLoops: 2,
-        requireManualResume: false,
       },
     };
     writeFileSync(configPath, JSON.stringify(config, null, 2) + "\n");

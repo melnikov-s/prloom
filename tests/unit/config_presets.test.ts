@@ -166,21 +166,18 @@ test("resolveConfig ignores missing preset name", () => {
   expect(resolved.base_branch).toBe("main");
 });
 
-test("resolveConfig correctly merges nested agent config", () => {
+test("resolveConfig correctly merges nested stage config", () => {
   mkdirSync(join(TEST_DIR, "prloom"), { recursive: true });
   writeFileSync(
     join(TEST_DIR, "prloom", "config.json"),
     JSON.stringify({
-      agents: {
-        default: "opencode",
-        opencode: {
-          default: "gpt-4",
-        },
+      stages: {
+        default: { agent: "opencode", model: "gpt-4" },
       },
       presets: {
         premium: {
-          agents: {
-            default: "claude",
+          stages: {
+            default: { agent: "claude", model: "sonnet" },
           },
         },
       },
@@ -190,7 +187,10 @@ test("resolveConfig correctly merges nested agent config", () => {
   const config = loadConfig(TEST_DIR);
   const resolved = resolveConfig(config, "premium");
 
-  expect(resolved.agents.default).toBe("claude");
+  expect(resolved.stages?.default).toEqual({
+    agent: "claude",
+    model: "sonnet",
+  });
 });
 
 // ============================================================================

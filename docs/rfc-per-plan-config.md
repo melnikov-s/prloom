@@ -196,8 +196,7 @@ function resolveConfig(globalConfig, presetName, worktreeConfig) {
 | `plugins.<name>.enabled`   | ✅ Yes    | Disable specific plugin    |
 | `plugins.<name>.<setting>` | ✅ Yes    | Override plugin settings   |
 | `bus.tickIntervalMs`       | ✅ Yes    | Change tick rate           |
-| `agent.model`              | ✅ Yes    | Different model per plan   |
-| `agent.adapter`            | ✅ Yes    | Different adapter per plan |
+| `stages.<stage>`           | ✅ Yes    | Different model per plan   |
 
 ---
 
@@ -219,7 +218,7 @@ When GitHub is disabled, the plan runs entirely locally.
 
 ## Design Decisions
 
-1. **Everything is overridable**: All config values (including agent model/adapter) can be overridden per plan.
+1. **Everything is overridable**: All config values (including model presets/stage overrides) can be overridden per plan.
 
 2. **No preset inheritance**: Presets don't extend other presets. Copy/paste if needed.
 

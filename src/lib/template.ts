@@ -86,7 +86,7 @@ export function renderDesignerNewPrompt(
   repoPath: string,
   planPath: string,
   baseBranch: string,
-  workerAgent: string,
+  workerModel: string,
   userDescription?: string,
 ): string {
   const template = BUILTIN_PROMPTS["designer_new"];
@@ -95,7 +95,7 @@ export function renderDesignerNewPrompt(
     repo_path: repoPath,
     plan_path: planPath,
     base_branch: baseBranch,
-    worker_agent: workerAgent,
+    worker_model: workerModel,
     user_description: userDescription ?? "",
   });
 

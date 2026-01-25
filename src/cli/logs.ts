@@ -1,7 +1,7 @@
 import { loadState } from "../lib/state.js";
 import { resolvePlanId } from "../lib/resolver.js";
 import { promptSelection } from "../ui/Selection.js";
-import { loadConfig, getAgentConfig } from "../lib/config.js";
+import { loadConfig, getAgentConfig, resolveConfig } from "../lib/config.js";
 
 export async function runLogs(
   repoRoot: string,
@@ -51,8 +51,9 @@ export async function runLogs(
     console.log(`Agent PID: ${ps.pid}`);
   }
 
-  // Show resume command based on agent
-  const agentName = ps.agent ?? getAgentConfig(config, "worker").agent;
+  // Show resume command based on adapter
+  const resolvedConfig = resolveConfig(config, ps.preset);
+  const agentName = getAgentConfig(resolvedConfig, "worker").agent;
   const resumeCommands: Record<string, string> = {
     amp: "amp threads continue",
     claude: "claude --continue",

@@ -51,7 +51,6 @@ function writeInboxPlanWithPreset(
   repoRoot: string,
   planId: string,
   planContent: string,
-  agent: string,
   preset: string
 ): void {
   const inboxDir = join(repoRoot, "prloom", ".local", "inbox");
@@ -63,7 +62,7 @@ function writeInboxPlanWithPreset(
   // Write metadata JSON with preset
   writeFileSync(
     join(inboxDir, `${planId}.json`),
-    JSON.stringify({ status: "queued", agent, preset }, null, 2)
+    JSON.stringify({ status: "queued", preset }, null, 2)
   );
 }
 
@@ -72,7 +71,6 @@ test("presets: plan with preset uses preset config", async () => {
 
   // Write config with a preset that changes github settings
   writeTestConfig(repoRoot, {
-    agents: { default: "opencode" },
     github: { enabled: true }, // Global: enabled
     base_branch: "main",
     presets: {
@@ -89,7 +87,7 @@ test("presets: plan with preset uses preset config", async () => {
     objective: "Testing preset overrides.",
     todos: ["Single task"],
   });
-  writeInboxPlanWithPreset(repoRoot, planId, planContent, "opencode", "no-github");
+  writeInboxPlanWithPreset(repoRoot, planId, planContent, "no-github");
 
   const config = loadConfig(repoRoot);
   const worktreesDir = resolveWorktreesDir(repoRoot, config);
@@ -115,12 +113,13 @@ test("presets: worktree config is written for preset plans", async () => {
 
   // Write config with a preset
   writeTestConfig(repoRoot, {
-    agents: { default: "opencode" },
     github: { enabled: false },
     base_branch: "main",
     presets: {
       "custom-agent": {
-        agents: { default: "claude" },
+        stages: {
+          default: { agent: "claude", model: "sonnet" },
+        },
       },
     },
   });
@@ -132,7 +131,7 @@ test("presets: worktree config is written for preset plans", async () => {
     objective: "Testing worktree config for presets.",
     todos: ["Task"],
   });
-  writeInboxPlanWithPreset(repoRoot, planId, planContent, "opencode", "custom-agent");
+  writeInboxPlanWithPreset(repoRoot, planId, planContent, "custom-agent");
 
   const config = loadConfig(repoRoot);
   const worktreesDir = resolveWorktreesDir(repoRoot, config);
@@ -155,7 +154,10 @@ test("presets: worktree config is written for preset plans", async () => {
 
   // Verify config contents
   const worktreeConfig = JSON.parse(readFileSync(worktreeConfigPath, "utf-8"));
-  expect(worktreeConfig.agents?.default).toBe("claude");
+  expect(worktreeConfig.stages?.default).toEqual({
+    agent: "claude",
+    model: "sonnet",
+  });
 }, 30000);
 
 test("presets: plugin overrides in preset", async () => {
@@ -190,7 +192,7 @@ test("presets: plugin overrides in preset", async () => {
     todos: ["Task"],
   });
 
-  writeInboxPlanWithPreset(repoRoot, planId, planContent, "opencode", "no-plugins");
+  writeInboxPlanWithPreset(repoRoot, planId, planContent, "no-plugins");
 
   const config = loadConfig(repoRoot);
   const worktreesDir = resolveWorktreesDir(repoRoot, config);
@@ -252,7 +254,7 @@ test("presets: plan without preset uses global config", async () => {
   writeFileSync(join(inboxDir, `${planId}.md`), planContent);
   writeFileSync(
     join(inboxDir, `${planId}.json`),
-    JSON.stringify({ status: "queued", agent: "opencode" }, null, 2)
+    JSON.stringify({ status: "queued" }, null, 2)
   );
 
   const config = loadConfig(repoRoot);

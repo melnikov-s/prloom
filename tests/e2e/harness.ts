@@ -526,7 +526,7 @@ export function writeInboxPlan(
   repoRoot: string,
   planId: string,
   planContent: string,
-  agent: string = "opencode"
+  _agent: string = "opencode"
 ): void {
   const inboxDir = join(repoRoot, "prloom", ".local", "inbox");
   mkdirSync(inboxDir, { recursive: true });
@@ -537,7 +537,7 @@ export function writeInboxPlan(
   // Write metadata JSON (queued status)
   writeFileSync(
     join(inboxDir, `${planId}.json`),
-    JSON.stringify({ status: "queued", agent }, null, 2)
+    JSON.stringify({ status: "queued" }, null, 2)
   );
 }
 

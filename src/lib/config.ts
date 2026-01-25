@@ -87,10 +87,6 @@ export interface CommitReviewConfig {
   enabled: boolean;
   /** Maximum review → fix cycles before blocking (default: 2) */
   maxLoops?: number;
-  /** Require manual resume after each TODO commit (default: false) */
-  requireManualResume?: boolean;
-  /** Agent to use for review (overrides default) */
-  agent?: AgentName;
   /** Model to use for review */
   model?: ModelRef;
 }
@@ -101,9 +97,9 @@ export interface CommitReviewConfig {
  */
 export interface PresetConfig {
   github?: Partial<GithubConfig>;
-  agents?: Partial<AgentsConfig>;
   models?: Record<string, ModelPreset>;
   stages?: Partial<StageModelConfig>;
+  requireManualResume?: boolean;
   github_poll_interval_ms?: number;
   base_branch?: string;
   /** Plugin overrides (enable/disable, config overrides) */
@@ -120,10 +116,11 @@ export interface ModelPreset {
   model?: string;
 }
 
+// String refs resolve via config.models presets; object refs inline agent+model.
 export type ModelRef = string | ModelPreset;
 
 /**
- * Stage-specific agent/model configuration.
+ * Stage-specific model configuration.
  */
 export interface StageModelConfig {
   default?: ModelRef;
@@ -131,36 +128,6 @@ export interface StageModelConfig {
   worker?: ModelRef;
   triage?: ModelRef;
   commitReview?: ModelRef;
-}
-
-/**
- * Model configuration for a specific agent.
- * Maps stage names to model identifiers, with a default fallback.
- */
-export interface AgentModelConfig {
-  default?: string;
-  designer?: string;
-  worker?: string;
-  triage?: string;
-  commitReview?: string;
-}
-
-export interface AgentConfig extends AgentModelConfig {
-  [key: string]: unknown;
-}
-
-/**
- * Agents configuration.
- * - `default`: which agent to use by default
- * - `[agentName]`: model configuration per agent
- */
-export interface AgentsConfig {
-  default: AgentName;
-  amp?: AgentConfig;
-  claude?: AgentConfig;
-  codex?: AgentConfig;
-  gemini?: AgentConfig;
-  opencode?: AgentConfig;
 }
 
 /**
@@ -172,7 +139,6 @@ export interface AgentStageConfig {
 }
 
 export interface Config {
-  agents: AgentsConfig;
   github: GithubConfig;
   models?: Record<string, ModelPreset>;
   stages?: StageModelConfig;
@@ -209,25 +175,27 @@ export interface Config {
   // RFC: Commit Review Gate
   // ==========================================================================
 
+  /** Require manual resume after each TODO commit (default: false) */
+  requireManualResume?: boolean;
   /** Commit review gate configuration (pre-commit quality gate) */
   commitReview?: CommitReviewConfig;
 }
 
+const DEFAULT_STAGE_MODEL: ModelPreset = { agent: "opencode" };
+
 const DEFAULTS: Config = {
-  agents: {
-    default: "opencode",
-  },
   github: DEFAULT_GITHUB,
+  stages: { default: DEFAULT_STAGE_MODEL },
   worktrees_dir: "prloom/.local/worktrees",
   github_poll_interval_ms: 60000, // 60 seconds for GitHub API rate limits
   base_branch: "main",
   bus: DEFAULT_BUS,
   bridges: DEFAULT_BRIDGES,
+  requireManualResume: false,
   // RFC: Commit Review Gate - disabled by default, set enabled: true to activate
   commitReview: {
     enabled: false,
     maxLoops: 2,
-    requireManualResume: false,
   },
 };
 
@@ -242,21 +210,8 @@ export function loadConfig(repoRoot: string): Config {
     const raw = readFileSync(configPath, "utf-8");
     const parsed = JSON.parse(raw);
 
-    // Parse agents config
-    const defaultAgent =
-      parseAgentName(parsed.agents?.default) ?? DEFAULTS.agents.default;
-
-    const agents: AgentsConfig = {
-      default: defaultAgent,
-      amp: parseAgentModelConfig(parsed.agents?.amp),
-      claude: parseAgentModelConfig(parsed.agents?.claude),
-      codex: parseAgentModelConfig(parsed.agents?.codex),
-      gemini: parseAgentModelConfig(parsed.agents?.gemini),
-      opencode: parseAgentModelConfig(parsed.agents?.opencode),
-    };
-
     const models = parseModelPresets(parsed.models);
-    const stages = parseStageModelConfig(parsed.stages);
+    const stages = parseStageModelConfig(parsed.stages) ?? DEFAULTS.stages;
 
     // Parse github config
     const github: GithubConfig = {
@@ -314,7 +269,6 @@ export function loadConfig(repoRoot: string): Config {
     const review = parseReviewConfig(parsed.review);
 
     return {
-      agents,
       github,
       models,
       stages,
@@ -335,6 +289,10 @@ export function loadConfig(repoRoot: string): Config {
       initCommands: Array.isArray(parsed.initCommands)
         ? parsed.initCommands
         : undefined,
+      requireManualResume:
+        typeof parsed.requireManualResume === "boolean"
+          ? parsed.requireManualResume
+          : DEFAULTS.requireManualResume,
       review,
       commitReview: parseCommitReviewConfig(parsed.commitReview),
     };
@@ -463,42 +421,8 @@ function parseCommitReviewConfig(
   return {
     enabled: obj.enabled,
     maxLoops: typeof obj.maxLoops === "number" ? obj.maxLoops : undefined,
-    requireManualResume:
-      typeof obj.requireManualResume === "boolean"
-        ? obj.requireManualResume
-        : undefined,
-    agent: parseAgentName(obj.agent),
     model: parseModelRef(obj.model),
   };
-}
-
-function parseAgentModelConfig(value: unknown): AgentConfig | undefined {
-  if (typeof value !== "object" || value === null) {
-    return undefined;
-  }
-
-  const obj = value as Record<string, unknown>;
-  const config: AgentConfig = {};
-  const stageKeys = new Set([
-    "default",
-    "designer",
-    "worker",
-    "triage",
-    "commitReview",
-  ]);
-
-  for (const [key, val] of Object.entries(obj)) {
-    if (stageKeys.has(key)) {
-      if (typeof val === "string") {
-        (config as AgentModelConfig)[key as keyof AgentModelConfig] = val;
-      }
-      continue;
-    }
-
-    config[key] = val;
-  }
-
-  return Object.keys(config).length > 0 ? config : undefined;
 }
 
 function parseStageModelConfig(value: unknown): StageModelConfig | undefined {
@@ -534,7 +458,7 @@ function parseAgentName(value: unknown): AgentName | undefined {
 export function resolveModelRef(
   config: Config,
   modelRef: ModelRef | undefined,
-): { agent?: AgentName; model?: string } | undefined {
+): { agent: AgentName; model?: string } | undefined {
   if (!modelRef) {
     return undefined;
   }
@@ -542,11 +466,10 @@ export function resolveModelRef(
   if (typeof modelRef === "string") {
     const presetName = normalizeModelPresetName(modelRef);
     const preset = presetName ? config.models?.[presetName] : undefined;
-    if (preset) {
-      return { agent: preset.agent, model: preset.model };
+    if (!preset) {
+      return undefined;
     }
-
-    return { model: modelRef };
+    return { agent: preset.agent, model: preset.model };
   }
 
   const agent = parseAgentName(modelRef.agent);
@@ -562,62 +485,48 @@ export function resolveModelRef(
 
 function resolveStageConfig(
   config: Config,
-  stage: AgentStage,
-  baseAgent: AgentName,
-  modelRef?: ModelRef,
+  ...modelRefs: (ModelRef | undefined)[]
 ): AgentStageConfig {
-  const resolved = resolveModelRef(config, modelRef);
-  const agent = resolved?.agent ?? baseAgent;
-  const agentModels = config.agents[agent];
-  const defaultModel =
-    typeof agentModels?.default === "string" ? agentModels.default : undefined;
-  const stageModel =
-    agentModels && typeof agentModels[stage] === "string"
-      ? agentModels[stage]
-      : undefined;
-  const commitReviewModel =
-    agentModels && typeof agentModels.commitReview === "string"
-      ? agentModels.commitReview
-      : undefined;
-  const fallbackModel =
-    stage === "commitReview"
-      ? commitReviewModel ?? defaultModel
-      : stageModel ?? defaultModel;
+  for (const modelRef of modelRefs) {
+    const resolved = resolveModelRef(config, modelRef);
+    if (resolved) {
+      return resolved;
+    }
+  }
 
   return {
-    agent,
-    model: resolved?.model ?? fallbackModel,
+    agent: DEFAULT_STAGE_MODEL.agent,
+    model: DEFAULT_STAGE_MODEL.model,
   };
 }
 
 /**
  * Get the agent configuration for a specific stage.
  * Resolution order:
- * 1. Agent's stage-specific model (e.g., agents.opencode.worker)
- * 2. Agent's default model (e.g., agents.opencode.default)
- * 3. Just the agent name with no model
+ * 1. Model override passed to this call
+ * 2. commitReview.model (commitReview stage only)
+ * 3. stages.<stage> or stages.default
+ * 4. Default stage model (opencode)
  */
 export function getAgentConfig(
   config: Config,
   stage: AgentStage,
-  agentOverride?: AgentName,
+  modelOverride?: ModelRef,
 ): AgentStageConfig {
-  const baseAgent = agentOverride ?? config.agents.default;
+  const stageOverride = config.stages?.[stage];
+  const defaultStage = config.stages?.default;
 
-  // RFC: Commit Review Gate - commitReview stage can have its own agent/model in config.commitReview
-  if (stage === "commitReview" && config.commitReview) {
-    const agent = config.commitReview.agent ?? baseAgent;
-    const stageOverride = config.stages?.commitReview ?? config.stages?.default;
-    const modelRef = config.commitReview.model ?? stageOverride;
-    return resolveStageConfig(config, stage, agent, modelRef);
+  if (stage === "commitReview" && config.commitReview?.model) {
+    return resolveStageConfig(
+      config,
+      modelOverride,
+      config.commitReview.model,
+      stageOverride,
+      defaultStage,
+    );
   }
 
-  const stageOverride = config.stages?.[stage] ?? config.stages?.default;
-  if (stageOverride) {
-    return resolveStageConfig(config, stage, baseAgent, stageOverride);
-  }
-
-  return resolveStageConfig(config, stage, baseAgent);
+  return resolveStageConfig(config, modelOverride, stageOverride, defaultStage);
 }
 
 export function resolveWorktreesDir(repoRoot: string, config: Config): string {
@@ -786,7 +695,6 @@ export function resolveConfig(
   );
 
   // Build result with proper defaults fallback
-  const mergedAgents = merged.agents as AgentsConfig | undefined;
   const mergedGithub = merged.github as GithubConfig | undefined;
   const mergedBus = merged.bus as BusConfig | undefined;
   const mergedBridges = merged.bridges as
@@ -795,7 +703,13 @@ export function resolveConfig(
   const mergedModels =
     parseModelPresets(merged.models) ?? globalConfig.models;
   const mergedStages =
-    parseStageModelConfig(merged.stages) ?? globalConfig.stages;
+    parseStageModelConfig(merged.stages) ??
+    globalConfig.stages ??
+    DEFAULTS.stages;
+  const mergedRequireManualResume =
+    typeof merged.requireManualResume === "boolean"
+      ? merged.requireManualResume
+      : undefined;
 
   // Merge plugin configs with proper override handling
   let mergedPlugins = globalConfig.plugins;
@@ -807,7 +721,6 @@ export function resolveConfig(
   }
 
   return {
-    agents: mergedAgents ?? DEFAULTS.agents,
     github: mergedGithub ?? DEFAULTS.github,
     models: mergedModels,
     stages: mergedStages,
@@ -820,6 +733,8 @@ export function resolveConfig(
     bus: mergedBus ?? DEFAULTS.bus,
     bridges: mergedBridges ?? DEFAULTS.bridges,
     plugins: mergedPlugins,
+    requireManualResume:
+      mergedRequireManualResume ?? DEFAULTS.requireManualResume,
     // RFC: Review Providers - carry through from global config (not merged from presets)
     review: globalConfig.review,
     // RFC: Commit Review Gate - merged from global -> preset -> worktree

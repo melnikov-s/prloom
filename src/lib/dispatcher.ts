@@ -631,7 +631,6 @@ export async function ingestInboxPlans(
       // Update plan state with active status and activation fields
       state.plans[actualId] = {
         ...state.plans[actualId],
-        agent: planMeta?.agent ?? state.plans[actualId]?.agent,
         worktree: worktreePath,
         branch,
         pr,
@@ -1086,7 +1085,7 @@ export async function processActivePlans(
             plan,
             todo,
           );
-          const workerConfig = getAgentConfig(planConfig, "worker", ps.agent);
+          const workerConfig = getAgentConfig(planConfig, "worker");
           const adapter = getAdapter(workerConfig.agent);
 
           // Build tmux config if available and not explicitly disabled
@@ -1406,7 +1405,10 @@ export async function processActivePlans(
               ? { sessionName: `prloom-review-${planId}` }
               : undefined;
 
-            log.info(`   Using agent: ${reviewerConfig.agent}`, planId);
+            const reviewerLabel = reviewerConfig.model
+              ? `${reviewerConfig.agent} / ${reviewerConfig.model}`
+              : reviewerConfig.agent;
+            log.info(`   Using model: ${reviewerLabel}`, planId);
 
             // RFC: Session Resume - check if we are already running this review
             let reviewResult: ExecutionResult;
@@ -1565,7 +1567,7 @@ export async function processActivePlans(
           const remainingTodo = findNextUnchecked(updated);
           if (
             committed &&
-            planConfig.commitReview?.requireManualResume &&
+            planConfig.requireManualResume &&
             remainingTodo
           ) {
             log.info(`   Paused for manual resume after commit`, planId);
@@ -1746,7 +1748,10 @@ async function runTriage(
   );
 
   log.info(`🔍 Running triage...`, planId);
-  log.info(`   Using agent: ${triageConfig.agent}`, planId);
+  const triageLabel = triageConfig.model
+    ? `${triageConfig.agent} / ${triageConfig.model}`
+    : triageConfig.agent;
+  log.info(`   Using model: ${triageLabel}`, planId);
 
   // Build tmux config if available and not explicitly disabled
   const useTmux = options.tmux !== false && (await hasTmux());

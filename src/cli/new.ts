@@ -4,9 +4,8 @@ import {
   getAgentConfig,
   getPresetNames,
   resolveConfig,
-  resolveModelRef,
 } from "../lib/config.js";
-import { getAdapter, type AgentName } from "../lib/adapters/index.js";
+import { getAdapter } from "../lib/adapters/index.js";
 import { nanoid } from "nanoid";
 import { generatePlanSkeleton } from "../lib/plan.js";
 import { renderDesignerNewPrompt } from "../lib/template.js";
@@ -28,7 +27,6 @@ interface RunNewOptions {
 export async function runNew(
   repoRoot: string,
   planId?: string,
-  agentOverride?: string,
   noDesigner?: boolean,
   model?: string,
   branchPreference?: string,
@@ -58,15 +56,15 @@ export async function runNew(
     }
   }
 
-  // Resolve designer agent: CLI flag > config.designer > config.default
-  const designerConfig = getAgentConfig(config, "designer");
-  const modelOverride = resolveModelRef(config, model);
-  const designerAgent =
-    modelOverride?.agent ?? (agentOverride as AgentName) ?? designerConfig.agent;
+  // Resolve config with preset so stage overrides apply
+  const resolvedConfig = resolveConfig(config, selectedPreset);
 
-  // Resolve worker agent: CLI flag > config.default
-  const workerConfig = getAgentConfig(config, "worker");
-  const workerAgent = (agentOverride as AgentName) ?? workerConfig.agent;
+  // Resolve designer/worker configuration
+  const designerConfig = getAgentConfig(resolvedConfig, "designer", model);
+  const workerConfig = getAgentConfig(resolvedConfig, "worker");
+  const workerLabel = workerConfig.model
+    ? `${workerConfig.agent} / ${workerConfig.model}`
+    : workerConfig.agent;
 
   // Determine base branch for this plan (current branch)
   const baseBranch = await getCurrentBranch(repoRoot);
@@ -132,7 +130,7 @@ export async function runNew(
   if (selectedPreset) {
     console.log(`Preset: ${selectedPreset}`);
   }
-  console.log(`Worker agent: ${workerAgent}`);
+  console.log(`Worker model: ${workerLabel}`);
 
   // Skip designer session if --no-designer flag is used
   if (noDesigner) {
@@ -142,8 +140,11 @@ export async function runNew(
     return;
   }
 
-  const adapter = getAdapter(designerAgent);
-  console.log(`Designer agent: ${designerAgent}`);
+  const adapter = getAdapter(designerConfig.agent);
+  const designerLabel = designerConfig.model
+    ? `${designerConfig.agent} / ${designerConfig.model}`
+    : designerConfig.agent;
+  console.log(`Designer model: ${designerLabel}`);
   console.log("");
   console.log("Starting Designer session to fill in the plan...");
 
@@ -151,12 +152,12 @@ export async function runNew(
     repoRoot,
     planPath,
     baseBranch,
-    workerAgent,
+    workerLabel,
   );
   await adapter.interactive({
     cwd: repoRoot,
     prompt,
-    model: modelOverride?.model ?? designerConfig.model,
+    model: designerConfig.model,
   });
 
   console.log("");
@@ -164,7 +165,6 @@ export async function runNew(
 
   // Run afterDesign hooks
   // Use resolved config with preset so plugin overrides take effect
-  const resolvedConfig = resolveConfig(config, selectedPreset);
   const hookRegistry = await loadPlugins(resolvedConfig, repoRoot);
   if (hookRegistry.afterDesign && hookRegistry.afterDesign.length > 0) {
     console.log("Running afterDesign hooks...");

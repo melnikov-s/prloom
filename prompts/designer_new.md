@@ -13,7 +13,7 @@ You are working in:
 
 - **Repo**: `{{repo_path}}`
 - **Base branch**: `{{base_branch}}`
-- **Worker agent**: `{{worker_agent}}`
+- **Worker model**: `{{worker_model}}`
 
 Explore the codebase freely to understand context. Do NOT ask questions you can answer by exploring (e.g., test commands, file locations, package.json contents).
 

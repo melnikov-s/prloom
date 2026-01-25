@@ -47,13 +47,12 @@ describe("requireManualResume", () => {
     const { repoRoot, logsDir } = tempRepo;
 
     writeTestConfig(repoRoot, {
-      agents: { default: "opencode" },
       github: { enabled: false },
       base_branch: "main",
       commitReview: {
         enabled: false,
-        requireManualResume: true,
       },
+      requireManualResume: true,
     });
 
     const planId = "pause-after-commit";

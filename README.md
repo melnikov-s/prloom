@@ -91,13 +91,13 @@ bun run build
 
 - `prloom init`
   - Initializes `prloom/`, ensures `prloom/.local/` is gitignored, and writes `prloom/config.json`.
-- `prloom new [plan-id] [--agent <codex|opencode|claude>]`
+- `prloom new [plan-id] [--model <preset>]`
   - Creates `prloom/.local/inbox/<id>.md` and launches an interactive designer session.
 - `prloom start`
   - Starts the dispatcher loop (ingests inbox plans, runs TODOs, polls PR feedback).
 - `prloom status`
   - Shows inbox plans and active plans tracked in `prloom/.local/state.json`.
-- `prloom edit <plan-id> [--agent <...>]`
+- `prloom edit <plan-id>`
   - Edits a plan either in inbox (pre-dispatch) or in the plan's worktree (post-dispatch).
 - `prloom stop <plan-id>` / `prloom unpause <plan-id>`
   - Pauses/resumes automation for an active plan.
@@ -236,17 +236,13 @@ Create `prloom/config.json`:
 
 ```json
 {
-  "agents": {
-    "default": "opencode",
-    "opencode": {
-      "default": "gpt-4",
-      "designer": "claude-sonnet-4-20250514",
-      "worker": "gpt-4-turbo"
-    },
-    "claude": {
-      "default": "sonnet",
-      "designer": "opus"
-    }
+  "models": {
+    "planning": { "agent": "opencode", "model": "gpt-4" },
+    "fast": { "agent": "opencode", "model": "gpt-4-turbo" }
+  },
+  "stages": {
+    "designer": "planning",
+    "worker": "fast"
   },
   "worktrees_dir": "prloom/.local/worktrees",
   "github_poll_interval_ms": 60000,
@@ -254,22 +250,14 @@ Create `prloom/config.json`:
 }
 ```
 
-### Agent Configuration
+### Model Configuration
 
-The `agents` config allows you to:
-- Set a default agent app (e.g., `opencode`, `claude`, `codex`, `gemini`)
-- Configure model preferences per agent, with stage-specific overrides
+The `models` config lets you define named presets that include the adapter (`agent`) and model name. Stage config references those presets or uses inline `{ "agent", "model" }` objects.
 
 **Structure:**
-- `agents.default`: Which agent app to use (e.g., `"opencode"`)
-- `agents.<agent>`: Model configuration for that agent
-  - `default`: Default model for all stages
-  - `designer`: Model override for the designer stage
-  - `worker`: Model override for the worker stage
-  - `reviewer`: Model override for the reviewer stage
-  - `triage`: Model override for the triage stage
-
-This design keeps model identifiers scoped to their agent (since each agent uses different model names), while making it easy to switch between agents.
+- `models.<name>`: `{ "agent": "opencode", "model": "gpt-4" }`
+- `stages.<stage>`: either a preset name (string) or an inline object
+- `stages.default`: fallback for stages without an explicit value
 
 ## Repository Context
 

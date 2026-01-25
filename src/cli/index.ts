@@ -94,15 +94,11 @@ yargs(hideBin(process.argv))
     (yargs) =>
       yargs
         .positional("plan-id", { type: "string", describe: "Plan ID" })
-        .option("agent", {
-          type: "string",
-          describe: "Coding agent to use (codex, opencode, claude, gemini, amp)",
-        })
         .option("model", {
           alias: "m",
           type: "string",
           describe:
-            "Model to use for designer agent (e.g., claude-opus-4, gemini-2.5-pro)",
+            "Model preset to use for designer stage (e.g., planning, fast)",
         })
         .option("no-designer", {
           type: "boolean",
@@ -125,7 +121,6 @@ yargs(hideBin(process.argv))
       await runNew(
         await getRepoRoot(),
         argv["plan-id"],
-        argv.agent,
         argv["no-designer"],
         argv.model,
         argv.branch,
@@ -141,10 +136,6 @@ yargs(hideBin(process.argv))
     (yargs) =>
       yargs
         .positional("plan-id", { type: "string" })
-        .option("agent", {
-          type: "string",
-          describe: "Coding agent to use (codex, opencode, claude, gemini, amp)",
-        })
         .option("no-designer", {
           type: "boolean",
           describe: "Print plan path without launching designer session",
@@ -154,7 +145,7 @@ yargs(hideBin(process.argv))
       const repoRoot = await getRepoRoot();
       const planIdInput = argv["plan-id"] as string | undefined;
       const { runEdit } = await import("./edit.js");
-      await runEdit(repoRoot, planIdInput, argv.agent, argv["no-designer"]);
+      await runEdit(repoRoot, planIdInput, argv["no-designer"]);
     }
   )
 

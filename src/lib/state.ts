@@ -7,7 +7,6 @@ import {
   unlinkSync,
   readdirSync,
 } from "fs";
-import type { AgentName } from "./adapters/index.js";
 
 // =============================================================================
 // PlanSource - External Identity Tracking
@@ -27,9 +26,6 @@ export interface PlanSource {
 }
 
 export interface PlanState {
-  /** Agent to use for this plan */
-  agent?: AgentName;
-
   /** Preset name used when plan was created */
   preset?: string;
 
@@ -320,11 +316,10 @@ export function setPlanStatus(
   repoRoot: string,
   planId: string,
   status: PlanState["status"],
-  agent?: AgentName,
 ): void {
   const state = loadState(repoRoot);
   const existing = state.plans[planId] ?? { status: "draft" };
-  state.plans[planId] = { ...existing, status, agent: agent ?? existing.agent };
+  state.plans[planId] = { ...existing, status };
   saveState(repoRoot, state);
 }
 

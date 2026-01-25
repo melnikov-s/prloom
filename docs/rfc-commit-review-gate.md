@@ -90,14 +90,14 @@ beforeTodo hooks
 
 ---
 
-### 2) New Agent Stage: `commitReview`
+### 2) New Stage: `commitReview`
 
-Add a new stage to agent config:
+Add a new stage to stage config:
 
 - Existing: `designer`, `worker`, `triage`
 - New: `commitReview`
 
-This stage allows selecting a different agent + model for the commit review gate.
+This stage allows selecting a different model preset or inline `{ agent, model }` for the commit review gate.
 
 ---
 
@@ -257,12 +257,11 @@ Add a new config block (global + preset + per-worktree override supported):
 
 ```json
 {
+  "requireManualResume": false,
   "commitReview": {
     "enabled": false,
     "maxLoops": 2,
-    "requireManualResume": false,
-    "agent": "opencode",
-    "model": "gpt-5-mini"
+    "model": "review"
   }
 }
 ```
@@ -271,8 +270,8 @@ Semantics:
 
 - `enabled`: enable commit review gate.
 - `maxLoops`: max review → fix cycles per TODO before blocking.
-- `requireManualResume`: pause the dispatcher after each commit until manually resumed.
-- `agent` / `model`: reviewer agent selection (independent from worker).
+- `model`: reviewer model preset or inline `{ agent, model }` object.
+- `requireManualResume`: pause the dispatcher after each commit until manually resumed (after commit review if enabled).
 
 Note: commit review uses the dispatcher’s existing tmux behavior (same as worker). There is no per-feature tmux toggle.
 
@@ -314,7 +313,7 @@ If `sessions.enabled` is false, prloom runs in current ephemeral mode.
 5. After approval:
    - Run `afterTodo` hooks once (pre-commit).
    - Commit and push.
-   - If `requireManualResume` is true and more TODOs remain, set status to `paused`.
+    - If `requireManualResume` is true and more TODOs remain, set status to `paused`.
 
 ---
 
